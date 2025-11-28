@@ -1,85 +1,151 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
-import { IconRobot, IconSend, IconCpu } from "@tabler/icons-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  IconRobot, IconSend, IconCpu, IconPlus, IconTrash, 
+  IconMessage, IconMenu2, IconX, IconDeviceFloppy 
+} from "@tabler/icons-react";
+import { 
+  collection, addDoc, query, orderBy, onSnapshot, 
+  deleteDoc, doc, updateDoc, serverTimestamp 
+} from "firebase/firestore";
+import { db } from "../lib/firebase"; // تأكد أن مسار الاستيراد صحيح
 
+// مفتاحك المباشر
 const API_KEY = "AIzaSyDi8-POg6RGCoBCkni6_8XNikJvTmH4z3M";
 
 export default function AITutor({ user }) {
-  const userName = user?.email?.split('@')[0] || 'Operative';
-  
-  // سنخزن اسم الموديل هنا لنعرضه لك
-  const [activeModel, setActiveModel] = useState(null);
-  
-  const [messages, setMessages] = useState([
-    { role: "model", text: `Scanning available AI Cores...` }
-  ]);
+  // --- الحالات (State) ---
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // إدارة المحادثات
+  const [sessions, setSessions] = useState([]); // قائمة المحادثات المحفوظة
+  const [currentSessionId, setCurrentSessionId] = useState(null); // المحادثة الحالية
+  const [messages, setMessages] = useState([]); // رسائل المحادثة الحالية
+
   const scrollRef = useRef(null);
 
-  // البحث التلقائي عن الموديل
+  // 1. جلب قائمة المحادثات السابقة من Firebase
   useEffect(() => {
-    const findBestModel = async () => {
-      try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`);
-        const data = await res.json();
-        
-        if (data.error) throw new Error(data.error.message);
+    if (!user) return;
+    
+    // جلب المحادثات الخاصة بالمستخدم فقط
+    const q = query(
+      collection(db, "users", user.uid, "ai_chats"), 
+      orderBy("createdAt", "desc")
+    );
 
-        const chatModels = data.models.filter(m => m.supportedGenerationMethods.includes("generateContent"));
-        
-        // البحث عن أفضل موديل (فلاش أو برو)
-        let bestModel = chatModels.find(m => m.name.includes("flash")) || 
-                        chatModels.find(m => m.name.includes("pro")) || 
-                        chatModels[0];
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const loadedSessions = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setSessions(loadedSessions);
+    });
 
-        if (bestModel) {
-          setActiveModel(bestModel.name); // حفظ اسم الموديل
-          setMessages(prev => [
-            { role: "model", text: `System Online. Connected to: [${bestModel.displayName}].\nأهلاً بك أيها العميل ${userName}. أنا جاهز لتعليمك الروسية.` }
-          ]);
+    return () => unsubscribe();
+  }, [user]);
+
+  // 2. تحميل رسائل المحادثة المختارة
+  useEffect(() => {
+    if (!currentSessionId && sessions.length > 0) {
+        // لا تختار تلقائياً، اترك المستخدم يختار أو ينشئ جديداً
+        // setMessages([]); 
+    } else if (currentSessionId) {
+        const session = sessions.find(s => s.id === currentSessionId);
+        if (session) {
+            setMessages(session.messages || []);
         }
-      } catch (err) {
-        setMessages(prev => [{ role: "model", text: `⚠️ Error: ${err.message}` }]);
-      }
-    };
-    findBestModel();
-  }, []);
+    }
+  }, [currentSessionId, sessions]);
 
+  // 3. السكرول التلقائي لآخر رسالة
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  // --- الوظائف (Actions) ---
+
+  const startNewChat = () => {
+    setCurrentSessionId(null);
+    setMessages([]);
+    setSidebarOpen(false);
+  };
+
+  const deleteChat = async (e, chatId) => {
+    e.stopPropagation(); // منع فتح الشات عند الضغط على الحذف
+    if(!confirm("Are you sure you want to delete this memory data?")) return;
+    
+    await deleteDoc(doc(db, "users", user.uid, "ai_chats", chatId));
+    if (currentSessionId === chatId) {
+        startNewChat();
+    }
+  };
+
+  const saveToFirebase = async (newMessages, generatedTitle = null) => {
+    if (!user) return;
+
+    // إذا كانت محادثة جديدة
+    if (!currentSessionId) {
+        const title = generatedTitle || newMessages[0].text.substring(0, 30) + "...";
+        const docRef = await addDoc(collection(db, "users", user.uid, "ai_chats"), {
+            createdAt: serverTimestamp(),
+            title: title,
+            messages: newMessages
+        });
+        setCurrentSessionId(docRef.id);
+    } else {
+        // تحديث محادثة موجودة
+        const chatRef = doc(db, "users", user.uid, "ai_chats", currentSessionId);
+        await updateDoc(chatRef, {
+            messages: newMessages,
+            lastUpdate: serverTimestamp()
+        });
+    }
+  };
+
   const sendMessage = async () => {
-    if (!input.trim() || loading || !activeModel) return;
+    if (!input.trim() || loading) return;
 
     const userMsg = input;
-    setInput(""); 
-    setMessages(prev => [...prev, { role: "user", text: userMsg }]);
+    setInput("");
+    
+    // تحديث الواجهة فوراً
+    const updatedMessages = [...messages, { role: "user", text: userMsg }];
+    setMessages(updatedMessages);
     setLoading(true);
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/${activeModel}:generateContent?key=${API_KEY}`;
-
-      // --- التغيير الجوهري هنا في التعليمات (Prompt) ---
-      const promptText = `
-        You are "Russian Master AI", a specialized tutor teaching Russian to Arabic speakers.
-        
-        Instructions:
-        1. If the user speaks Arabic, reply in Arabic and explain the concept.
-        2. If the user speaks Russian, correct their mistakes and translate to Arabic.
-        3. Keep the tone: Professional, Cyberpunk style (use terms like "يا بطل", "العملية", "تحليل").
-        4. Be concise and helpful.
-        
-        User Message: ${userMsg}
-      `;
-
-      const response = await fetch(url, {
+      // إرسال الطلب لجوجل
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
+        {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }]
+            contents: [
+              {
+                parts: [
+                  { 
+                    // --- التعديل هنا: تعليمات مرنة جداً ---
+                    text: `
+                      You are "Russian Master AI", a highly intelligent assistant with a Cyberpunk personality.
+                      
+                      CORE DIRECTIVES:
+                      1. ANSWER ANY QUESTION the user asks, in ANY language they use.
+                      2. If the user asks about Russian language, be a strict tutor.
+                      3. If the user asks about programming, life, history, or chat casually, answer helpfully and normally.
+                      4. TONE: Professional, slightly futuristic, helpful.
+                      
+                      User History: ${JSON.stringify(messages.slice(-5))}
+                      Current Message: ${userMsg}
+                    ` 
+                  }
+                ]
+              }
+            ]
           }),
         }
       );
@@ -88,9 +154,15 @@ export default function AITutor({ user }) {
       if (data.error) throw new Error(data.error.message);
 
       const botReply = data.candidates[0].content.parts[0].text;
-      setMessages(prev => [...prev, { role: "model", text: botReply }]);
+      const finalMessages = [...updatedMessages, { role: "model", text: botReply }];
+      
+      setMessages(finalMessages);
+      
+      // حفظ في قاعدة البيانات
+      await saveToFirebase(finalMessages);
 
     } catch (err) {
+      console.error(err);
       setMessages(prev => [...prev, { role: "model", text: `⚠️ Error: ${err.message}` }]);
     } finally {
       setLoading(false);
@@ -98,60 +170,138 @@ export default function AITutor({ user }) {
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-4 pb-24 md:pb-4 relative overflow-hidden font-sans">
+    <div className="w-full h-full flex bg-[#050505] overflow-hidden relative font-sans text-white">
       
-      <div className="w-full max-w-4xl bg-cyan-950/40 border border-cyan-500/30 p-4 rounded-t-2xl flex items-center gap-4 backdrop-blur-md z-10">
-        <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center border border-cyan-400 shadow-[0_0_10px_#06b6d4]">
-            <IconRobot size={28} className="text-cyan-400 animate-pulse" />
+      {/* --- Sidebar (History) --- */}
+      <div className={`
+        fixed md:relative z-30 w-72 h-full bg-[#0a0a0a] border-r border-white/10 flex flex-col transition-transform duration-300
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
+        <div className="p-4 border-b border-white/10 flex justify-between items-center">
+            <h2 className="font-black tracking-widest text-cyan-500">DATA LOGS</h2>
+            <button onClick={() => setSidebarOpen(false)} className="md:hidden"><IconX/></button>
         </div>
-        <div>
-            <h2 className="text-xl font-black text-white tracking-widest">AI MENTOR</h2>
-            {/* هنا سيظهر اسم الموديل الذي تسأل عنه */}
-            <p className="text-[10px] text-cyan-400/60 font-mono uppercase">
-                CORE: {activeModel ? activeModel.replace('models/', '').toUpperCase() : "SCANNING..."}
-            </p>
+
+        <div className="p-3">
+            <button 
+                onClick={startNewChat}
+                className="w-full py-3 bg-cyan-900/20 border border-cyan-500/50 rounded-xl flex items-center justify-center gap-2 hover:bg-cyan-500/20 transition-all text-cyan-400 font-bold text-sm"
+            >
+                <IconPlus size={18}/> NEW SESSION
+            </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+            {sessions.map(session => (
+                <div 
+                    key={session.id}
+                    onClick={() => { setCurrentSessionId(session.id); setSidebarOpen(false); }}
+                    className={`group p-3 rounded-lg flex items-center justify-between cursor-pointer transition-all border ${
+                        currentSessionId === session.id 
+                        ? 'bg-white/10 border-cyan-500/50 text-white' 
+                        : 'bg-transparent border-transparent hover:bg-white/5 text-white/50'
+                    }`}
+                >
+                    <div className="flex items-center gap-3 truncate">
+                        <IconMessage size={16} />
+                        <span className="text-xs truncate max-w-[140px] font-mono">
+                            {session.title || "Unknown Data"}
+                        </span>
+                    </div>
+                    <button 
+                        onClick={(e) => deleteChat(e, session.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-opacity"
+                    >
+                        <IconTrash size={14} />
+                    </button>
+                </div>
+            ))}
         </div>
       </div>
 
-      <div className="flex-1 w-full max-w-4xl bg-black/80 border-x border-cyan-500/20 backdrop-blur-sm overflow-y-auto custom-scrollbar p-4 space-y-6 relative">
-         {messages.map((msg, i) => {
-             const isBot = msg.role === "model";
-             return (
-                 <motion.div 
-                    key={i} 
-                    initial={{ opacity: 0, y: 10, x: isBot ? -10 : 10 }}
-                    animate={{ opacity: 1, y: 0, x: 0 }}
-                    className={`flex ${isBot ? 'justify-start' : 'justify-end'}`}
-                 >
-                     <div className={`max-w-[85%] md:max-w-[70%] p-4 rounded-2xl border backdrop-blur-md shadow-lg ${
-                         isBot ? 'bg-cyan-950/30 border-cyan-500/30 rounded-tl-none text-cyan-50' : 'bg-purple-950/30 border-purple-500/30 rounded-tr-none text-purple-50'
-                     }`}>
-                         <div className={`text-[9px] font-bold mb-2 uppercase tracking-widest flex items-center gap-1 ${isBot ? 'text-cyan-400' : 'text-purple-400'}`}>
-                             {isBot ? <IconCpu size={10}/> : null}
-                             {isBot ? "AI CORE" : "OPERATIVE"}
-                         </div>
-                         <p className="whitespace-pre-wrap leading-relaxed text-sm md:text-base font-mono" dir="auto">{msg.text}</p>
-                     </div>
-                 </motion.div>
-             )
-         })}
-         <div ref={scrollRef} className="h-4" />
-      </div>
+      {/* --- Main Chat Area --- */}
+      <div className="flex-1 flex flex-col h-full relative w-full">
+        
+        {/* Header */}
+        <div className="h-16 border-b border-white/10 bg-[#0a0a0a]/80 backdrop-blur flex items-center px-4 justify-between shrink-0 z-20">
+            <div className="flex items-center gap-3">
+                <button onClick={() => setSidebarOpen(true)} className="md:hidden text-white/50"><IconMenu2/></button>
+                <div className="w-8 h-8 rounded-full bg-cyan-900/20 border border-cyan-500/50 flex items-center justify-center">
+                    <IconRobot size={18} className="text-cyan-400" />
+                </div>
+                <div>
+                    <h3 className="font-bold text-sm">AI MENTOR V2</h3>
+                    <p className="text-[10px] text-white/30 uppercase">
+                        {currentSessionId ? "Session Recorded" : "Unsaved Channel"}
+                    </p>
+                </div>
+            </div>
+        </div>
 
-      <div className="w-full max-w-4xl bg-[#050505] border border-cyan-500/30 p-4 rounded-b-2xl z-10 flex gap-3 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-          <input 
-            type="text" 
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-            disabled={!activeModel}
-            placeholder={activeModel ? "اكتب رسالتك هنا..." : "جاري الاتصال..."} 
-            className="flex-1 bg-[#111] border border-white/10 rounded-xl px-5 py-4 text-white outline-none focus:border-cyan-500 transition-all font-mono text-sm text-right"
-            dir="auto"
-          />
-          <button onClick={sendMessage} disabled={loading || !activeModel} className="bg-cyan-600 hover:bg-cyan-500 text-white p-4 rounded-xl transition-all disabled:opacity-50">
-              <IconSend size={24} />
-          </button>
+        {/* Messages List (Scrollable) */}
+        {/* السر هنا: flex-1 مع overflow-y-auto يسمح بالسكرول داخل هذا الجزء فقط */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+            {messages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-white/20">
+                    <IconCpu size={64} stroke={1} className="mb-4 animate-pulse"/>
+                    <p className="text-sm tracking-widest uppercase">System Ready.</p>
+                    <p className="text-xs mt-2">Ask me anything in any language.</p>
+                </div>
+            ) : (
+                messages.map((msg, i) => (
+                    <motion.div 
+                        key={i} 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex ${msg.role === "model" ? 'justify-start' : 'justify-end'}`}
+                    >
+                        <div className={`max-w-[85%] md:max-w-[70%] p-4 rounded-2xl border ${
+                            msg.role === "model"
+                            ? 'bg-[#111] border-white/10 text-gray-200 rounded-tl-none'
+                            : 'bg-cyan-900/20 border-cyan-500/30 text-cyan-100 rounded-tr-none'
+                        }`}>
+                            <div className="text-[10px] font-bold opacity-40 mb-2 uppercase flex gap-2">
+                                {msg.role === "model" ? "AI CORE" : "YOU"}
+                            </div>
+                            <p className="whitespace-pre-wrap leading-relaxed text-sm">{msg.text}</p>
+                        </div>
+                    </motion.div>
+                ))
+            )}
+            
+            {loading && (
+                <div className="flex justify-start">
+                    <div className="bg-white/5 px-4 py-2 rounded-full text-xs text-cyan-400 animate-pulse border border-cyan-500/20">
+                        Thinking...
+                    </div>
+                </div>
+            )}
+            {/* عنصر وهمي للنزول إليه */}
+            <div ref={scrollRef} className="h-4" />
+        </div>
+
+        {/* Input Area (Fixed Bottom) */}
+        <div className="p-4 bg-[#0a0a0a] border-t border-white/10 shrink-0">
+            <div className="flex gap-2 max-w-4xl mx-auto">
+                <input 
+                    type="text" 
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                    placeholder="اكتب رسالتك هنا..." 
+                    className="flex-1 bg-[#151515] border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-cyan-500 transition-all font-mono text-sm"
+                    dir="auto"
+                />
+                <button 
+                    onClick={sendMessage}
+                    disabled={loading}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-white p-3 rounded-xl transition-all disabled:opacity-50"
+                >
+                    <IconSend size={20} />
+                </button>
+            </div>
+        </div>
+
       </div>
     </div>
   );
