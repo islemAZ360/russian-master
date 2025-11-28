@@ -11,7 +11,8 @@ import {
   IconLock, 
   IconAlertTriangle, 
   IconServer,
-  IconMessageCircle 
+  IconMessageCircle,
+  IconRobot // تم إضافة أيقونة الروبوت
 } from '@tabler/icons-react';
 
 // --- استيراد المكونات ---
@@ -20,8 +21,8 @@ import { CategorySelect } from '../components/CategorySelect';
 import { StudyCard } from '../components/StudyCard';
 import { AuthScreen } from '../components/AuthScreen';
 import { DataManager } from '../components/DataManager';
-import CyberDeck from '../components/CyberDeck'; // بديل Leaderboard
-import CommunicationHub from '../components/CommunicationHub'; // الشات الجديد
+import CyberDeck from '../components/CyberDeck'; 
+import CommunicationHub from '../components/CommunicationHub'; 
 import SettingsView from '../components/SettingsView';
 import AdminDashboard from '../components/AdminDashboard';
 import { FloatingDock } from '../components/ui/floating-dock';
@@ -29,13 +30,13 @@ import DigitalRain from '../components/ui/DigitalRain';
 import IntroSequence from '../components/IntroSequence'; 
 import { BossBattleWrapper } from '../components/BossBattleWrapper'; 
 import DailyReward from '../components/DailyReward';
+import AITutor from '../components/AITutor'; // --- تم استيراد مكون البوت الجديد ---
 
 // --- المكتبات والخطافات (Hooks) ---
 import { useStudySystem } from '../hooks/useStudySystem';
 import { useAudio } from '../hooks/useAudio';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from "firebase/auth";
-// تصحيح: دمج جميع استيرادات فيربيس في سطر واحد لمنع الأخطاء
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 
 export default function RussianApp() {
@@ -77,7 +78,7 @@ export default function RussianApp() {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
         setUser(u);
         setLoadingAuth(false);
-        if (u) setShowDailyReward(true); // تفعيل المكافأة عند الدخول
+        if (u) setShowDailyReward(true); 
     });
     return () => unsubscribe();
   }, []);
@@ -156,7 +157,10 @@ export default function RussianApp() {
   // --- بناء القائمة السفلية (Navigation Dock) ---
   let navLinks = [
     { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
-    { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') }, // أيقونة الشات
+    // --- الزر الجديد: AI Mentor ---
+    { title: "AI Mentor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => setCurrentView('ai-tutor') },
+    
+    { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
     { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
     { title: "Archive", icon: <IconDatabase className="w-full text-emerald-400" />, onClick: () => setCurrentView('data') }, 
     { title: "ID Card", icon: <IconTrophy className="w-full text-yellow-500" />, onClick: () => setCurrentView('leaderboard') },
@@ -169,7 +173,6 @@ export default function RussianApp() {
 
   // --- محول العرض (View Switcher) ---
   const renderContent = () => {
-    // حماية الأدمن
     if (currentView === 'admin' && isAdmin) return <AdminDashboard />;
     if (currentView === 'admin' && !isAdmin) return <HeroSection onStart={() => setCurrentView('category')} user={user} />;
 
@@ -177,8 +180,12 @@ export default function RussianApp() {
       case 'home': 
         return <HeroSection onStart={() => setCurrentView('category')} user={user} />;
       
+      // --- عرض صفحة البوت ---
+      case 'ai-tutor':
+        return <AITutor user={user} />;
+      
       case 'chat':
-        return <CommunicationHub user={user} />; // صفحة الشات الجديدة
+        return <CommunicationHub user={user} />;
       
       case 'category': 
         return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
@@ -215,8 +222,7 @@ export default function RussianApp() {
       case 'data': 
         return <DataManager cards={cards} onAdd={addCard} onDelete={deleteCard} onUpdate={updateCard} />;
       
-case 'leaderboard': 
-        // حماية البيانات: نمرر كائنات فارغة إذا لم تكن البيانات جاهزة بعد
+      case 'leaderboard': 
         return (
             <CyberDeck 
                 user={user || { email: 'Guest' }} 
