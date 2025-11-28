@@ -1,10 +1,20 @@
+"use client";
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { IconTrash, IconPencil, IconSearch, IconDatabase, IconCpu } from "@tabler/icons-react";
+import { IconTrash, IconPencil, IconSearch, IconDatabase, IconCpu, IconWand, IconLoader } from "@tabler/icons-react";
 
-export function DataManager({ onAdd, onDelete, onUpdate, cards }) {
+// المفتاح المباشر (لأننا في بيئة Client)
+const API_KEY = "AIzaSyDi8-POg6RGCoBCkni6_8XNikJvTmH4z3M";
+
+export function DataManager({ onAdd, onDelete, onUpdate, cards, isJunior }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
+  
+  // حالات الإضافة
+  const [newCard, setNewCard] = useState({ russian: "", arabic: "", category: "General" });
+  const [aiLoading, setAiLoading] = useState(false);
+
+  // حالات التعديل
   const [editingId, setEditingId] = useState(null);
   const [editRus, setEditRus] = useState("");
   const [editAra, setEditAra] = useState("");
@@ -19,112 +29,167 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards }) {
       });
   }, [cards, search, filter]);
 
-  // --- دوال التعديل ---
+  // --- دالة الذكاء الاصطناعي السحرية ---
+  const handleAiAutoFill = async () => {
+      if (!newCard.russian) return alert("Write the Russian word first!");
+      setAiLoading(true);
+      try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{
+                  parts: [{ 
+                    text: `Analyze this Russian text: "${newCard.russian}". 
+                           Return ONLY a JSON object with: 
+                           { "arabic": "translation", "category": "one_word_category (e.g. Verbs, Nouns, Tech, Slang)" }` 
+                  }]
+                }]
+              }),
+            }
+          );
+          const data = await response.json();
+          let text = data.candidates[0].content.parts[0].text;
+          // تنظيف النص للحصول على JSON فقط
+          text = text.replace(/```json|```/g, "").trim();
+          const result = JSON.parse(text);
+          
+          setNewCard({ ...newCard, arabic: result.arabic, category: result.category });
+      } catch (e) {
+          alert("AI Error: " + e.message);
+      } finally {
+          setAiLoading(false);
+      }
+  };
+
+  const handleAddSubmit = () => {
+      if(newCard.russian && newCard.arabic) {
+          onAdd(newCard);
+          setNewCard({ russian: "", arabic: "", category: "General" });
+      }
+  };
+
   const startEdit = (card) => { setEditingId(card.id); setEditRus(card.russian); setEditAra(card.arabic); };
   const saveEdit = () => { onUpdate(editingId, editRus, editAra); setEditingId(null); };
 
   return (
-    // التغيير هنا: h-screen لملء الشاشة، و overflow-hidden لمنع تمرير الصفحة بالكامل
-    <div className="w-full h-screen flex flex-col p-6 overflow-hidden relative">
+    // pb-32 هنا ضرورية جداً لكي لا يغطي الشريط السفلي على آخر العناصر
+    <div className="w-full h-full flex flex-col p-6 overflow-hidden relative pb-32">
       
-      {/* Header Fixed */}
-      <div className="flex flex-col md:flex-row justify-between items-end mb-6 shrink-0 z-10">
-        <div>
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3">
-                <IconDatabase size={40} className="text-cyan-500 animate-pulse" />
-                <div>
-                    <h1 className="text-4xl font-black text-white tracking-tighter">
-                        NEURAL<span className="text-cyan-500">_</span>DATA
-                    </h1>
-                    {/* إصلاح: عداد الكلمات الإجمالي */}
-                    <div className="flex items-center gap-2 text-cyan-400/60 text-xs font-mono tracking-widest mt-1">
-                        <IconCpu size={12}/> 
-                        <span>TOTAL UNITS: <span className="text-white font-bold text-lg">{cards.length}</span></span>
-                        <span>|</span>
-                        <span>FILTERED: <span className="text-white font-bold">{filteredCards.length}</span></span>
-                    </div>
-                </div>
-            </motion.div>
+      {/* Header & Add Section (للمسؤولين فقط أو الجميع حسب رغبتك) */}
+      <div className="flex flex-col gap-6 mb-6 shrink-0 z-10 bg-[#0a0a0a]/90 p-6 rounded-2xl border border-white/10 backdrop-blur-md">
+        <div className="flex items-center gap-3">
+            <IconDatabase size={32} className="text-cyan-500" />
+            <h1 className="text-2xl font-black text-white">NEURAL ARCHIVE</h1>
         </div>
 
-        {/* Search */}
-        <div className="w-full md:w-80 mt-4 md:mt-0">
-             <div className="relative group">
-                <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-cyan-400 transition-colors" size={20} />
+        {/* نموذج الإضافة الذكي */}
+        <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex-1 relative">
                 <input 
-                    type="text" 
-                    placeholder="SCAN DATABASE..." 
-                    className="w-full bg-cyan-900/10 border border-cyan-500/30 rounded-none border-l-2 border-r-2 border-t-0 border-b-0 py-3 pl-12 pr-4 text-white focus:bg-cyan-900/20 outline-none transition-all font-mono text-sm"
-                    value={search} 
-                    onChange={(e) => setSearch(e.target.value)} 
+                    value={newCard.russian} 
+                    onChange={e => setNewCard({...newCard, russian: e.target.value})}
+                    placeholder="Russian Word..." 
+                    className="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none focus:border-cyan-500"
                 />
-                {/* زخرفة تقنية */}
-                <div className="absolute bottom-0 left-0 w-full h-[1px] bg-cyan-500/50 group-focus-within:bg-cyan-400 group-focus-within:shadow-[0_0_10px_#06b6d4] transition-all"></div>
+                {/* زر الذكاء الاصطناعي */}
+                <button 
+                    onClick={handleAiAutoFill}
+                    disabled={aiLoading || !newCard.russian}
+                    className="absolute right-2 top-2 p-1.5 bg-purple-600/20 text-purple-400 rounded-lg hover:bg-purple-600 hover:text-white transition-all disabled:opacity-50"
+                    title="AI Auto-Fill"
+                >
+                    {aiLoading ? <IconLoader className="animate-spin" size={18}/> : <IconWand size={18}/>}
+                </button>
             </div>
+            
+            <input 
+                value={newCard.arabic} 
+                onChange={e => setNewCard({...newCard, arabic: e.target.value})}
+                placeholder="Translation (Auto)" 
+                className="flex-1 bg-black border border-white/20 p-3 rounded-xl text-white outline-none focus:border-cyan-500 dir-rtl"
+            />
+            
+            <input 
+                value={newCard.category} 
+                onChange={e => setNewCard({...newCard, category: e.target.value})}
+                placeholder="Category" 
+                className="w-full md:w-32 bg-black border border-white/20 p-3 rounded-xl text-white outline-none focus:border-cyan-500"
+            />
+            
+            <button onClick={handleAddSubmit} className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-6 py-3 rounded-xl shadow-lg transition-all">
+                ADD
+            </button>
         </div>
       </div>
 
-      {/* Filter Chips */}
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-4 shrink-0 custom-scrollbar z-10">
-        {categories.map(cat => (
-            <button
-                key={cat}
-                onClick={() => setFilter(cat)}
-                className={`px-4 py-1 text-[10px] font-bold uppercase tracking-widest border transition-all skew-x-[-10deg] ${
-                    filter === cat 
-                    ? "bg-cyan-500 text-black border-cyan-500" 
-                    : "bg-transparent text-cyan-500 border-cyan-500/30 hover:border-cyan-500 hover:text-white"
-                }`}
-            >
-                <span className="skew-x-[10deg] inline-block">{cat}</span>
-            </button>
-        ))}
+      {/* Search & Filter */}
+      <div className="flex flex-col gap-4 mb-4 shrink-0 z-10">
+         <div className="relative group">
+            <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" size={20} />
+            <input 
+                type="text" 
+                placeholder="SCAN DATABASE..." 
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:bg-white/10 outline-none font-mono text-sm"
+                value={search} 
+                onChange={(e) => setSearch(e.target.value)} 
+            />
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+            {categories.map(cat => (
+                <button
+                    key={cat}
+                    onClick={() => setFilter(cat)}
+                    className={`px-4 py-1 text-[10px] font-bold uppercase rounded-full border transition-all whitespace-nowrap ${
+                        filter === cat ? "bg-cyan-600 border-cyan-500 text-white" : "bg-transparent text-cyan-500 border-cyan-500/30"
+                    }`}
+                >
+                    {cat}
+                </button>
+            ))}
+        </div>
       </div>
 
-      {/* Grid Container - Scrollable Area */}
-      {/* التغيير الجوهري: هذا الكونتينر هو الوحيد الذي يقبل التمرير */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-32">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            <AnimatePresence mode="popLayout">
+      {/* Scrollable List */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-20">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <AnimatePresence>
                 {filteredCards.map((card, i) => (
                     <motion.div 
                         layout
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
-                        transition={{ duration: 0.2, delay: i * 0.02 }}
                         key={card.id} 
-                        className="group relative bg-black/40 border border-white/5 p-5 hover:border-cyan-500/50 transition-all hover:bg-cyan-900/10"
+                        className="group relative bg-[#0f0f0f] border border-white/5 p-5 rounded-2xl hover:border-cyan-500/50 transition-all hover:shadow-[0_0_20px_rgba(6,182,212,0.1)]"
                     >
-                        {/* زوايا تقنية للبطاقة */}
-                        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-
                         {editingId === card.id ? (
                             <div className="flex flex-col gap-2 relative z-10">
-                                <input value={editRus} onChange={(e) => setEditRus(e.target.value)} className="bg-white/5 border border-cyan-500/50 p-2 text-white outline-none font-bold text-sm" autoFocus />
-                                <input value={editAra} onChange={(e) => setEditAra(e.target.value)} className="bg-white/5 border border-emerald-500/50 p-2 text-white text-right outline-none font-cairo text-sm" />
+                                <input value={editRus} onChange={(e) => setEditRus(e.target.value)} className="bg-black border border-cyan-500 p-2 rounded text-white" />
+                                <input value={editAra} onChange={(e) => setEditAra(e.target.value)} className="bg-black border border-emerald-500 p-2 rounded text-white text-right" />
                                 <div className="flex gap-2 mt-2">
-                                    <button onClick={saveEdit} className="flex-1 bg-emerald-500/20 text-emerald-400 py-1 text-[10px] font-bold hover:bg-emerald-500/30">SAVE</button>
-                                    <button onClick={() => setEditingId(null)} className="flex-1 bg-white/5 text-white/40 py-1 text-[10px] font-bold hover:bg-white/10">CANCEL</button>
+                                    <button onClick={saveEdit} className="flex-1 bg-emerald-600 text-white py-1 rounded text-xs">SAVE</button>
+                                    <button onClick={() => setEditingId(null)} className="flex-1 bg-gray-700 text-white py-1 rounded text-xs">CANCEL</button>
                                 </div>
                             </div>
                         ) : (
                             <>
-                                <div className="flex justify-between items-start mb-4 relative z-10">
-                                    <span className="text-[9px] font-mono text-cyan-500/40 uppercase truncate max-w-[70%]">
-                                        //{card.category || "NULL"}
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-cyan-400 font-mono uppercase truncate max-w-[70%]">
+                                        {card.category}
                                     </span>
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => startEdit(card)} className="text-blue-400 hover:text-white transition-colors"><IconPencil size={14} /></button>
-                                        <button onClick={() => onDelete(card.id)} className="text-red-400 hover:text-white transition-colors"><IconTrash size={14} /></button>
-                                    </div>
+                                    {/* إظهار أزرار التحكم فقط إذا كان جونيور أو أدمن */}
+                                    {isJunior && (
+                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => startEdit(card)} className="text-blue-400 hover:bg-blue-900/30 p-1 rounded"><IconPencil size={16} /></button>
+                                            <button onClick={() => onDelete(card.id)} className="text-red-400 hover:bg-red-900/30 p-1 rounded"><IconTrash size={16} /></button>
+                                        </div>
+                                    )}
                                 </div>
-
-                                <div className="relative z-10">
-                                    <h3 className="text-lg font-bold text-white mb-1">{card.russian}</h3>
-                                    <p className="text-md text-cyan-200/60 dir-rtl font-cairo">{card.arabic}</p>
-                                </div>
+                                <h3 className="text-xl font-bold text-white mb-1">{card.russian}</h3>
+                                <p className="text-md text-gray-400 dir-rtl font-cairo">{card.arabic}</p>
                             </>
                         )}
                     </motion.div>
