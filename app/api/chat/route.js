@@ -1,57 +1,58 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
-import { fullDatabase } from "@/data/fullDatabase"; 
+// سنحاول استيراد قاعدة البيانات، وإذا فشلت لن نوقف الكود
+let fullDatabase = [];
+try {
+  const dbModule = require("@/data/fullDatabase");
+  fullDatabase = dbModule.fullDatabase || [];
+} catch (e) {
+  console.log("⚠️ تحذير: لم يتم العثور على قاعدة البيانات، سنعمل بدونها.");
+}
 
 export async function POST(req) {
+  console.log("--- 1. بدء طلب الشات (Server Start) ---");
+
   try {
-    console.log("--- 1. بدء طلب جديد ---");
-    
-    // 1. التأكد من وصول البيانات من الفرونت إند
-    const body = await req.json();
-    console.log("--- 2. البيانات المستلمة:", { 
-        message: body.message, 
-        modelName: body.modelName,
-        historyLength: body.history?.length 
-    });
-
-    // 2. التأكد من قراءة المفتاح
+    // 1. فحص المفتاح
     const apiKey = process.env.GEMINI_API_KEY;
+    console.log("--- 2. حالة المفتاح:", apiKey ? "✅ موجود" : "❌ مفقود");
+    
     if (!apiKey) {
-      console.error("--- ❌ خطأ: المفتاح غير موجود في process.env ---");
-      return NextResponse.json({ error: "API Key Missing on Server" }, { status: 500 });
+      return NextResponse.json({ error: "API Key is missing in .env.local" }, { status: 500 });
     }
-    console.log("--- 3. المفتاح موجود (تمت قراءته بنجاح) ---");
 
+    // 2. استلام البيانات
+    const body = await req.json();
+    const { message, history, modelName } = body;
+    console.log("--- 3. الرسالة المستلمة:", message);
+    console.log("--- 4. الموديل المطلوب:", modelName);
+
+    // 3. الاتصال بجوجل
     const genAI = new GoogleGenerativeAI(apiKey);
-    const selectedModel = body.modelName || "gemini-1.5-flash";
+    const selectedModel = modelName || "gemini-1.5-flash";
     const model = genAI.getGenerativeModel({ model: selectedModel });
 
-    const categories = fullDatabase 
-      ? [...new Set(fullDatabase.map(item => item.category))].join(", ")
-      : "General Russian";
-    
-    const systemPrompt = `You are a strict Russian tutor. User is studying: [${categories}]. Reply in Russian then English.`;
-
-    console.log(`--- 4. جاري الاتصال بجوجل باستخدام موديل: ${selectedModel} ---`);
+    const systemPrompt = `You are a Russian Tutor. Reply concisely.`;
 
     const chat = model.startChat({
       history: [
         { role: "user", parts: [{ text: systemPrompt }] },
         { role: "model", parts: [{ text: "Ready." }] },
-        ...(body.history || [])
+        ...(history || [])
       ],
     });
 
-    const result = await chat.sendMessage(body.message);
+    console.log("--- 5. جاري إرسال الرسالة إلى Google... ---");
+    const result = await chat.sendMessage(message);
     const response = await result.response;
     const text = response.text();
-
-    console.log("--- 5. تم استلام الرد من جوجل بنجاح ---");
+    
+    console.log("--- 6. تم استلام الرد بنجاح! ---");
     return NextResponse.json({ reply: text });
 
   } catch (error) {
-    // هذا سيطبع الخطأ الحقيقي في التيرمينال عندك
-    console.error("--- ❌❌ خطأ فادح في السيرفر:", error);
-    return NextResponse.json({ error: error.message || "Unknown Error" }, { status: 500 });
+    // هذا هو أهم جزء، سيطبع سبب المشكلة في التيرمينال
+    console.error("❌❌ خطأ فادح في السيرفر:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
