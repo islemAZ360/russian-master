@@ -7,16 +7,15 @@ import {
   IconMessageCircle, IconRobot 
 } from '@tabler/icons-react';
 
-// --- استيراد المكونات ---
 import { HeroSection } from '../components/HeroSection';
 import { CategorySelect } from '../components/CategorySelect';
 import { StudyCard } from '../components/StudyCard';
 import { AuthScreen } from '../components/AuthScreen';
-import { DataManager } from '../components/DataManager'; // تم تحديثه
+import { DataManager } from '../components/DataManager'; 
 import CyberDeck from '../components/CyberDeck'; 
 import CommunicationHub from '../components/CommunicationHub'; 
-import SettingsView from '../components/SettingsView'; // تم تحديثه
-import AdminDashboard from '../components/AdminDashboard'; // تم تحديثه
+import SettingsView from '../components/SettingsView'; 
+import AdminDashboard from '../components/AdminDashboard'; 
 import AITutor from '../components/AITutor';
 import { FloatingDock } from '../components/ui/floating-dock';
 import DigitalRain from '../components/ui/DigitalRain'; 
@@ -28,11 +27,14 @@ import { useStudySystem } from '../hooks/useStudySystem';
 import { useAudio } from '../hooks/useAudio';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, onSnapshot, updateDoc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, setDoc, getDoc } from "firebase/firestore";
+
+// الإيميل الرئيسي (السوبر أدمن)
+const MASTER_EMAIL = "islamaz@bomba.com";
 
 export default function RussianApp() {
   const [user, setUser] = useState(null);
-  const [userData, setUserData] = useState(null); // بيانات المستخدم مع الرتبة
+  const [userData, setUserData] = useState(null); 
   const [currentView, setCurrentView] = useState('home');
   const [activeCategory, setActiveCategory] = useState("All");
   const [showIntro, setShowIntro] = useState(true); 
@@ -51,13 +53,23 @@ export default function RussianApp() {
 
   const { speak, playSFX } = useAudio();
 
-  // مراقبة المستخدم والرتبة
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
         if (u) {
             setUser(u);
             const userRef = doc(db, "users", u.uid);
-            // مراقبة بيانات المستخدم الحية (للرتب والحظر)
+            
+            // --- تصحيح صلاحيات السوبر أدمن تلقائياً ---
+            if (u.email === MASTER_EMAIL) {
+                const snap = await getDoc(userRef);
+                if (snap.exists() && snap.data().role !== 'admin') {
+                    await updateDoc(userRef, { role: 'admin' });
+                } else if (!snap.exists()) {
+                    await setDoc(userRef, { email: u.email, role: 'admin', xp: 0 });
+                }
+            }
+            // -------------------------------------------
+
             onSnapshot(userRef, (docSnap) => {
                 if (docSnap.exists()) {
                     setUserData(docSnap.data());
@@ -77,7 +89,6 @@ export default function RussianApp() {
     return () => unsubscribe();
   }, []);
 
-  // مراقبة النظام
   useEffect(() => {
     const unsubBroad = onSnapshot(doc(db, "system", "broadcast"), (d) => setBroadcast(d.exists() && d.data().active ? d.data().message : null));
     const unsubMaint = onSnapshot(doc(db, "system", "status"), (d) => setMaintenance(d.exists() ? d.data().maintenance : false));
@@ -91,10 +102,11 @@ export default function RussianApp() {
       return [...new Set(cards.map(c => c.category || "General"))];
   }, [cards]);
 
-  // التحقق من الصلاحيات
-  const isAdmin = userData?.role === 'admin';
+  // --- التحقق من الصلاحيات (تم التعديل هنا) ---
+  const isMaster = user?.email === MASTER_EMAIL; // صلاحية مطلقة للإيميل
+  const isAdmin = userData?.role === 'admin' || isMaster;
   const isJunior = userData?.role === 'junior' || isAdmin;
-  const isBanned = userData?.isBanned;
+  const isBanned = userData?.isBanned && !isMaster; // السوبر أدمن لا يحظر
 
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
 
@@ -120,7 +132,6 @@ export default function RussianApp() {
   if (loadingAuth) return <div className="h-screen bg-black text-cyan-500 flex items-center justify-center">LOADING NEURAL LINK...</div>;
   if (!user) return <AuthScreen onLoginSuccess={setUser} />;
 
-  // القائمة السفلية
   let navLinks = [
     { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
     { title: "AI Mentor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => setCurrentView('ai-tutor') },
@@ -131,12 +142,12 @@ export default function RussianApp() {
     { title: "Config", icon: <IconSettings className="w-full text-neutral-400" />, onClick: () => setCurrentView('settings') },
   ];
   
+  // شرط ظهور زر الأدمن
   if (isJunior) {
       navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
   }
 
   const renderContent = () => {
-    // حماية الصفحات
     if (currentView === 'admin' && !isJunior) return <HeroSection onStart={() => setCurrentView('category')} user={user} />;
 
     switch (currentView) {
@@ -146,7 +157,7 @@ export default function RussianApp() {
       case 'category': return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
       case 'study':
         return (
-            <div className="flex flex-col items-center justify-center h-full w-full relative pb-32"> {/* إصلاح السكرول */}
+            <div className="flex flex-col items-center justify-center h-full w-full relative pb-32">
                 {currentCard ? (
                     <BossBattleWrapper isCorrect={battleResult} resetTrigger={battleTrigger}>
                         <StudyCard 
@@ -173,6 +184,7 @@ export default function RussianApp() {
             </div>
         );
       case 'data': 
+        // تمرير صلاحية الأدمن لصفحة البيانات لتفعيل الأزرار
         return <DataManager cards={cards} onAdd={addCard} onDelete={deleteCard} onUpdate={updateCard} isJunior={isJunior} />;
       case 'leaderboard': 
         return <CyberDeck user={user} stats={stats || { xp: 0, streak: 0, avatar: '👤' }} cards={cards || []} />;
@@ -196,7 +208,6 @@ export default function RussianApp() {
         )}
       </AnimatePresence>
 
-      {/* الحاوية الرئيسية مع هامش سفلي كبير لتجنب القائمة */}
       <main className="relative z-10 flex flex-col items-center justify-center min-h-screen w-full pt-10 md:pt-0">
            <AnimatePresence mode="wait">
              <motion.div 

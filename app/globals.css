@@ -2,60 +2,99 @@
 @tailwind components;
 @tailwind utilities;
 
+/* --- 1. استيراد الخطوط (عربي + تقني) --- */
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
 
 :root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 3, 0, 20;
-  --background-end-rgb: 0, 0, 0;
   --neon-cyan: #06b6d4;
   --neon-purple: #a855f7;
+  --neon-red: #ef4444;
+  --bg-dark: #050505;
 }
 
+/* --- 2. إعدادات الصفحة الأساسية --- */
 body {
-  color: rgb(var(--foreground-rgb));
-  background: black;
-  font-family: 'JetBrains Mono', monospace; /* خط تقني للأرقام والإنجليزية */
-  overflow: hidden;
+  color: white;
+  background: var(--bg-dark);
+  font-family: 'JetBrains Mono', monospace; /* الأرقام والإنجليزية */
+  overflow-x: hidden; /* منع التمرير العرضي */
+  -webkit-font-smoothing: antialiased;
 }
 
-/* دعم الخط العربي */
-h1, h2, h3, h4, p, span, div {
+/* دعم الخط العربي في النصوص */
+h1, h2, h3, h4, p, span, div, button, input, textarea {
   font-family: 'Cairo', sans-serif;
 }
 
-/* --- المؤثرات السينمائية (The Cinematic Effects) --- */
+/* الأكواد والأرقام تبقى بالخط التقني */
+.font-mono {
+  font-family: 'JetBrains Mono', monospace !important;
+}
 
-/* 1. تأثير شاشة CRT القديمة (Scanlines) */
+/* --- 3. تخصيص شريط التمرير (Scrollbar) ليبدو احترافياً --- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+  transition: background 0.3s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neon-cyan);
+  box-shadow: 0 0 10px var(--neon-cyan);
+}
+
+/* --- 4. الطبقات السينمائية (Cinematic Overlays) --- */
+
+/* تأثير خطوط الشاشة (Scanlines) */
 .scanlines {
   background: linear-gradient(
     to bottom,
     rgba(255,255,255,0),
     rgba(255,255,255,0) 50%,
-    rgba(0,0,0,0.1) 50%,
-    rgba(0,0,0,0.1)
+    rgba(0,0,0,0.2) 50%,
+    rgba(0,0,0,0.2)
   );
   background-size: 100% 4px;
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 9998;
+  opacity: 0.6;
 }
 
-/* 2. تعتيم الحواف (Vignette) */
+/* تأثير تعتيم الحواف (Vignette) */
 .vignette {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle, transparent 60%, black 100%);
+  background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.8) 100%);
   pointer-events: none;
-  z-index: 9998;
+  z-index: 9997;
 }
 
-/* 3. زوايا الـ HUD */
+/* تأثير الضجيج (Noise) لزيادة الواقعية */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9996;
+  opacity: 0.4;
+}
+
+/* --- 5. زوايا الـ HUD (واجهة النظام) --- */
 .hud-corner {
   position: fixed;
-  width: 30px; height: 30px;
-  border: 2px solid rgba(6, 182, 212, 0.4);
+  width: 40px; height: 40px;
+  border: 2px solid rgba(6, 182, 212, 0.3);
   z-index: 50;
   pointer-events: none;
   transition: all 0.5s ease;
@@ -65,15 +104,70 @@ h1, h2, h3, h4, p, span, div {
 .hud-corner.bl { bottom: 20px; left: 20px; border-right: 0; border-top: 0; }
 .hud-corner.br { bottom: 20px; right: 20px; border-left: 0; border-top: 0; }
 
-/* 4. شريط التمرير السيبراني */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #000; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: var(--neon-cyan); }
+/* --- 6. فئات مساعدة (Utility Classes) --- */
 
-/* --- فئات مساعدة --- */
-.text-glow { text-shadow: 0 0 10px rgba(6, 182, 212, 0.7); }
-.dir-rtl { direction: rtl; }
+/* توهج النصوص */
+.text-glow {
+  text-shadow: 0 0 10px rgba(6, 182, 212, 0.7), 0 0 20px rgba(6, 182, 212, 0.5);
+}
+.text-glow-purple {
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.7), 0 0 20px rgba(168, 85, 247, 0.5);
+}
+
+/* خلفية شبكية (Grid) */
+.bg-grid-pattern {
+  background-size: 40px 40px;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+}
+
+/* الكتابة الآلية */
+.typewriter {
+  overflow: hidden;
+  border-left: 2px solid var(--neon-cyan); /* المؤشر */
+  white-space: nowrap;
+  animation: typing 3s steps(40, end), blink-caret 0.75s step-end infinite;
+}
+
+/* اتجاه النصوص العربية */
+.dir-rtl { direction: rtl; text-align: right; }
+
+/* تأثيرات ثلاثية الأبعاد للبطاقات */
 .preserve-3d { transform-style: preserve-3d; }
 .backface-hidden { backface-visibility: hidden; }
 .perspective-1000 { perspective: 1000px; }
+
+/* --- 7. التحريكات (Animations) --- */
+
+@keyframes typing {
+  from { width: 0 }
+  to { width: 100% }
+}
+
+@keyframes blink-caret {
+  from, to { border-color: transparent }
+  50% { border-color: var(--neon-cyan) }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+/* فئات لاستخدام الأنيميشن */
+.animate-float { animation: float 6s ease-in-out infinite; }
+.animate-pulse-slow { animation: pulse-slow 3s infinite; }
+
+/* تحديد النصوص (Selection) */
+::selection {
+  background: rgba(6, 182, 212, 0.3);
+  color: white;
+  text-shadow: 0 0 5px var(--neon-cyan);
+}
