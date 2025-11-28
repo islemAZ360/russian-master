@@ -1,21 +1,15 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { IconRobot, IconSend, IconCpu, IconSettings, IconAlertTriangle } from "@tabler/icons-react";
-// استيراد المكتبة مباشرة في الواجهة
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { IconRobot, IconSend, IconCpu } from "@tabler/icons-react";
 
-// ⚠️ مفتاحك يعمل هنا مباشرة لأن المتصفح هو من يتصل بجوجل
+// مفتاحك المباشر
 const API_KEY = "AIzaSyDi8-POg6RGCoBCkni6_8XNikJvTmH4z3M";
-
-const AI_MODELS = [
-  { id: "gemini-1.5-flash", name: "⚡ FLASH V1.5 (Fast)" },
-  { id: "gemini-1.5-pro", name: "🧠 PRO V1.5 (Smart)" },
-];
 
 export default function AITutor({ user }) {
   const userName = user?.email?.split('@')[0] || 'Operative';
-  const [selectedModel, setSelectedModel] = useState("gemini-1.5-flash");
+  
+  // الحالة الافتراضية للرسائل
   const [messages, setMessages] = useState([
     { role: "model", text: `System Online.\nWelcome, ${userName}. Select AI Core and state objective.` }
   ]);
@@ -23,55 +17,60 @@ export default function AITutor({ user }) {
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef(null);
 
-  // تهيئة المحادثة (خارج الدالة لتستمر)
-  const [chatSession, setChatSession] = useState(null);
-
-  useEffect(() => {
-    // تجهيز البوت عند فتح الصفحة
-    const initChat = async () => {
-        const genAI = new GoogleGenerativeAI(API_KEY);
-        const model = genAI.getGenerativeModel({ model: selectedModel });
-        
-        const systemPrompt = `
-          You are "Russian Master AI", a Cyberpunk Russian Tutor.
-          Protocol: Teach Russian, correct errors strictly, be concise.
-          Tone: Military/Cyberpunk.
-        `;
-
-        const chat = model.startChat({
-            history: [
-                { role: "user", parts: [{ text: systemPrompt }] },
-                { role: "model", parts: [{ text: "Affirmative. Systems ready." }] },
-            ],
-        });
-        setChatSession(chat);
-    };
-    initChat();
-  }, [selectedModel]); // يعيد التهيئة عند تغيير الموديل
-
+  // التمرير التلقائي
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
   const sendMessage = async () => {
-    if (!input.trim() || loading || !chatSession) return;
+    if (!input.trim() || loading) return;
 
     const userMsg = input;
-    setInput("");
+    setInput(""); // تفريغ الحقل
     setMessages(prev => [...prev, { role: "user", text: userMsg }]);
     setLoading(true);
 
     try {
-      // الاتصال المباشر بجوجل من المتصفح (بدون سيرفر وسيط)
-      const result = await chatSession.sendMessage(userMsg);
-      const response = await result.response;
-      const text = response.text();
+      // --- هنا السر: نستخدم الرابط المباشر مثل ملف HTML تماماً ---
+      // هذا يتجاوز مشاكل المكتبة
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { 
+                    // نرسل التوجيه (System Prompt) مع رسالة المستخدم في كل مرة لضمان السياق
+                    text: `You are "Russian Master AI", a Cyberpunk Russian Tutor. 
+                           User Message: ${userMsg}
+                           Reply concisely in Russian then English.` 
+                  }
+                ]
+              }
+            ]
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error.message);
+      }
+
+      // استخراج النص من الرد الخام
+      const botReply = data.candidates[0].content.parts[0].text;
       
-      setMessages(prev => [...prev, { role: "model", text: text }]);
+      setMessages(prev => [...prev, { role: "model", text: botReply }]);
 
     } catch (err) {
-      console.error(err);
-      setMessages(prev => [...prev, { role: "model", text: "⚠️ Error: Connection blocked or API Key invalid." }]);
+      console.error("Fetch Error:", err);
+      setMessages(prev => [...prev, { role: "model", text: `⚠️ Critical Error: ${err.message || "Connection Failed"}` }]);
     } finally {
       setLoading(false);
     }
@@ -81,25 +80,13 @@ export default function AITutor({ user }) {
     <div className="w-full h-full flex flex-col items-center justify-center p-4 pb-24 md:pb-4 relative overflow-hidden font-sans">
       
       {/* رأس الشات */}
-      <div className="w-full max-w-4xl bg-cyan-950/40 border border-cyan-500/30 p-4 rounded-t-2xl flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-md z-10">
-        <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center border border-cyan-400 shadow-[0_0_10px_#06b6d4]">
-                <IconRobot size={28} className="text-cyan-400 animate-pulse" />
-            </div>
-            <div>
-                <h2 className="text-xl font-black text-white tracking-widest">AI MENTOR</h2>
-                <p className="text-[10px] text-cyan-400/60 font-mono uppercase">Direct Link Mode</p>
-            </div>
+      <div className="w-full max-w-4xl bg-cyan-950/40 border border-cyan-500/30 p-4 rounded-t-2xl flex items-center gap-4 backdrop-blur-md z-10">
+        <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center border border-cyan-400 shadow-[0_0_10px_#06b6d4]">
+            <IconRobot size={28} className="text-cyan-400 animate-pulse" />
         </div>
-
-        <div className="relative group w-full md:w-auto">
-            <select 
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                className="w-full md:w-48 bg-black/80 text-cyan-400 border border-cyan-500/50 rounded-lg px-3 py-2 text-xs font-mono outline-none focus:border-cyan-400 cursor-pointer"
-            >
-                {AI_MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+        <div>
+            <h2 className="text-xl font-black text-white tracking-widest">AI MENTOR</h2>
+            <p className="text-[10px] text-cyan-400/60 font-mono uppercase">Direct HTTP Mode</p>
         </div>
       </div>
 
@@ -133,7 +120,7 @@ export default function AITutor({ user }) {
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
                  <div className="bg-cyan-950/10 border border-cyan-500/20 p-3 rounded-2xl rounded-tl-none flex gap-2 items-center text-cyan-500 text-xs font-mono animate-pulse">
                      <IconCpu size={16} className="animate-spin" />
-                     <span>COMPUTING...</span>
+                     <span>ESTABLISHING UPLINK...</span>
                  </div>
              </motion.div>
          )}
