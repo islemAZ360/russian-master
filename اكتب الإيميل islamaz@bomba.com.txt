@@ -1,0 +1,8 @@
+اكتب الإيميل: islamaz@bomba.com
+اكتب كلمة المرور: bombaAZ360
+
+git add .
+git commit -m "Fix admin 0 users, fix cards, restore dictionary"
+git push
+
+node collect_code.js

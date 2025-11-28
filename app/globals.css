@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 3, 0, 20;
+  --background-end-rgb: 0, 0, 0;
+  --neon-cyan: #06b6d4;
+  --neon-purple: #a855f7;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: black;
+  font-family: 'JetBrains Mono', monospace; /* خط تقني للأرقام والإنجليزية */
+  overflow: hidden;
+}
+
+/* دعم الخط العربي */
+h1, h2, h3, h4, p, span, div {
+  font-family: 'Cairo', sans-serif;
+}
+
+/* --- المؤثرات السينمائية (The Cinematic Effects) --- */
+
+/* 1. تأثير شاشة CRT القديمة (Scanlines) */
+.scanlines {
+  background: linear-gradient(
+    to bottom,
+    rgba(255,255,255,0),
+    rgba(255,255,255,0) 50%,
+    rgba(0,0,0,0.1) 50%,
+    rgba(0,0,0,0.1)
+  );
+  background-size: 100% 4px;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* 2. تعتيم الحواف (Vignette) */
+.vignette {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle, transparent 60%, black 100%);
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* 3. زوايا الـ HUD */
+.hud-corner {
+  position: fixed;
+  width: 30px; height: 30px;
+  border: 2px solid rgba(6, 182, 212, 0.4);
+  z-index: 50;
+  pointer-events: none;
+  transition: all 0.5s ease;
+}
+.hud-corner.tl { top: 20px; left: 20px; border-right: 0; border-bottom: 0; }
+.hud-corner.tr { top: 20px; right: 20px; border-left: 0; border-bottom: 0; }
+.hud-corner.bl { bottom: 20px; left: 20px; border-right: 0; border-top: 0; }
+.hud-corner.br { bottom: 20px; right: 20px; border-left: 0; border-top: 0; }
+
+/* 4. شريط التمرير السيبراني */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #000; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--neon-cyan); }
+
+/* --- فئات مساعدة --- */
+.text-glow { text-shadow: 0 0 10px rgba(6, 182, 212, 0.7); }
+.dir-rtl { direction: rtl; }
+.preserve-3d { transform-style: preserve-3d; }
+.backface-hidden { backface-visibility: hidden; }
+.perspective-1000 { perspective: 1000px; }
