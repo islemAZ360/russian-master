@@ -3,10 +3,12 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   IconRobot, IconSend, IconMenu2, IconX, IconPlus, IconMessage, 
-  IconVolume, IconCopy, IconSparkles, IconPlayerStop 
+  IconVolume, IconCopy, IconMicrophone, IconPlayerStop, IconCpu 
 } from "@tabler/icons-react";
 import { collection, addDoc, query, orderBy, onSnapshot, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export default function AITutor({ user }) {
   const [input, setInput] = useState("");
@@ -16,25 +18,48 @@ export default function AITutor({ user }) {
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   
   const scrollRef = useRef(null);
+  const recognitionRef = useRef(null);
 
-  // اقتراحات سريعة
-  const QUICK_PROMPTS = [
-    "🇷🇺 علمني كلمة روسية جديدة",
-    "📝 صحح لي هذه الجملة",
-    "🗣️ كيف أنطق 'شكراً' بالروسية؟",
-    "🤖 من أنت؟"
-  ];
+  // إعداد التعرف على الصوت
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window) {
+        const recognition = new window.webkitSpeechRecognition();
+        recognition.continuous = false;
+        recognition.lang = 'ar-SA'; // يمكن تغييرها حسب الحاجة
+        recognition.interimResults = false;
 
-  // جلب الجلسات
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            setInput(prev => prev + " " + transcript);
+            setIsListening(false);
+        };
+
+        recognition.onerror = () => setIsListening(false);
+        recognition.onend = () => setIsListening(false);
+        
+        recognitionRef.current = recognition;
+    }
+  }, []);
+
+  const toggleListening = () => {
+      if (!recognitionRef.current) return alert("المتصفح لا يدعم الإدخال الصوتي");
+      if (isListening) {
+          recognitionRef.current.stop();
+      } else {
+          recognitionRef.current.start();
+          setIsListening(true);
+      }
+  };
+
+  // جلب البيانات
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, "users", user.uid, "ai_chats"), orderBy("lastUpdate", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setSessions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    return () => unsubscribe();
+    const unsub = onSnapshot(q, (snap) => setSessions(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    return () => unsub();
   }, [user]);
 
   useEffect(() => {
@@ -46,188 +71,134 @@ export default function AITutor({ user }) {
     }
   }, [currentSessionId, sessions]);
 
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  useEffect(() => scrollRef.current?.scrollIntoView({ behavior: "smooth" }), [messages, loading]);
 
-  const startNewChat = () => {
-    setCurrentSessionId(null);
-    setMessages([]);
-    setIsSidebarOpen(false);
-  };
-
-  // دالة النطق المتطورة
   const speakText = (text) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel(); // إيقاف أي صوت سابق
-      if (isSpeaking) {
-        setIsSpeaking(false);
-        return;
-      }
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      // محاولة اكتشاف اللغة تلقائياً (بسيط)
-      if (/[а-яА-Я]/.test(text)) utterance.lang = 'ru-RU';
-      else if (/[a-zA-Z]/.test(text)) utterance.lang = 'en-US';
-      else utterance.lang = 'ar-SA';
-      
-      utterance.rate = 0.9;
-      utterance.onend = () => setIsSpeaking(false);
-      
-      setIsSpeaking(true);
-      window.speechSynthesis.speak(utterance);
-    }
+    window.speechSynthesis.cancel();
+    if (isSpeaking) { setIsSpeaking(false); return; }
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = /[а-яА-Я]/.test(text) ? 'ru-RU' : 'ar-SA';
+    u.rate = 0.9;
+    u.onend = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(u);
   };
 
-  const copyText = (text) => {
-    navigator.clipboard.writeText(text);
-    alert("تم نسخ النص!");
-  };
+  const sendMessage = async (txt = null) => {
+    const text = txt || input;
+    if (!text.trim() || loading) return;
 
-  const sendMessage = async (overrideText = null) => {
-    const textToSend = overrideText || input;
-    if (!textToSend.trim() || loading) return;
-
-    const newHistory = [...messages, { role: "user", text: textToSend }];
-    
+    const newMsgs = [...messages, { role: "user", text }];
     setInput("");
-    setMessages(newHistory);
+    setMessages(newMsgs);
     setLoading(true);
 
     try {
       const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newHistory })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: newMsgs })
       });
-
       const data = await res.json();
-      if (!res.ok) throw new Error(data.reply || "Server Error");
+      const finalMsgs = [...newMsgs, { role: "model", text: data.reply }];
+      setMessages(finalMsgs);
 
-      const finalMessages = [...newHistory, { role: "model", text: data.reply }];
-      setMessages(finalMessages);
-
-      // حفظ في Firebase
       if (user) {
         if (!currentSessionId) {
-          const title = textToSend.substring(0, 20) + "...";
-          const docRef = await addDoc(collection(db, "users", user.uid, "ai_chats"), {
-            title, messages: finalMessages, createdAt: serverTimestamp(), lastUpdate: serverTimestamp()
-          });
-          setCurrentSessionId(docRef.id);
+            const ref = await addDoc(collection(db, "users", user.uid, "ai_chats"), { 
+                title: text.substring(0, 20), messages: finalMsgs, createdAt: serverTimestamp(), lastUpdate: serverTimestamp() 
+            });
+            setCurrentSessionId(ref.id);
         } else {
-          await updateDoc(doc(db, "users", user.uid, "ai_chats", currentSessionId), {
-            messages: finalMessages, lastUpdate: serverTimestamp()
-          });
+            await updateDoc(doc(db, "users", user.uid, "ai_chats", currentSessionId), { messages: finalMsgs, lastUpdate: serverTimestamp() });
         }
       }
-    } catch (err) {
-      setMessages(prev => [...prev, { role: "model", text: `⚠️ Error: ${err.message}` }]);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setMessages(prev => [...prev, { role: "model", text: "⚠️ Error connecting to mainframe." }]); } 
+    finally { setLoading(false); }
   };
 
   return (
-    <div className="w-full h-full flex bg-[#020202] overflow-hidden relative font-sans text-white">
+    <div className="w-full h-full flex bg-[#030303] text-white font-sans overflow-hidden relative">
       
-      {/* Sidebar Overlay for Mobile */}
-      {isSidebarOpen && <div className="fixed inset-0 bg-black/80 z-30 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>}
-
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-40 w-72 bg-[#0a0a0a] border-r border-white/5 transform transition-transform duration-300 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:static md:shrink-0`}>
-        <div className="p-5 border-b border-white/5 flex justify-between items-center bg-cyan-950/10 backdrop-blur-md">
-            <h2 className="font-black tracking-[0.2em] text-cyan-500 text-sm flex items-center gap-2">
-                <IconSparkles size={16}/> NEXUS LOGS
-            </h2>
-            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-white/50"><IconX size={20}/></button>
+      <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-black/90 backdrop-blur-xl border-r border-white/10 transform transition-transform duration-300 flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:static md:shrink-0`}>
+        <div className="p-6 border-b border-white/10 flex justify-between items-center">
+            <h2 className="font-black tracking-widest text-cyan-500 text-sm flex gap-2"><IconCpu/> MEMORY BANKS</h2>
+            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden"><IconX/></button>
         </div>
         <div className="p-4">
-            <button onClick={startNewChat} className="w-full py-3 bg-cyan-600/10 border border-cyan-500/30 rounded-xl flex items-center justify-center gap-2 hover:bg-cyan-600/30 text-cyan-400 font-bold text-xs tracking-wider transition-all hover:scale-[1.02]">
-                <IconPlus size={16}/> NEW SESSION
+            <button onClick={() => { setCurrentSessionId(null); setMessages([]); setIsSidebarOpen(false); }} className="w-full py-3 bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-400 font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
+                <IconPlus size={18}/> New Sequence
             </button>
         </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-            {sessions.map(session => (
-                <div key={session.id} onClick={() => { setCurrentSessionId(session.id); setIsSidebarOpen(false); }} className={`group p-3 rounded-xl cursor-pointer transition-all border flex items-center gap-3 ${currentSessionId === session.id ? 'bg-white/10 border-cyan-500/40' : 'border-transparent hover:bg-white/5'}`}>
-                    <div className={`p-2 rounded-lg ${currentSessionId === session.id ? 'bg-cyan-500/20 text-cyan-400' : 'bg-white/5 text-white/30'}`}><IconMessage size={16}/></div>
-                    <span className="text-xs truncate font-mono opacity-70 group-hover:opacity-100">{session.title}</span>
+            {sessions.map(s => (
+                <div key={s.id} onClick={() => { setCurrentSessionId(s.id); setIsSidebarOpen(false); }} className={`p-3 rounded-lg cursor-pointer flex items-center gap-3 transition-all ${currentSessionId === s.id ? 'bg-white/10 border border-white/20' : 'hover:bg-white/5 border border-transparent'}`}>
+                    <IconMessage size={16} className="text-white/40"/>
+                    <span className="text-xs truncate font-mono text-white/70">{s.title}</span>
                 </div>
             ))}
         </div>
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col h-full relative min-w-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-opacity-5">
+      {/* Main Chat */}
+      <div className="flex-1 flex flex-col relative h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-100">
         
         {/* Header */}
-        <div className="h-16 border-b border-white/5 bg-[#0a0a0a]/80 backdrop-blur-xl flex items-center px-6 justify-between shrink-0 z-20">
+        <div className="h-20 border-b border-white/10 bg-black/40 backdrop-blur-md flex items-center px-6 justify-between z-40">
             <div className="flex items-center gap-4">
-                <button onClick={() => setIsSidebarOpen(true)} className="md:hidden text-white/50 hover:text-white"><IconMenu2/></button>
-                <div className="relative">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-600 to-purple-600 flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.4)]">
-                        <IconRobot size={22} className="text-white" />
-                    </div>
-                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-black animate-pulse"></div>
+                <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 bg-white/5 rounded-lg"><IconMenu2/></button>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-600 to-blue-700 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.5)]">
+                    <IconRobot size={24} className="text-white"/>
                 </div>
                 <div>
-                    <h3 className="font-bold text-sm tracking-widest text-white">NEXUS-7 AI</h3>
-                    <p className="text-[10px] text-cyan-400/60 font-mono">ONLINE // V2.5</p>
+                    <h1 className="font-black text-lg tracking-widest text-white">NEXUS-7</h1>
+                    <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span className="text-[10px] font-mono text-white/50 uppercase">Systems Nominal</span>
+                    </div>
                 </div>
             </div>
         </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6 pb-40">
+        {/* Chat Area */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 space-y-6 pb-40">
             {messages.length === 0 && (
-                <div className="h-full flex flex-col items-center justify-center text-center opacity-0 animate-in fade-in duration-1000">
-                    <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6 border border-white/10 animate-bounce">
-                        <IconSparkles size={40} className="text-cyan-500"/>
-                    </div>
-                    <h2 className="text-2xl font-bold text-white mb-2">System Online</h2>
-                    <p className="text-white/30 text-sm max-w-xs">Ask me anything in any language. I am ready to teach.</p>
-                    
-                    {/* Quick Prompts */}
-                    <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-2 w-full max-w-lg">
-                        {QUICK_PROMPTS.map((prompt, i) => (
-                            <button 
-                                key={i} 
-                                onClick={() => sendMessage(prompt)}
-                                className="p-3 bg-white/5 border border-white/10 rounded-xl text-xs text-left hover:bg-white/10 hover:border-cyan-500/30 transition-all text-white/70"
-                            >
-                                {prompt}
-                            </button>
-                        ))}
-                    </div>
+                <div className="h-full flex flex-col items-center justify-center text-center opacity-50 select-none">
+                    <IconCpu size={64} className="mb-4 text-cyan-500/50 animate-pulse"/>
+                    <h3 className="text-2xl font-bold text-white/20 uppercase tracking-widest">Awaiting Input</h3>
                 </div>
             )}
-
+            
             {messages.map((msg, i) => (
-                <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    key={i} 
-                    className={`flex ${msg.role === "model" ? 'justify-start' : 'justify-end'}`}
-                >
-                    <div className={`max-w-[85%] md:max-w-[70%] group relative`}>
-                        {/* Bubble */}
-                        <div className={`p-4 rounded-2xl border backdrop-blur-sm shadow-sm ${
+                <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex ${msg.role === "model" ? 'justify-start' : 'justify-end'}`}>
+                    <div className={`max-w-[90%] md:max-w-[75%] relative group`}>
+                        <div className={`p-5 rounded-2xl text-sm leading-relaxed shadow-lg backdrop-blur-md border ${
                             msg.role === "model" 
-                            ? 'bg-[#111] border-white/10 text-gray-200 rounded-tl-sm' 
-                            : 'bg-gradient-to-r from-cyan-900/40 to-blue-900/40 border-cyan-500/30 text-cyan-50 rounded-tr-sm'
+                            ? 'bg-[#111]/90 border-white/10 text-gray-200 rounded-tl-sm' 
+                            : 'bg-cyan-900/20 border-cyan-500/30 text-cyan-50 rounded-tr-sm'
                         }`}>
-                            <p className={`whitespace-pre-wrap text-sm leading-relaxed ${/[\u0600-\u06FF]/.test(msg.text) ? 'font-cairo text-right dir-rtl' : 'font-mono'}`}>
-                                {msg.text}
-                            </p>
+                            {/* تنسيق Markdown */}
+                            {msg.role === "model" ? (
+                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                                    strong: ({node, ...props}) => <span className="text-cyan-400 font-black" {...props} />,
+                                    table: ({node, ...props}) => <table className="w-full my-2 border-collapse border border-white/20 text-xs" {...props} />,
+                                    th: ({node, ...props}) => <th className="border border-white/20 p-2 bg-white/5 text-cyan-400" {...props} />,
+                                    td: ({node, ...props}) => <td className="border border-white/20 p-2" {...props} />,
+                                }}>
+                                    {msg.text}
+                                </ReactMarkdown>
+                            ) : (
+                                <p className="font-mono">{msg.text}</p>
+                            )}
                         </div>
-
-                        {/* Actions (Only for AI messages) */}
+                        
+                        {/* أدوات الرسالة */}
                         {msg.role === "model" && (
-                            <div className="flex gap-2 mt-2 ml-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                <button onClick={() => speakText(msg.text)} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/20 text-white/50 hover:text-cyan-400 transition-all" title="Speak">
+                            <div className="absolute -bottom-8 left-0 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => speakText(msg.text)} className="p-1.5 bg-white/10 rounded-full hover:bg-cyan-500 hover:text-black transition-all">
                                     {isSpeaking ? <IconPlayerStop size={14}/> : <IconVolume size={14}/>}
                                 </button>
-                                <button onClick={() => copyText(msg.text)} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/20 text-white/50 hover:text-purple-400 transition-all" title="Copy">
+                                <button onClick={() => navigator.clipboard.writeText(msg.text)} className="p-1.5 bg-white/10 rounded-full hover:bg-purple-500 hover:text-white transition-all">
                                     <IconCopy size={14}/>
                                 </button>
                             </div>
@@ -235,47 +206,45 @@ export default function AITutor({ user }) {
                     </div>
                 </motion.div>
             ))}
-            
+
             {loading && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-                    <div className="bg-[#111] border border-white/10 px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-2">
-                        <span className="w-2 h-2 bg-cyan-500 rounded-full animate-bounce"></span>
-                        <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce delay-100"></span>
-                        <span className="w-2 h-2 bg-pink-500 rounded-full animate-bounce delay-200"></span>
-                    </div>
-                </motion.div>
+                <div className="flex items-center gap-3 text-cyan-500 text-xs font-mono animate-pulse">
+                    <IconCpu size={16} className="animate-spin"/> PROCESSING DATA...
+                </div>
             )}
             <div ref={scrollRef}></div>
         </div>
 
-        {/* Input Area */}
-        <div className="absolute bottom-0 left-0 w-full p-4 md:p-6 bg-gradient-to-t from-black via-[#0a0a0a] to-transparent z-30">
-            <div className="max-w-4xl mx-auto flex gap-3 items-end bg-[#0f0f0f] border border-white/10 p-2 rounded-2xl shadow-2xl ring-1 ring-white/5">
-                <textarea 
-                    rows={1}
-                    value={input} 
-                    onChange={(e) => setInput(e.target.value)} 
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            sendMessage();
-                        }
-                    }}
-                    placeholder="Transmitting to NEXUS..." 
-                    className="flex-1 bg-transparent px-4 py-3 text-white outline-none placeholder:text-white/20 font-mono text-sm resize-none max-h-32 custom-scrollbar"
-                />
+        {/* Input Bar */}
+        <div className="absolute bottom-0 left-0 w-full p-4 md:p-6 bg-gradient-to-t from-black via-black/90 to-transparent z-40">
+            <div className="max-w-4xl mx-auto flex gap-3 items-end bg-[#111] border border-white/10 p-2 rounded-2xl shadow-2xl relative">
+                
+                {/* Voice Button */}
                 <button 
-                    onClick={() => sendMessage()} 
-                    disabled={loading || !input.trim()} 
-                    className="p-3 bg-gradient-to-tr from-cyan-600 to-blue-600 rounded-xl text-white shadow-lg hover:shadow-cyan-500/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={toggleListening}
+                    className={`p-3 rounded-xl transition-all ${isListening ? 'bg-red-500/20 text-red-500 animate-pulse' : 'hover:bg-white/5 text-white/50 hover:text-white'}`}
                 >
-                    <IconSend size={20} />
+                    <IconMicrophone size={22}/>
+                </button>
+
+                <textarea 
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                    placeholder="Enter command to NEXUS..."
+                    className="flex-1 bg-transparent border-none outline-none text-white px-2 py-3 max-h-32 min-h-[50px] resize-none font-mono text-sm custom-scrollbar"
+                />
+
+                <button 
+                    onClick={() => sendMessage()}
+                    disabled={!input.trim() || loading}
+                    className="p-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl shadow-lg shadow-cyan-500/20 disabled:opacity-50 disabled:shadow-none transition-all"
+                >
+                    <IconSend size={20}/>
                 </button>
             </div>
-            <div className="text-center mt-2 text-[10px] text-white/20 font-mono uppercase tracking-widest">
-                Secured via Gemini 2.5 Flash Protocol
-            </div>
         </div>
+
       </div>
     </div>
   );

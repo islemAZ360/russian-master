@@ -16,12 +16,12 @@
 body {
   color: white;
   background: var(--bg-dark);
-  font-family: 'JetBrains Mono', monospace; /* الأرقام والإنجليزية */
-  overflow-x: hidden; /* منع التمرير العرضي */
+  font-family: 'JetBrains Mono', monospace; /* الأرقام والإنجليزية التقنية */
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-/* دعم الخط العربي في النصوص */
+/* دعم الخط العربي في النصوص العامة */
 h1, h2, h3, h4, p, span, div, button, input, textarea {
   font-family: 'Cairo', sans-serif;
 }
@@ -31,14 +31,14 @@ h1, h2, h3, h4, p, span, div, button, input, textarea {
   font-family: 'JetBrains Mono', monospace !important;
 }
 
-/* --- 3. تخصيص شريط التمرير (Scrollbar) ليبدو احترافياً --- */
+/* --- 3. تخصيص شريط التمرير (Scrollbar) --- */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #000;
+  background: #050505;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -54,7 +54,7 @@ h1, h2, h3, h4, p, span, div, button, input, textarea {
 
 /* --- 4. الطبقات السينمائية (Cinematic Overlays) --- */
 
-/* تأثير خطوط الشاشة (Scanlines) */
+/* خطوط الشاشة (Scanlines) */
 .scanlines {
   background: linear-gradient(
     to bottom,
@@ -68,111 +68,98 @@ h1, h2, h3, h4, p, span, div, button, input, textarea {
   inset: 0;
   pointer-events: none;
   z-index: 9998;
-  opacity: 0.6;
+  opacity: 0.4;
 }
 
-/* تأثير تعتيم الحواف (Vignette) */
+/* تعتيم الحواف (Vignette) */
 .vignette {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.8) 100%);
+  background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.9) 100%);
   pointer-events: none;
   z-index: 9997;
 }
 
-/* تأثير الضجيج (Noise) لزيادة الواقعية */
+/* الضجيج (Noise) */
 .noise-overlay {
   position: fixed;
   inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
   pointer-events: none;
   z-index: 9996;
-  opacity: 0.4;
+  opacity: 0.3;
 }
 
 /* --- 5. زوايا الـ HUD (واجهة النظام) --- */
 .hud-corner {
   position: fixed;
-  width: 40px; height: 40px;
-  border: 2px solid rgba(6, 182, 212, 0.3);
+  width: 30px; height: 30px;
+  border: 2px solid rgba(6, 182, 212, 0.2);
   z-index: 50;
   pointer-events: none;
-  transition: all 0.5s ease;
 }
 .hud-corner.tl { top: 20px; left: 20px; border-right: 0; border-bottom: 0; }
 .hud-corner.tr { top: 20px; right: 20px; border-left: 0; border-bottom: 0; }
 .hud-corner.bl { bottom: 20px; left: 20px; border-right: 0; border-top: 0; }
 .hud-corner.br { bottom: 20px; right: 20px; border-left: 0; border-top: 0; }
 
-/* --- 6. فئات مساعدة (Utility Classes) --- */
+/* --- 6. تنسيق ردود الذكاء الاصطناعي (Markdown Styles) --- */
+/* هذا الجزء مهم جداً لتظهر الجداول والنصوص بشكل جميل في الشات */
 
-/* توهج النصوص */
-.text-glow {
-  text-shadow: 0 0 10px rgba(6, 182, 212, 0.7), 0 0 20px rgba(6, 182, 212, 0.5);
-}
-.text-glow-purple {
-  text-shadow: 0 0 10px rgba(168, 85, 247, 0.7), 0 0 20px rgba(168, 85, 247, 0.5);
-}
-
-/* خلفية شبكية (Grid) */
-.bg-grid-pattern {
-  background-size: 40px 40px;
-  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-  mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
-}
-
-/* الكتابة الآلية */
-.typewriter {
+/* الجداول */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.9em;
+  background-color: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
   overflow: hidden;
-  border-left: 2px solid var(--neon-cyan); /* المؤشر */
-  white-space: nowrap;
-  animation: typing 3s steps(40, end), blink-caret 0.75s step-end infinite;
 }
 
-/* اتجاه النصوص العربية */
-.dir-rtl { direction: rtl; text-align: right; }
-
-/* تأثيرات ثلاثية الأبعاد للبطاقات */
-.preserve-3d { transform-style: preserve-3d; }
-.backface-hidden { backface-visibility: hidden; }
-.perspective-1000 { perspective: 1000px; }
-
-/* --- 7. التحريكات (Animations) --- */
-
-@keyframes typing {
-  from { width: 0 }
-  to { width: 100% }
+th, td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 10px 12px;
+  text-align: left;
 }
 
-@keyframes blink-caret {
-  from, to { border-color: transparent }
-  50% { border-color: var(--neon-cyan) }
+/* رؤوس الجداول */
+th {
+  background-color: rgba(6, 182, 212, 0.1); /* لون سماوي خفيف */
+  color: var(--neon-cyan);
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
 }
 
-@keyframes pulse-slow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+/* الخط العريض */
+strong {
+  color: var(--neon-purple); /* لون بنفسجي للكلمات المهمة */
+  font-weight: 900;
 }
 
-@keyframes float {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
-  100% { transform: translateY(0px); }
+/* القوائم */
+ul, ol {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
 }
 
-/* فئات لاستخدام الأنيميشن */
-.animate-float { animation: float 6s ease-in-out infinite; }
-.animate-pulse-slow { animation: pulse-slow 3s infinite; }
-
-/* تحديد النصوص (Selection) */
-::selection {
-  background: rgba(6, 182, 212, 0.3);
-  color: white;
-  text-shadow: 0 0 5px var(--neon-cyan);
+li {
+  margin-bottom: 0.5rem;
+  position: relative;
 }
-/* في نهاية الملف */
 
+/* الروابط (إذا وجدت) */
+a {
+  color: var(--neon-cyan);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* --- 7. المؤثرات الخاصة (Animations) --- */
+
+/* النص المتقطع (Glitch Text) - يستخدم في الألعاب */
 .glitch-text {
   position: relative;
 }
@@ -216,6 +203,7 @@ h1, h2, h3, h4, p, span, div, button, input, textarea {
   100% { clip: rect(39px, 9999px, 107px, 0); }
 }
 
+/* اهتزاز الشاشة (Shake Effect) - يستخدم عند الخطأ */
 .animate-shake {
   animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
 }
@@ -226,3 +214,29 @@ h1, h2, h3, h4, p, span, div, button, input, textarea {
   30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
   40%, 60% { transform: translate3d(4px, 0, 0); }
 }
+
+/* دوران بطيء (للأيقونات) */
+.animate-spin-slow {
+  animation: spin 8s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* تحسين تحديد النصوص */
+::selection {
+  background: rgba(6, 182, 212, 0.3);
+  color: white;
+  text-shadow: 0 0 5px var(--neon-cyan);
+}
+
+/* فئات مساعدة للتوافق */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #333 #000;
+}
+.perspective-1000 { perspective: 1000px; }
+.backface-hidden { backface-visibility: hidden; }
+.preserve-3d { transform-style: preserve-3d; }
+.dir-rtl { direction: rtl; }

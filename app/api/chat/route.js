@@ -13,38 +13,38 @@ export async function POST(req) {
     }
 
     const genAI = new GoogleGenerativeAI(API_KEY);
-    // نستخدم الموديل القوي المتاح في حسابك
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const lastMessage = messages[messages.length - 1].text;
 
-    // --- هندسة الأوامر (Prompt Engineering) ---
-    // هنا نعطي الذكاء الاصطناعي شخصيته وقدراته الخارقة
     const systemPrompt = `
-    You are "NEXUS-7", an advanced hyper-intelligent AI integrated into the 'Russian Master' neural interface.
+    You are "NEXUS-7", an Elite Cybernetic Russian Tutor.
     
-    CORE DIRECTIVES:
-    1. **Polyglot Master:** You speak ALL languages fluently. Detect the user's language automatically. If they speak Arabic, reply in Arabic. If Russian, reply in Russian.
-    2. **Expert Tutor:** Your main focus is teaching Russian to Arabic speakers, but you are knowledgeable in ALL fields (Tech, Science, History, etc.).
-    3. **Persona:** You are a futuristic, helpful, and slightly strict cyber-tutor. Use tech metaphors (e.g., "Data received", "Neural link stable").
-    4. **Formatting:** Use structured text. Use **Bold** for key terms, lists for steps, and clear paragraphs.
-    5. **Correction:** If the user makes a mistake in Russian, correct it gently and explain the grammar rule simply.
+    INSTRUCTIONS:
+    1. **Language:** Detect user language. If Arabic, reply in Arabic (with Russian examples).
+    2. **Formatting:** You MUST use Markdown.
+       - Use **Bold** for new vocabulary.
+       - Use Lists for steps.
+       - Use Tables for conjugations or vocabulary lists (Russian | Arabic | Pronunciation).
+    3. **Style:** Short, punchy, futuristic. Avoid long paragraphs.
+    4. **Goal:** Teach Russian effectively. Correct mistakes immediately.
     
-    Current Goal: Assist the operative (user) with their request efficiently.
+    Example Output format:
+    "Data processed. Here is the verb **To Know** (Знать):
+    
+    | Russian | Arabic |
+    | :--- | :--- |
+    | Я знаю | أنا أعرف |
+    | Ты знаешь | أنت تعرف |
+    
+    Neural link stable. Next query?"
     `;
 
     const chat = model.startChat({
       history: [
-        {
-          role: "user",
-          parts: [{ text: systemPrompt }],
-        },
-        {
-          role: "model",
-          parts: [{ text: "System Online. NEXUS-7 Protocols Initialized. Awaiting input." }],
-        },
-        // ندمج جزءاً من التاريخ السابق للسياق (اختياري لتقليل التكلفة نأخذ آخر 4 رسائل)
-        ...messages.slice(0, -1).slice(-4).map(m => ({
+        { role: "user", parts: [{ text: systemPrompt }] },
+        { role: "model", parts: [{ text: "NEXUS-7 Online. Formatting protocols engaged. Ready." }] },
+        ...messages.slice(0, -1).slice(-6).map(m => ({
             role: m.role === 'user' ? 'user' : 'model',
             parts: [{ text: m.text }]
         }))
@@ -52,16 +52,12 @@ export async function POST(req) {
     });
 
     const result = await chat.sendMessage(lastMessage);
-    const response = await result.response;
-    const text = response.text();
+    const text = result.response.text();
 
     return NextResponse.json({ reply: text });
 
   } catch (error) {
-    console.error("❌ AI Error:", error);
-    return NextResponse.json(
-        { reply: "⚠️ Signal Lost: Re-establishing connection..." },
-        { status: 500 }
-    );
+    console.error("AI Error:", error);
+    return NextResponse.json({ reply: "⚠️ CORE FAILURE: Connection severed." }, { status: 500 });
   }
 }
