@@ -1,63 +1,89 @@
 "use client";
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { 
-  IconVolume, IconLogout, IconTrash, IconUser, IconShield, IconSettings, IconCheck, IconMessageExclamation 
+  IconVolume, IconVolumeOff, IconEye, IconEyeOff, IconGauge, IconUser, IconLogout 
 } from '@tabler/icons-react';
-import { useStudySystem } from '../hooks/useStudySystem';
-import { auth, db } from '../lib/firebase';
-import SupportModal from './SupportModal'; // المكون الجديد
+import { useSettings } from '../context/SettingsContext';
 
-const AVATARS = ["👤", "🤖", "👽", "👾", "💀", "🐱", "🦉", "⚡", "🔥", "💎", "🐉", "🚀"];
+export default function SettingsView({ onLogout }) {
+  const { settings, updateSettings } = useSettings();
 
-export default function SettingsView({ onLogout, resetProgress, user }) {
-  const { setAvatar, stats } = useStudySystem(user);
-  const [soundEnabled, setSoundEnabled] = useState(true); 
-  const [showSupport, setShowSupport] = useState(false);
+  const Toggle = ({ label, icon: Icon, value, onChange }) => (
+    <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl mb-3">
+      <div className="flex items-center gap-3">
+        <div className={`p-2 rounded-lg ${value ? 'bg-cyan-500/20 text-cyan-400' : 'bg-red-500/20 text-red-400'}`}>
+            <Icon size={24} />
+        </div>
+        <span className="font-bold text-sm tracking-widest">{label}</span>
+      </div>
+      <button 
+        onClick={() => onChange(!value)}
+        className={`w-12 h-6 rounded-full p-1 transition-colors ${value ? 'bg-cyan-600' : 'bg-gray-700'}`}
+      >
+        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${value ? 'translate-x-6' : 'translate-x-0'}`} />
+      </button>
+    </div>
+  );
 
   return (
     <div className="w-full h-full flex flex-col p-6 font-sans text-white pb-32 overflow-y-auto custom-scrollbar">
-      
-      {/* Support Modal */}
-      {showSupport && <SupportModal user={user} onClose={() => setShowSupport(false)} />}
+      <div className="max-w-2xl mx-auto w-full">
+        <h2 className="text-3xl font-black mb-8 text-cyan-500 tracking-[0.2em] flex items-center gap-2">
+            <IconGauge className="animate-spin-slow" /> SYSTEM CONFIG
+        </h2>
 
-      <div className="max-w-3xl mx-auto w-full space-y-8">
-        
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="border-b border-white/10 pb-6 flex justify-between items-end">
-            <div>
-                <h2 className="text-4xl font-black tracking-widest flex items-center gap-3 text-white">
-                    <IconSettings size={40} className="text-cyan-500 animate-[spin_10s_linear_infinite]"/>
-                    SYSTEM CONFIG
-                </h2>
-                <p className="text-white/40 text-xs font-bold uppercase tracking-[0.3em] mt-2 ml-14">
-                    Neural Interface Customization
-                </p>
-            </div>
-            {/* زر الدعم الفني */}
-            <button onClick={() => setShowSupport(true)} className="bg-purple-600/20 border border-purple-500 text-purple-400 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-purple-600 hover:text-white transition-all">
-                <IconMessageExclamation size={18} /> CONTACT HQ
-            </button>
-        </motion.div>
+        {/* 1. إعدادات الصوت */}
+        <div className="mb-8">
+            <h3 className="text-xs text-white/40 uppercase font-bold mb-3 ml-2">Audio Modules</h3>
+            <Toggle 
+                label="System SFX" 
+                icon={settings.soundEffects ? IconVolume : IconVolumeOff} 
+                value={settings.soundEffects} 
+                onChange={(v) => updateSettings('soundEffects', v)} 
+            />
+            <Toggle 
+                label="Text-to-Speech" 
+                icon={IconUser} 
+                value={settings.speech} 
+                onChange={(v) => updateSettings('speech', v)} 
+            />
+        </div>
 
-        {/* Avatar Section */}
-        <section className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-            <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-cyan-400"><IconUser/> OPERATIVE IDENTITY</h3>
-            <div className="grid grid-cols-4 md:grid-cols-6 gap-4">
-                {AVATARS.map((avi, index) => {
-                    const isSelected = stats?.avatar === avi;
-                    return (
-                        <button key={index} onClick={() => setAvatar(avi)} className={`aspect-square rounded-xl flex items-center justify-center text-3xl transition-all relative ${isSelected ? 'bg-cyan-600/20 border-2 border-cyan-500' : 'bg-white/5 border border-white/10 hover:bg-white/10'}`}>
-                            {avi}
-                            {isSelected && <div className="absolute -top-2 -right-2 bg-cyan-500 rounded-full p-0.5 text-black"><IconCheck size={12} stroke={4} /></div>}
-                        </button>
-                    );
-                })}
+        {/* 2. إعدادات الرسومات */}
+        <div className="mb-8">
+            <h3 className="text-xs text-white/40 uppercase font-bold mb-3 ml-2">Visual Interface</h3>
+            <Toggle 
+                label="High Performance (Effects)" 
+                icon={settings.visualEffects ? IconEye : IconEyeOff} 
+                value={settings.visualEffects} 
+                onChange={(v) => updateSettings('visualEffects', v)} 
+            />
+        </div>
+
+        {/* 3. الصعوبة */}
+        <div className="mb-8">
+            <h3 className="text-xs text-white/40 uppercase font-bold mb-3 ml-2">Training Intensity</h3>
+            <div className="grid grid-cols-3 gap-2">
+                {['easy', 'normal', 'hard'].map((mode) => (
+                    <button
+                        key={mode}
+                        onClick={() => updateSettings('difficulty', mode)}
+                        className={`py-3 rounded-lg font-bold text-xs uppercase border transition-all ${
+                            settings.difficulty === mode 
+                            ? 'bg-cyan-600 border-cyan-400 text-white shadow-[0_0_15px_rgba(6,182,212,0.3)]' 
+                            : 'bg-black border-white/10 text-white/40 hover:bg-white/5'
+                        }`}
+                    >
+                        {mode}
+                    </button>
+                ))}
             </div>
-        </section>
+        </div>
 
         {/* Logout */}
-        <button onClick={onLogout} className="w-full py-5 bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-2xl font-black tracking-widest flex items-center justify-center gap-3 transition-all">
-            <IconLogout className="text-cyan-500"/> DISCONNECT
+        <button onClick={onLogout} className="w-full py-4 mt-4 bg-red-900/20 border border-red-500/50 text-red-500 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-red-900/40 transition-all">
+            <IconLogout size={20} /> TERMINATE SESSION
         </button>
       </div>
     </div>
