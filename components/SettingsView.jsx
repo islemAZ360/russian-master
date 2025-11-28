@@ -1,8 +1,7 @@
 "use client";
 import React from 'react';
-import { motion } from 'framer-motion';
 import { 
-  IconVolume, IconVolumeOff, IconEye, IconEyeOff, IconGauge, IconUser, IconLogout 
+  IconVolume, IconVolumeOff, IconEye, IconEyeOff, IconGauge, IconLogout, IconCpu 
 } from '@tabler/icons-react';
 import { useSettings } from '../context/SettingsContext';
 
@@ -10,7 +9,7 @@ export default function SettingsView({ onLogout }) {
   const { settings, updateSettings } = useSettings();
 
   const Toggle = ({ label, icon: Icon, value, onChange }) => (
-    <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl mb-3">
+    <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl mb-3 hover:bg-white/10 transition-all">
       <div className="flex items-center gap-3">
         <div className={`p-2 rounded-lg ${value ? 'bg-cyan-500/20 text-cyan-400' : 'bg-red-500/20 text-red-400'}`}>
             <Icon size={24} />
@@ -33,35 +32,20 @@ export default function SettingsView({ onLogout }) {
             <IconGauge className="animate-spin-slow" /> SYSTEM CONFIG
         </h2>
 
-        {/* 1. إعدادات الصوت */}
+        {/* إعدادات الصوت */}
         <div className="mb-8">
             <h3 className="text-xs text-white/40 uppercase font-bold mb-3 ml-2">Audio Modules</h3>
-            <Toggle 
-                label="System SFX" 
-                icon={settings.soundEffects ? IconVolume : IconVolumeOff} 
-                value={settings.soundEffects} 
-                onChange={(v) => updateSettings('soundEffects', v)} 
-            />
-            <Toggle 
-                label="Text-to-Speech" 
-                icon={IconUser} 
-                value={settings.speech} 
-                onChange={(v) => updateSettings('speech', v)} 
-            />
+            <Toggle label="System SFX" icon={settings.soundEffects ? IconVolume : IconVolumeOff} value={settings.soundEffects} onChange={(v) => updateSettings('soundEffects', v)} />
+            <Toggle label="Voice Assistant" icon={IconCpu} value={settings.speech} onChange={(v) => updateSettings('speech', v)} />
         </div>
 
-        {/* 2. إعدادات الرسومات */}
+        {/* إعدادات الجرافيك */}
         <div className="mb-8">
             <h3 className="text-xs text-white/40 uppercase font-bold mb-3 ml-2">Visual Interface</h3>
-            <Toggle 
-                label="High Performance (Effects)" 
-                icon={settings.visualEffects ? IconEye : IconEyeOff} 
-                value={settings.visualEffects} 
-                onChange={(v) => updateSettings('visualEffects', v)} 
-            />
+            <Toggle label="High Performance" icon={settings.visualEffects ? IconEye : IconEyeOff} value={settings.visualEffects} onChange={(v) => updateSettings('visualEffects', v)} />
         </div>
 
-        {/* 3. الصعوبة */}
+        {/* إعدادات الصعوبة */}
         <div className="mb-8">
             <h3 className="text-xs text-white/40 uppercase font-bold mb-3 ml-2">Training Intensity</h3>
             <div className="grid grid-cols-3 gap-2">
@@ -81,7 +65,7 @@ export default function SettingsView({ onLogout }) {
             </div>
         </div>
 
-        {/* Logout */}
+        {/* تسجيل الخروج */}
         <button onClick={onLogout} className="w-full py-4 mt-4 bg-red-900/20 border border-red-500/50 text-red-500 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-red-900/40 transition-all">
             <IconLogout size={20} /> TERMINATE SESSION
         </button>

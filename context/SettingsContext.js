@@ -4,13 +4,15 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 const SettingsContext = createContext();
 
 export const SettingsProvider = ({ children }) => {
+  // الإعدادات الافتراضية
   const [settings, setSettings] = useState({
-    soundEffects: true,
-    speech: true,
-    visualEffects: true,
-    difficulty: 'normal',
+    soundEffects: true, // تفعيل المؤثرات الصوتية
+    speech: true,       // تفعيل نطق الكلمات
+    visualEffects: true, // تفعيل الجرافيك العالي
+    difficulty: 'normal', // مستوى الصعوبة
   });
 
+  // تحميل الإعدادات المحفوظة عند فتح الموقع
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('russian_master_config');
@@ -24,6 +26,7 @@ export const SettingsProvider = ({ children }) => {
     }
   }, []);
 
+  // دالة لتحديث الإعدادات وحفظها
   const updateSettings = (key, value) => {
     setSettings(prev => {
       const newSettings = { ...prev, [key]: value };
@@ -41,6 +44,7 @@ export const SettingsProvider = ({ children }) => {
   );
 };
 
+// Hook لاستخدام الإعدادات في أي مكان
 export const useSettings = () => {
   const context = useContext(SettingsContext);
   if (!context) {
