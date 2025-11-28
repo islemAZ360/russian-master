@@ -9,9 +9,8 @@ const API_KEY = "AIzaSyDi8-POg6RGCoBCkni6_8XNikJvTmH4z3M";
 export default function AITutor({ user }) {
   const userName = user?.email?.split('@')[0] || 'Operative';
   
-  // الحالة الافتراضية للرسائل
   const [messages, setMessages] = useState([
-    { role: "model", text: `System Online.\nWelcome, ${userName}. Select AI Core and state objective.` }
+    { role: "model", text: `System Online (Gemini Pro).\nWelcome, ${userName}. Select AI Core and state objective.` }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,15 +25,14 @@ export default function AITutor({ user }) {
     if (!input.trim() || loading) return;
 
     const userMsg = input;
-    setInput(""); // تفريغ الحقل
+    setInput(""); 
     setMessages(prev => [...prev, { role: "user", text: userMsg }]);
     setLoading(true);
 
     try {
-      // --- هنا السر: نستخدم الرابط المباشر مثل ملف HTML تماماً ---
-      // هذا يتجاوز مشاكل المكتبة
+      // ✅ التغيير هنا: استخدمنا gemini-pro لأنه الأكثر استقراراً وتوفراً
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`,
         {
           method: "POST",
           headers: {
@@ -45,7 +43,7 @@ export default function AITutor({ user }) {
               {
                 parts: [
                   { 
-                    // نرسل التوجيه (System Prompt) مع رسالة المستخدم في كل مرة لضمان السياق
+                    // نرسل التوجيه (System Prompt) مع رسالة المستخدم
                     text: `You are "Russian Master AI", a Cyberpunk Russian Tutor. 
                            User Message: ${userMsg}
                            Reply concisely in Russian then English.` 
@@ -59,18 +57,18 @@ export default function AITutor({ user }) {
 
       const data = await response.json();
 
+      // إذا حدث خطأ، اعرضه بوضوح
       if (data.error) {
         throw new Error(data.error.message);
       }
 
-      // استخراج النص من الرد الخام
       const botReply = data.candidates[0].content.parts[0].text;
-      
       setMessages(prev => [...prev, { role: "model", text: botReply }]);
 
     } catch (err) {
       console.error("Fetch Error:", err);
-      setMessages(prev => [...prev, { role: "model", text: `⚠️ Critical Error: ${err.message || "Connection Failed"}` }]);
+      // طباعة الخطأ في الشات للمساعدة
+      setMessages(prev => [...prev, { role: "model", text: `⚠️ API Error: ${err.message}` }]);
     } finally {
       setLoading(false);
     }
@@ -86,7 +84,7 @@ export default function AITutor({ user }) {
         </div>
         <div>
             <h2 className="text-xl font-black text-white tracking-widest">AI MENTOR</h2>
-            <p className="text-[10px] text-cyan-400/60 font-mono uppercase">Direct HTTP Mode</p>
+            <p className="text-[10px] text-cyan-400/60 font-mono uppercase">Core: Gemini Pro</p>
         </div>
       </div>
 
