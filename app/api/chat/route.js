@@ -4,63 +4,54 @@ import { fullDatabase } from "@/data/fullDatabase";
 
 export async function POST(req) {
   try {
-    // التعديل هنا: نستقبل modelName من واجهة المستخدم
-    const { message, history, modelName } = await req.json();
+    console.log("--- 1. بدء طلب جديد ---");
     
-    const apiKey = process.env.GEMINI_API_KEY;
+    // 1. التأكد من وصول البيانات من الفرونت إند
+    const body = await req.json();
+    console.log("--- 2. البيانات المستلمة:", { 
+        message: body.message, 
+        modelName: body.modelName,
+        historyLength: body.history?.length 
+    });
 
+    // 2. التأكد من قراءة المفتاح
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: "API Key not found" }, { status: 500 });
+      console.error("--- ❌ خطأ: المفتاح غير موجود في process.env ---");
+      return NextResponse.json({ error: "API Key Missing on Server" }, { status: 500 });
     }
+    console.log("--- 3. المفتاح موجود (تمت قراءته بنجاح) ---");
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    
-    // استخدام الموديل المختار، وإذا لم يرسل المستخدم شيئاً نستخدم Flash كاحتياط
-    // ملاحظة: تأكدنا أن هذه الموديلات مدعومة
-    const selectedModel = modelName || "gemini-1.5-flash";
+    const selectedModel = body.modelName || "gemini-1.5-flash";
     const model = genAI.getGenerativeModel({ model: selectedModel });
 
     const categories = fullDatabase 
       ? [...new Set(fullDatabase.map(item => item.category))].join(", ")
       : "General Russian";
     
-    const systemPrompt = `
-      You are "Russian Master AI", running on core [${selectedModel}].
-      
-      Mission Protocols:
-      1. Teach Russian language efficiently.
-      2. Strictly correct grammar/spelling errors.
-      3. Use English/Arabic for explanations.
-      4. Current User Study Sectors: [${categories}].
-      5. Tone: Cyberpunk, Military, Concise (e.g., "Affirmative", "Negative", "Data uploaded").
-      
-      Directives:
-      - Reply in Russian first, then translate/explain.
-      - Keep responses short and impactful.
-    `;
+    const systemPrompt = `You are a strict Russian tutor. User is studying: [${categories}]. Reply in Russian then English.`;
+
+    console.log(`--- 4. جاري الاتصال بجوجل باستخدام موديل: ${selectedModel} ---`);
 
     const chat = model.startChat({
       history: [
-        {
-          role: "user",
-          parts: [{ text: systemPrompt }],
-        },
-        {
-          role: "model",
-          parts: [{ text: `Core ${selectedModel} Online. Ready for instructions.` }],
-        },
-        ...history 
+        { role: "user", parts: [{ text: systemPrompt }] },
+        { role: "model", parts: [{ text: "Ready." }] },
+        ...(body.history || [])
       ],
     });
 
-    const result = await chat.sendMessage(message);
+    const result = await chat.sendMessage(body.message);
     const response = await result.response;
     const text = response.text();
 
+    console.log("--- 5. تم استلام الرد من جوجل بنجاح ---");
     return NextResponse.json({ reply: text });
 
   } catch (error) {
-    console.error("AI Error:", error);
-    return NextResponse.json({ error: "System Overload. Try switching cores." }, { status: 500 });
+    // هذا سيطبع الخطأ الحقيقي في التيرمينال عندك
+    console.error("--- ❌❌ خطأ فادح في السيرفر:", error);
+    return NextResponse.json({ error: error.message || "Unknown Error" }, { status: 500 });
   }
 }
