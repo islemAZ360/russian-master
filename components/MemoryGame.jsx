@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { IconBrain, IconCheck, IconX, IconRefresh } from "@tabler/icons-react";
+import { IconBrain, IconRefresh, IconX } from "@tabler/icons-react";
 import confetti from "canvas-confetti";
 
 export default function MemoryGame({ cards, onClose }) {
@@ -11,26 +11,26 @@ export default function MemoryGame({ cards, onClose }) {
   const [disabled, setDisabled] = useState(false);
   const [won, setWon] = useState(false);
 
-  // تحضير البطاقات (خلط الروسي والعربي)
-  useEffect(() => {
-    initializeGame();
-  }, []);
+  useEffect(() => { initializeGame(); }, []);
 
   const initializeGame = () => {
-    // نأخذ عينة عشوائية من 6 كلمات (12 بطاقة)
-    const sample = cards
-      .filter(c => c.russian && c.arabic)
-      .sort(() => 0.5 - Math.random())
-      .slice(0, 6);
+    const validCards = cards.filter(c => c.russian && c.arabic);
+    if (validCards.length < 2) return;
 
-    const russianCards = sample.map(c => ({ id: c.id, content: c.russian, type: 'ru', pairId: c.id }));
-    const arabicCards = sample.map(c => ({ id: c.id + '_ar', content: c.arabic, type: 'ar', pairId: c.id }));
+    // نأخذ عينة صغيرة (6 أزواج = 12 بطاقة)
+    const sample = validCards.sort(() => 0.5 - Math.random()).slice(0, 6);
 
-    const combined = [...russianCards, ...arabicCards].sort(() => 0.5 - Math.random());
-    setGameCards(combined);
+    // إنشاء البطاقات بمعرفات فريدة
+    const deck = sample.flatMap(item => [
+        { id: `${item.id}-ru`, content: item.russian, pairId: item.id, type: 'ru' },
+        { id: `${item.id}-ar`, content: item.arabic, pairId: item.id, type: 'ar' }
+    ]).sort(() => Math.random() - 0.5);
+
+    setGameCards(deck);
     setFlipped([]);
     setSolved([]);
     setWon(false);
+    setDisabled(false);
   };
 
   const handleClick = (id) => {
@@ -43,8 +43,10 @@ export default function MemoryGame({ cards, onClose }) {
 
     if (flipped.length === 1) {
       setDisabled(true);
-      setFlipped([...flipped, id]);
-      checkForMatch(flipped[0], id);
+      const firstId = flipped[0];
+      const secondId = id;
+      setFlipped([firstId, secondId]);
+      checkForMatch(firstId, secondId);
     }
   };
 
@@ -56,7 +58,13 @@ export default function MemoryGame({ cards, onClose }) {
       setSolved(prev => [...prev, id1, id2]);
       setFlipped([]);
       setDisabled(false);
-      if (solved.length + 2 === gameCards.length) handleWin();
+      // تحقق الفوز
+      if (solved.length + 2 === gameCards.length) {
+          setTimeout(() => {
+              setWon(true);
+              confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+          }, 500);
+      }
     } else {
       setTimeout(() => {
         setFlipped([]);
@@ -65,24 +73,17 @@ export default function MemoryGame({ cards, onClose }) {
     }
   };
 
-  const handleWin = () => {
-    setWon(true);
-    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-  };
+  if (gameCards.length === 0) return <div className="text-white text-center p-10 pt-20">No enough cards. <br/><button onClick={onClose} className="mt-4 text-red-500 border border-red-500 px-4 py-2 rounded">Close</button></div>;
 
   return (
     <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col items-center justify-center p-4">
-      <div className="absolute inset-0 bg-purple-900/10 pointer-events-none scanlines"></div>
-      
       <div className="flex justify-between w-full max-w-4xl mb-8 items-center z-10">
-        <h2 className="text-3xl font-black text-purple-500 tracking-widest flex items-center gap-2">
-            <IconBrain size={32}/> MEMORY CORE
-        </h2>
-        <button onClick={onClose} className="px-4 py-2 border border-red-500 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors">EXIT</button>
+        <h2 className="text-3xl font-black text-purple-500 tracking-widest flex items-center gap-2"><IconBrain size={32}/> MEMORY CORE</h2>
+        <button onClick={onClose} className="px-4 py-2 border border-red-500 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors"><IconX/></button>
       </div>
 
       {!won ? (
-        <div className="grid grid-cols-3 md:grid-cols-4 gap-4 max-w-4xl w-full z-10">
+        <div className="grid grid-cols-3 md:grid-cols-4 gap-3 max-w-4xl w-full z-10">
             {gameCards.map((card) => {
                 const isFlipped = flipped.includes(card.id) || solved.includes(card.id);
                 const isSolved = solved.includes(card.id);
@@ -93,20 +94,14 @@ export default function MemoryGame({ cards, onClose }) {
                         animate={{ rotateY: isFlipped ? 180 : 0 }}
                         transition={{ duration: 0.3 }}
                         onClick={() => handleClick(card.id)}
-                        className="relative h-32 cursor-pointer perspective-1000"
+                        className="relative h-24 md:h-32 cursor-pointer perspective-1000"
                     >
-                        {/* الوجه الخلفي (مخفي) */}
-                        <div className="absolute inset-0 bg-gray-900 border-2 border-purple-500/30 rounded-xl flex items-center justify-center backface-hidden">
-                            <IconBrain className="text-purple-500/20" size={40}/>
+                        <div className="absolute inset-0 bg-gray-900 border-2 border-purple-500/30 rounded-xl flex items-center justify-center backface-hidden" style={{ backfaceVisibility: 'hidden' }}>
+                            <IconBrain className="text-purple-500/20" size={30}/>
                         </div>
-                        {/* الوجه الأمامي (النص) */}
                         <div 
-                            className={`absolute inset-0 rounded-xl flex items-center justify-center p-2 text-center text-sm font-bold border-2 backface-hidden transition-colors ${
-                                isSolved 
-                                ? 'bg-green-900/20 border-green-500 text-green-400' 
-                                : 'bg-purple-900/20 border-purple-500 text-white'
-                            }`}
-                            style={{ transform: "rotateY(180deg)" }}
+                            className={`absolute inset-0 rounded-xl flex items-center justify-center p-2 text-center text-sm font-bold border-2 backface-hidden transition-colors ${isSolved ? 'bg-green-900/40 border-green-500 text-green-400' : 'bg-purple-900/40 border-purple-500 text-white'}`}
+                            style={{ transform: "rotateY(180deg)", backfaceVisibility: 'hidden' }}
                         >
                             {card.content}
                         </div>
@@ -115,7 +110,7 @@ export default function MemoryGame({ cards, onClose }) {
             })}
         </div>
       ) : (
-        <div className="text-center z-10 animate-in zoom-in duration-500">
+        <div className="text-center z-10 animate-in zoom-in duration-500 bg-purple-900/20 p-10 rounded-3xl border border-purple-500">
             <h1 className="text-6xl font-black text-green-500 mb-4">DATA SYNCED</h1>
             <button onClick={initializeGame} className="px-8 py-3 bg-white text-black font-bold rounded-full hover:scale-105 transition-transform flex items-center gap-2 mx-auto">
                 <IconRefresh/> REPLAY

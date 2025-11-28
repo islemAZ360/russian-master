@@ -2,6 +2,59 @@
 
 
 ==================================================================
+FILE: app\api\chat\route.js
+==================================================================
+
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { NextResponse } from "next/server";
+
+// ⚠️ سنضع المفتاح هنا مباشرة للتجربة فقط لنرى هل المشكلة في قراءة الملف أم لا
+const HARDCODED_KEY = "AIzaSyDi8-POg6RGCoBCkni6_8XNikJvTmH4z3M";
+
+export async function POST(req) {
+  console.log("--- بدء محاولة الاتصال (Test Mode) ---");
+
+  try {
+    // 1. استقبال الرسالة
+    const body = await req.json();
+    const { message } = body;
+    console.log("الرسالة المستلمة:", message);
+
+    // 2. تجربة الاتصال المباشر
+    const genAI = new GoogleGenerativeAI(HARDCODED_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const chat = model.startChat({
+      history: [
+        {
+          role: "model",
+          parts: [{ text: "System Online. I am ready." }],
+        },
+      ],
+    });
+
+    console.log("جاري إرسال الطلب لجوجل...");
+    const result = await chat.sendMessage(message);
+    const response = await result.response;
+    const text = response.text();
+
+    console.log("تم الاستلام بنجاح:", text);
+    return NextResponse.json({ reply: text });
+
+  } catch (error) {
+    // هذا سيطبع المشكلة الحقيقية في التيرمينال
+    console.error("❌❌ خطأ فادح:", error);
+    
+    // سنعيد رسالة الخطأ للواجهة لنراها هناك أيضاً
+    return NextResponse.json({ 
+        error: "فشل الاتصال بالسيرفر", 
+        details: error.message 
+    }, { status: 500 });
+  }
+}
+
+
+==================================================================
 FILE: app\globals.css
 ==================================================================
 
@@ -9,60 +62,99 @@ FILE: app\globals.css
 @tailwind components;
 @tailwind utilities;
 
+/* --- 1. استيراد الخطوط (عربي + تقني) --- */
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
 
 :root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 3, 0, 20;
-  --background-end-rgb: 0, 0, 0;
   --neon-cyan: #06b6d4;
   --neon-purple: #a855f7;
+  --neon-red: #ef4444;
+  --bg-dark: #050505;
 }
 
+/* --- 2. إعدادات الصفحة الأساسية --- */
 body {
-  color: rgb(var(--foreground-rgb));
-  background: black;
-  font-family: 'JetBrains Mono', monospace; /* خط تقني للأرقام والإنجليزية */
-  overflow: hidden;
+  color: white;
+  background: var(--bg-dark);
+  font-family: 'JetBrains Mono', monospace; /* الأرقام والإنجليزية */
+  overflow-x: hidden; /* منع التمرير العرضي */
+  -webkit-font-smoothing: antialiased;
 }
 
-/* دعم الخط العربي */
-h1, h2, h3, h4, p, span, div {
+/* دعم الخط العربي في النصوص */
+h1, h2, h3, h4, p, span, div, button, input, textarea {
   font-family: 'Cairo', sans-serif;
 }
 
-/* --- المؤثرات السينمائية (The Cinematic Effects) --- */
+/* الأكواد والأرقام تبقى بالخط التقني */
+.font-mono {
+  font-family: 'JetBrains Mono', monospace !important;
+}
 
-/* 1. تأثير شاشة CRT القديمة (Scanlines) */
+/* --- 3. تخصيص شريط التمرير (Scrollbar) ليبدو احترافياً --- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+  transition: background 0.3s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neon-cyan);
+  box-shadow: 0 0 10px var(--neon-cyan);
+}
+
+/* --- 4. الطبقات السينمائية (Cinematic Overlays) --- */
+
+/* تأثير خطوط الشاشة (Scanlines) */
 .scanlines {
   background: linear-gradient(
     to bottom,
     rgba(255,255,255,0),
     rgba(255,255,255,0) 50%,
-    rgba(0,0,0,0.1) 50%,
-    rgba(0,0,0,0.1)
+    rgba(0,0,0,0.2) 50%,
+    rgba(0,0,0,0.2)
   );
   background-size: 100% 4px;
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 9998;
+  opacity: 0.6;
 }
 
-/* 2. تعتيم الحواف (Vignette) */
+/* تأثير تعتيم الحواف (Vignette) */
 .vignette {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle, transparent 60%, black 100%);
+  background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.8) 100%);
   pointer-events: none;
-  z-index: 9998;
+  z-index: 9997;
 }
 
-/* 3. زوايا الـ HUD */
+/* تأثير الضجيج (Noise) لزيادة الواقعية */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9996;
+  opacity: 0.4;
+}
+
+/* --- 5. زوايا الـ HUD (واجهة النظام) --- */
 .hud-corner {
   position: fixed;
-  width: 30px; height: 30px;
-  border: 2px solid rgba(6, 182, 212, 0.4);
+  width: 40px; height: 40px;
+  border: 2px solid rgba(6, 182, 212, 0.3);
   z-index: 50;
   pointer-events: none;
   transition: all 0.5s ease;
@@ -72,61 +164,195 @@ h1, h2, h3, h4, p, span, div {
 .hud-corner.bl { bottom: 20px; left: 20px; border-right: 0; border-top: 0; }
 .hud-corner.br { bottom: 20px; right: 20px; border-left: 0; border-top: 0; }
 
-/* 4. شريط التمرير السيبراني */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #000; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: var(--neon-cyan); }
+/* --- 6. فئات مساعدة (Utility Classes) --- */
 
-/* --- فئات مساعدة --- */
-.text-glow { text-shadow: 0 0 10px rgba(6, 182, 212, 0.7); }
-.dir-rtl { direction: rtl; }
+/* توهج النصوص */
+.text-glow {
+  text-shadow: 0 0 10px rgba(6, 182, 212, 0.7), 0 0 20px rgba(6, 182, 212, 0.5);
+}
+.text-glow-purple {
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.7), 0 0 20px rgba(168, 85, 247, 0.5);
+}
+
+/* خلفية شبكية (Grid) */
+.bg-grid-pattern {
+  background-size: 40px 40px;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+}
+
+/* الكتابة الآلية */
+.typewriter {
+  overflow: hidden;
+  border-left: 2px solid var(--neon-cyan); /* المؤشر */
+  white-space: nowrap;
+  animation: typing 3s steps(40, end), blink-caret 0.75s step-end infinite;
+}
+
+/* اتجاه النصوص العربية */
+.dir-rtl { direction: rtl; text-align: right; }
+
+/* تأثيرات ثلاثية الأبعاد للبطاقات */
 .preserve-3d { transform-style: preserve-3d; }
 .backface-hidden { backface-visibility: hidden; }
 .perspective-1000 { perspective: 1000px; }
+
+/* --- 7. التحريكات (Animations) --- */
+
+@keyframes typing {
+  from { width: 0 }
+  to { width: 100% }
+}
+
+@keyframes blink-caret {
+  from, to { border-color: transparent }
+  50% { border-color: var(--neon-cyan) }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+/* فئات لاستخدام الأنيميشن */
+.animate-float { animation: float 6s ease-in-out infinite; }
+.animate-pulse-slow { animation: pulse-slow 3s infinite; }
+
+/* تحديد النصوص (Selection) */
+::selection {
+  background: rgba(6, 182, 212, 0.3);
+  color: white;
+  text-shadow: 0 0 5px var(--neon-cyan);
+}
+/* في نهاية الملف */
+
+.glitch-text {
+  position: relative;
+}
+.glitch-text::before,
+.glitch-text::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: black;
+}
+.glitch-text::before {
+  left: 2px;
+  text-shadow: -1px 0 red;
+  clip: rect(24px, 550px, 90px, 0);
+  animation: glitch-anim-2 3s infinite linear alternate-reverse;
+}
+.glitch-text::after {
+  left: -2px;
+  text-shadow: -1px 0 #00ff00;
+  clip: rect(85px, 550px, 140px, 0);
+  animation: glitch-anim 2.5s infinite linear alternate-reverse;
+}
+
+@keyframes glitch-anim {
+  0% { clip: rect(14px, 9999px, 129px, 0); }
+  20% { clip: rect(40px, 9999px, 69px, 0); }
+  40% { clip: rect(96px, 9999px, 12px, 0); }
+  60% { clip: rect(6px, 9999px, 147px, 0); }
+  80% { clip: rect(69px, 9999px, 19px, 0); }
+  100% { clip: rect(122px, 9999px, 20px, 0); }
+}
+@keyframes glitch-anim-2 {
+  0% { clip: rect(126px, 9999px, 142px, 0); }
+  20% { clip: rect(3px, 9999px, 25px, 0); }
+  40% { clip: rect(63px, 9999px, 164px, 0); }
+  60% { clip: rect(124px, 9999px, 14px, 0); }
+  80% { clip: rect(138px, 9999px, 73px, 0); }
+  100% { clip: rect(39px, 9999px, 107px, 0); }
+}
+
+.animate-shake {
+  animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
 
 
 ==================================================================
 FILE: app\layout.js
 ==================================================================
 
+import { JetBrains_Mono, Cairo } from "next/font/google";
 import "./globals.css";
 
+// 1. إعداد الخطوط (Google Fonts Optimization)
+// الخط التقني للأرقام والإنجليزية
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-mono",
+  weight: ["400", "700"],
+  display: "swap",
+});
+
+// الخط العربي للنصوص والشرح
+const cairo = Cairo({
+  subsets: ["arabic", "latin"],
+  variable: "--font-cairo",
+  weight: ["300", "400", "700", "900"],
+  display: "swap",
+});
+
+// 2. بيانات التطبيق (Metadata)
 export const metadata = {
   title: "Russian Master | Neural Interface",
-  description: "Advanced Language Acquisition System",
+  description: "Advanced Cybernetic Language Acquisition System",
   manifest: "/manifest.json", 
+  themeColor: "#050505",
 };
 
+// 3. إعدادات الشاشة (منع الزووم لتعزيز شعور "النظام")
 export const viewport = {
-  themeColor: "#000000",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // منع التكبير للحفاظ على شعور التطبيق
+  userScalable: false, 
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="apple-touch-icon" href="/icon-192.png" />
-      </head>
-      <body>
-        {/* الطبقات السينمائية */}
+    <html lang="ar" dir="ltr" className={`${jetbrainsMono.variable} ${cairo.variable}`}>
+      <body className="antialiased bg-[#050505] text-white overflow-hidden selection:bg-cyan-500/30 selection:text-cyan-100">
+        
+        {/* --- المؤثرات البصرية (Cinematic Layers) --- */}
+        {/* هذه الطبقات تعتمد على CSS الذي كتبناه سابقاً */}
         <div className="scanlines"></div>
         <div className="vignette"></div>
+        <div className="noise-overlay"></div>
         
-        {/* حدود النظام */}
+        {/* --- واجهة النظام (HUD Corners) --- */}
         <div className="hud-corner tl"></div>
         <div className="hud-corner tr"></div>
         <div className="hud-corner bl"></div>
         <div className="hud-corner br"></div>
 
-        {/* خط ليزر علوي للتزيين */}
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 w-1/2 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent z-40"></div>
+        {/* --- خط ليزر علوي للتزيين (Top Laser) --- */}
+        <div className="fixed top-0 left-1/2 -translate-x-1/2 w-2/3 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent z-40 opacity-70 shadow-[0_0_10px_#06b6d4]"></div>
 
-        {children}
+        {/* --- المحتوى الرئيسي للصفحات --- */}
+        <div className="relative z-10 w-full h-full">
+          {children}
+        </div>
+
       </body>
     </html>
   );
@@ -141,28 +367,23 @@ FILE: app\page.js
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  IconHome, 
-  IconCpu, 
-  IconDatabase, 
-  IconTrophy, 
-  IconSettings, 
-  IconShield, 
-  IconLock, 
-  IconAlertTriangle, 
-  IconServer,
-  IconMessageCircle 
+  IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
+  IconShield, IconLock, IconAlertTriangle, IconServer,
+  IconMessageCircle, IconRobot, IconDeviceGamepad 
 } from '@tabler/icons-react';
 
-// --- استيراد المكونات ---
+// --- استيراد المكونات (Components) ---
 import { HeroSection } from '../components/HeroSection';
 import { CategorySelect } from '../components/CategorySelect';
 import { StudyCard } from '../components/StudyCard';
 import { AuthScreen } from '../components/AuthScreen';
-import { DataManager } from '../components/DataManager';
-import CyberDeck from '../components/CyberDeck'; // بديل Leaderboard
-import CommunicationHub from '../components/CommunicationHub'; // الشات الجديد
-import SettingsView from '../components/SettingsView';
-import AdminDashboard from '../components/AdminDashboard';
+import { DataManager } from '../components/DataManager'; 
+import CyberDeck from '../components/CyberDeck'; 
+import CommunicationHub from '../components/CommunicationHub'; 
+import SettingsView from '../components/SettingsView'; 
+import AdminDashboard from '../components/AdminDashboard'; 
+import AITutor from '../components/AITutor';
+import GamesHub from '../components/GamesHub'; // <-- قسم الألعاب الجديد
 import { FloatingDock } from '../components/ui/floating-dock';
 import DigitalRain from '../components/ui/DigitalRain'; 
 import IntroSequence from '../components/IntroSequence'; 
@@ -174,12 +395,15 @@ import { useStudySystem } from '../hooks/useStudySystem';
 import { useAudio } from '../hooks/useAudio';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from "firebase/auth";
-// تصحيح: دمج جميع استيرادات فيربيس في سطر واحد لمنع الأخطاء
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, setDoc, getDoc } from "firebase/firestore";
+
+// الإيميل الرئيسي (السوبر أدمن - لا يمكن حظره ويملك كل الصلاحيات)
+const MASTER_EMAIL = "islamaz@bomba.com";
 
 export default function RussianApp() {
-  // --- تعريف الحالات (State Definition) ---
+  // --- تعريف الحالات (States) ---
   const [user, setUser] = useState(null);
+  const [userData, setUserData] = useState(null); 
   const [currentView, setCurrentView] = useState('home');
   const [activeCategory, setActiveCategory] = useState("All");
   const [showIntro, setShowIntro] = useState(true); 
@@ -188,143 +412,153 @@ export default function RussianApp() {
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
 
-  // حالات نظام المعركة (Boss Battle)
+  // حالات المعركة (لصفحة الدراسة)
   const [battleResult, setBattleResult] = useState(null); 
   const [battleTrigger, setBattleTrigger] = useState(0);
 
-  // استدعاء الهوكات الخاصة
+  // استدعاء منطق النظام
   const { 
-    cards, 
-    currentCard, 
-    stats, 
-    handleSwipe, 
-    resetProgress, 
-    loading: loadingData, 
-    addCard, 
-    deleteCard, 
-    updateCard, 
-    isAdmin, 
-    isBanned 
+    cards, currentCard, stats, handleSwipe, resetProgress, 
+    addCard, deleteCard, updateCard 
   } = useStudySystem(user);
 
   const { speak, playSFX } = useAudio();
 
-  // --- التأثيرات (Effects) ---
-
-  // 1. مراقبة حالة المستخدم (Login/Logout)
+  // --- 1. مراقبة المستخدم والصلاحيات ---
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-        setUser(u);
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+        if (u) {
+            setUser(u);
+            const userRef = doc(db, "users", u.uid);
+            
+            // إصلاح صلاحيات السوبر أدمن تلقائياً عند الدخول
+            if (u.email === MASTER_EMAIL) {
+                const snap = await getDoc(userRef);
+                if (!snap.exists()) {
+                    await setDoc(userRef, { email: u.email, role: 'admin', xp: 0, createdAt: new Date().toISOString() });
+                } else if (snap.data().role !== 'admin') {
+                    await updateDoc(userRef, { role: 'admin' });
+                }
+            }
+
+            // مراقبة بيانات المستخدم الحية (للحظر الفوري أو تغيير الرتبة)
+            onSnapshot(userRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    setUserData(docSnap.data());
+                    // الطرد الأمني
+                    if (docSnap.data().forceLogout) {
+                        auth.signOut();
+                        window.location.reload();
+                    }
+                }
+            });
+            setShowDailyReward(true);
+        } else {
+            setUser(null);
+            setUserData(null);
+        }
         setLoadingAuth(false);
-        if (u) setShowDailyReward(true); // تفعيل المكافأة عند الدخول
     });
     return () => unsubscribe();
   }, []);
 
-  // 2. مراقبة النظام (الصيانة + البث المباشر)
+  // --- 2. مراقبة حالة النظام (رسائل الإدارة والصيانة) ---
   useEffect(() => {
-    const unsubBroad = onSnapshot(doc(db, "system", "broadcast"), (d) => {
-        setBroadcast(d.exists() && d.data().active ? d.data().message : null);
-    });
-    const unsubMaint = onSnapshot(doc(db, "system", "status"), (d) => {
-        setMaintenance(d.exists() ? d.data().maintenance : false);
-    });
+    const unsubBroad = onSnapshot(doc(db, "system", "broadcast"), (d) => setBroadcast(d.exists() && d.data().active ? d.data().message : null));
+    const unsubMaint = onSnapshot(doc(db, "system", "status"), (d) => setMaintenance(d.exists() ? d.data().maintenance : false));
     return () => { unsubBroad(); unsubMaint(); };
   }, []);
 
-  // 3. نظام الطرد الأمني (Kick System)
-  useEffect(() => {
-    if (!user) return;
-    const unsubUserDoc = onSnapshot(doc(db, "users", user.uid), async (snapshot) => {
-        if (snapshot.exists() && snapshot.data().forceLogout) {
-            await auth.signOut();
-            await updateDoc(doc(db, "users", user.uid), { forceLogout: false });
-            window.location.reload(); 
-        }
-    });
-    return () => unsubUserDoc();
-  }, [user]);
-
   const handleLogout = () => auth.signOut().then(() => window.location.reload());
 
-  // تصفية الفئات (Categories)
+  // تصفية الفئات للدراسة
   const categories = useMemo(() => {
       if (!cards) return [];
       return [...new Set(cards.map(c => c.category || "General"))];
   }, [cards]);
 
-  // --- منطق العرض (Rendering Logic) ---
+  // --- تحديد الصلاحيات ---
+  const isMaster = user?.email === MASTER_EMAIL;
+  const isAdmin = userData?.role === 'admin' || isMaster;
+  const isJunior = userData?.role === 'junior' || isAdmin;
+  const isBanned = userData?.isBanned && !isMaster;
 
-  // 1. شاشة الإقلاع (Intro Sequence)
+  // --- الشاشات الافتتاحية والتحذيرية ---
+  
+  // 1. مقدمة سينمائية
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
 
-  // 2. شاشة الصيانة (Maintenance)
+  // 2. وضع الصيانة (يستثنى منه الأدمن)
   if (maintenance && !isAdmin) return (
       <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-orange-500 relative overflow-hidden font-mono">
           <DigitalRain />
           <div className="z-10 text-center bg-black/90 p-12 border border-orange-500/50 rounded-3xl backdrop-blur-xl shadow-[0_0_50px_#ea580c]">
              <IconServer size={100} className="mx-auto mb-6 animate-pulse text-orange-500" />
              <h1 className="text-5xl font-black mb-4 text-white">SYSTEM UPDATING</h1>
-             <p className="text-orange-400/80 tracking-[0.2em] uppercase text-sm mb-8">Server connection severed by Admin.</p>
-             <div className="w-full h-1 bg-orange-900/30 rounded-full overflow-hidden">
-                 <div className="h-full bg-orange-500 w-1/2 animate-[width_2s_ease-in-out_infinite]"></div>
-             </div>
+             <p className="text-orange-400/80 tracking-[0.2em] uppercase text-sm">Server connection severed by Admin.</p>
           </div>
       </div>
   );
 
-  // 3. شاشة الحظر (Banned)
+  // 3. شاشة الحظر
   if (isBanned) return (
     <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-red-500 space-y-6 font-mono relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%)] bg-[size:100%_4px] pointer-events-none"></div>
         <IconLock size={80} className="animate-pulse" />
         <h1 className="text-6xl font-black tracking-widest text-center">ACCESS DENIED</h1>
-        <p className="text-red-500/50 uppercase tracking-widest text-center">Your neural link has been terminated.</p>
-        <button onClick={handleLogout} className="px-8 py-3 bg-red-900/20 border border-red-500 text-red-500 rounded hover:bg-red-500 hover:text-white transition-all">
-            LOGOUT
-        </button>
+        <p className="text-red-500/50 uppercase tracking-widest">Neural Link Terminated.</p>
+        <button onClick={handleLogout} className="px-8 py-3 border border-red-500 rounded hover:bg-red-900/20 transition-colors">LOGOUT</button>
     </div>
   );
 
-  // 4. شاشة التحميل الأولي
-  if (loadingAuth) return <div className="h-screen bg-black text-cyan-500 flex items-center justify-center">LOADING CORE...</div>;
-
+  // 4. شاشة التحميل
+  if (loadingAuth) return <div className="h-screen bg-black text-cyan-500 flex items-center justify-center font-mono animate-pulse">LOADING NEURAL LINK...</div>;
+  
   // 5. شاشة تسجيل الدخول
   if (!user) return <AuthScreen onLoginSuccess={setUser} />;
 
-  // --- بناء القائمة السفلية (Navigation Dock) ---
+  // --- إعداد القائمة السفلية (Navigation Dock) ---
   let navLinks = [
     { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
-    { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') }, // أيقونة الشات
+    { title: "AI Mentor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => setCurrentView('ai-tutor') },
+    // الزر الجديد للألعاب
+    { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
+    
+    { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
     { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
     { title: "Archive", icon: <IconDatabase className="w-full text-emerald-400" />, onClick: () => setCurrentView('data') }, 
     { title: "ID Card", icon: <IconTrophy className="w-full text-yellow-500" />, onClick: () => setCurrentView('leaderboard') },
     { title: "Config", icon: <IconSettings className="w-full text-neutral-400" />, onClick: () => setCurrentView('settings') },
   ];
   
-  if (isAdmin) {
-      navLinks.push({ title: "GOD MODE", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
+  // زر الأدمن يظهر فقط للمصرح لهم
+  if (isJunior) {
+      navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
   }
 
-  // --- محول العرض (View Switcher) ---
+  // --- محول العرض (Routing Logic) ---
   const renderContent = () => {
-    // حماية الأدمن
-    if (currentView === 'admin' && isAdmin) return <AdminDashboard />;
-    if (currentView === 'admin' && !isAdmin) return <HeroSection onStart={() => setCurrentView('category')} user={user} />;
+    // حماية رابط الأدمن
+    if (currentView === 'admin' && !isJunior) return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
 
     switch (currentView) {
       case 'home': 
-        return <HeroSection onStart={() => setCurrentView('category')} user={user} />;
+        return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
+      
+      case 'ai-tutor':
+        return <AITutor user={user} />;
+      
+      case 'games':
+        return <GamesHub cards={cards} />; // قسم الألعاب الجديد
       
       case 'chat':
-        return <CommunicationHub user={user} />; // صفحة الشات الجديدة
+        return <CommunicationHub user={user} />;
       
       case 'category': 
         return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
       
       case 'study':
         return (
-            <div className="flex flex-col items-center justify-center h-full w-full relative">
+            <div className="flex flex-col items-center justify-center h-full w-full relative pb-32">
                 {currentCard ? (
                     <BossBattleWrapper isCorrect={battleResult} resetTrigger={battleTrigger}>
                         <StudyCard 
@@ -352,27 +586,19 @@ export default function RussianApp() {
         );
       
       case 'data': 
-        return <DataManager cards={cards} onAdd={addCard} onDelete={deleteCard} onUpdate={updateCard} />;
+        return <DataManager cards={cards} onAdd={addCard} onDelete={deleteCard} onUpdate={updateCard} isJunior={isJunior} />;
       
-case 'leaderboard': 
-        // حماية البيانات: نمرر كائنات فارغة إذا لم تكن البيانات جاهزة بعد
-        return (
-            <CyberDeck 
-                user={user || { email: 'Guest' }} 
-                stats={stats || { xp: 0, streak: 0, avatar: '👤' }} 
-                cards={cards || []} 
-            />
-        );
+      case 'leaderboard': 
+        return <CyberDeck user={user} stats={stats || { xp: 0, streak: 0, avatar: '👤' }} cards={cards || []} />;
       
       case 'settings': 
-        return (
-            <SettingsView 
-                resetProgress={resetProgress} 
-                onLogout={handleLogout} 
-            />
-        );
+        return <SettingsView user={user} resetProgress={resetProgress} onLogout={handleLogout} />;
+      
+      case 'admin':
+        return <AdminDashboard currentUser={user} userData={userData} />;
+      
       default: 
-        return <HeroSection onStart={() => setCurrentView('category')} user={user} />;
+        return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
     }
   };
 
@@ -382,10 +608,10 @@ case 'leaderboard':
       {/* 1. الخلفية الرقمية */}
       <DigitalRain />
       
-      {/* 2. صندوق المكافأة */}
+      {/* 2. النوافذ العائمة */}
       {showDailyReward && <DailyReward user={user} onClose={() => setShowDailyReward(false)} />}
-
-      {/* 3. شريط البث المباشر */}
+      
+      {/* 3. شريط البث المباشر (للأدمن) */}
       <AnimatePresence>
         {broadcast && (
             <motion.div 
@@ -399,7 +625,7 @@ case 'leaderboard':
       </AnimatePresence>
 
       {/* 4. الحاوية الرئيسية للعرض */}
-      <main className="relative z-10 flex flex-col items-center justify-center min-h-screen w-full pt-10 pb-20 md:pt-0">
+      <main className="relative z-10 flex flex-col items-center justify-center min-h-screen w-full pt-10 md:pt-0">
            <AnimatePresence mode="wait">
              <motion.div 
                 key={currentView} 
@@ -414,7 +640,7 @@ case 'leaderboard':
            </AnimatePresence>
       </main>
 
-      {/* 5. القائمة العائمة */}
+      {/* 5. القائمة السفلية العائمة */}
       <div className="fixed bottom-8 left-0 w-full z-50 flex justify-center pointer-events-none">
           <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="pointer-events-auto">
               <FloatingDock items={navLinks} />
@@ -430,289 +656,179 @@ FILE: components\AdminDashboard.jsx
 ==================================================================
 
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, onSnapshot, deleteDoc, doc, updateDoc, setDoc, addDoc, query, orderBy, limit } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, setDoc, addDoc, query, orderBy, getDocs } from "firebase/firestore";
 import { 
-  IconTrash, IconUser, IconMessage, IconBroadcast, IconDatabase, 
-  IconShield, IconBolt, IconBan, IconGift, 
-  IconEye, IconLock, IconLogout, IconEdit, IconCheck, IconX, IconServer, IconFileCode
+  IconShield, IconBan, IconUser, IconMessage, IconCheck, IconX, IconCrown, IconStar 
 } from '@tabler/icons-react';
 
-// --- CANVAS BACKGROUND (الخلفية الشبكية) ---
-const NeuralMap = () => {
-    const canvasRef = useRef(null);
-    useEffect(() => {
-        const cvs = canvasRef.current;
-        if (!cvs) return;
-        const ctx = cvs.getContext('2d');
-        let w = cvs.width = cvs.offsetWidth;
-        let h = cvs.height = cvs.offsetHeight;
-        
-        // تقليل عدد النقاط قليلاً لتحسين الأداء
-        const nodes = Array.from({length: 30}, () => ({
-            x: Math.random() * w, y: Math.random() * h,
-            vx: (Math.random() - 0.5) * 1, vy: (Math.random() - 0.5) * 1
-        }));
-
-        let animationFrameId;
-
-        const loop = () => {
-            ctx.clearRect(0, 0, w, h);
-            ctx.fillStyle = '#06b6d4';
-            ctx.strokeStyle = 'rgba(6, 182, 212, 0.15)';
-            
-            nodes.forEach((n, i) => {
-                n.x += n.vx; n.y += n.vy;
-                if(n.x < 0 || n.x > w) n.vx *= -1;
-                if(n.y < 0 || n.y > h) n.vy *= -1;
-                
-                ctx.beginPath(); ctx.arc(n.x, n.y, 2, 0, Math.PI*2); ctx.fill();
-                
-                nodes.forEach((o, j) => {
-                    if (i !== j) {
-                        const dist = Math.hypot(n.x - o.x, n.y - o.y);
-                        if (dist < 100) {
-                            ctx.beginPath(); ctx.moveTo(n.x, n.y); ctx.lineTo(o.x, o.y); ctx.stroke();
-                        }
-                    }
-                });
-            });
-            animationFrameId = requestAnimationFrame(loop);
-        };
-        loop();
-
-        const handleResize = () => { 
-            if(cvs){ w = cvs.width = cvs.offsetWidth; h = cvs.height = cvs.offsetHeight; }
-        };
-        window.addEventListener('resize', handleResize);
-        
-        return () => { 
-            cancelAnimationFrame(animationFrameId); 
-            window.removeEventListener('resize', handleResize); 
-        };
-    }, []);
-    return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-20 pointer-events-none" />;
-};
-
-export default function AdminDashboard() {
+export default function AdminDashboard({ currentUser, userData }) {
   const [users, setUsers] = useState([]);
-  const [messages, setMessages] = useState([]);
-  const [cards, setCards] = useState([]); 
-  const [activeTab, setActiveTab] = useState('overview'); 
-  const [broadcastMsg, setBroadcastMsg] = useState("");
-  const [realLogs, setRealLogs] = useState([]);
-  const [maintenance, setMaintenance] = useState(false);
-  
-  // Library Edit State
-  const [editingCard, setEditingCard] = useState(null);
-  const [searchCard, setSearchCard] = useState("");
-  const [newCard, setNewCard] = useState({ russian: "", arabic: "", category: "General" });
+  const [activeTab, setActiveTab] = useState('users'); 
+  const [supportTickets, setSupportTickets] = useState([]);
+  const [replyText, setReplyText] = useState("");
+  const [selectedTicket, setSelectedTicket] = useState(null);
 
-  // User Inspector State
-  const [inspectUser, setInspectUser] = useState(null);
-  const [jsonEdit, setJsonEdit] = useState("");
+  // تحقق أن المستخدم الحالي أدمن حقيقي (وليس جونيور فقط) لبعض الخصائص
+  const isSuperAdmin = userData?.role === 'admin';
 
   useEffect(() => {
-    // جلب البيانات
-    const unsubSys = onSnapshot(doc(db, "system", "status"), (d) => setMaintenance(d.exists() ? d.data().maintenance : false));
-    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b)=>(b.xp||0)-(a.xp||0))));
-    const unsubMsgs = onSnapshot(query(collection(db, "messages"), orderBy("createdAt", "desc")), (s) => setMessages(s.docs.map(d=>({id:d.id,...d.data()}))));
-    const unsubCards = onSnapshot(collection(db, "library"), (s) => setCards(s.docs.map(d=>({id:d.id,...d.data()}))));
-    
-    // جلب السجلات (Logs)
-    const unsubLogs = onSnapshot(query(collection(db, "system_logs"), orderBy("timestamp", "desc"), limit(50)), (s) => {
-        setRealLogs(s.docs.map(d=>({id:d.id, ...d.data()})));
+    // جلب المستخدمين
+    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
+        setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    return () => { unsubUsers(); unsubMsgs(); unsubCards(); unsubLogs(); unsubSys(); };
+    // جلب تذاكر الدعم
+    const unsubSupport = onSnapshot(query(collection(db, "support_tickets"), orderBy("lastUpdate", "desc")), (snap) => {
+        setSupportTickets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    return () => { unsubUsers(); unsubSupport(); };
   }, []);
 
-  // --- ACTIONS ---
-  const toggleMaint = async () => {
-      const newState = !maintenance;
-      await setDoc(doc(db, "system", "status"), { maintenance: newState }, { merge: true });
-      if(newState) await setDoc(doc(db, "system", "broadcast"), { message: "⚠️ MAINTENANCE STARTED ⚠️", active: true, timestamp: Date.now() });
-      else await setDoc(doc(db, "system", "broadcast"), { active: false });
-  };
-  
-  const sendBroadcast = async () => { await setDoc(doc(db, "system", "broadcast"), { message: broadcastMsg, active: !!broadcastMsg, timestamp: Date.now() }); if(broadcastMsg) alert("Deployed!"); };
-  const kickUser = async (id) => { if(confirm("Kick?")) { await updateDoc(doc(db, "users", id), { forceLogout: true }); setTimeout(()=>updateDoc(doc(db, "users", id), { forceLogout: false }), 5000); }};
-  const banUser = async (id, status) => await updateDoc(doc(db, "users", id), { isBanned: !status });
-
-  // Library Actions
-  const addLibCard = async (e) => { e.preventDefault(); if(!newCard.russian) return; await addDoc(collection(db, "library"), {...newCard, createdAt: Date.now()}); setNewCard({russian:"",arabic:"",category:"General"}); };
-  const deleteLibCard = async (id) => { if(confirm("Delete Word?")) await deleteDoc(doc(db, "library", id)); };
-  const updateLibCard = async () => { if(editingCard) { await updateDoc(doc(db, "library", editingCard.id), { russian: editingCard.russian, arabic: editingCard.arabic, category: editingCard.category }); setEditingCard(null); }};
-
-  // Inspector Actions
-  const openInspector = (user) => { setInspectUser(user); setJsonEdit(JSON.stringify(user, null, 4)); };
-  const saveInspector = async () => {
-      try {
-          const parsed = JSON.parse(jsonEdit);
-          const { id, ...data } = parsed; 
-          await updateDoc(doc(db, "users", inspectUser.id), data);
-          alert("User Data Patched Successfully!");
-          setInspectUser(null);
-      } catch (e) { alert("Invalid JSON: " + e.message); }
+  // --- التحكم بالرتب ---
+  const changeRole = async (userId, newRole) => {
+      if (!isSuperAdmin) return alert("Access Denied: Only Super Admin can promote users.");
+      if (confirm(`Change user role to ${newRole}?`)) {
+          await updateDoc(doc(db, "users", userId), { role: newRole });
+      }
   };
 
-  // فلترة الكلمات
-  const filteredCards = cards.filter(c => 
-    (c.russian && c.russian.toLowerCase().includes(searchCard.toLowerCase())) || 
-    (c.arabic && c.arabic.includes(searchCard))
-  );
+  const banUser = async (id, status) => {
+      if (!isSuperAdmin) return alert("Access Denied: Only Super Admin can ban users.");
+      await updateDoc(doc(db, "users", id), { isBanned: !status });
+  };
+
+  // --- الدعم الفني ---
+  const sendSupportReply = async () => {
+      if (!selectedTicket || !replyText) return;
+      
+      const ticketRef = doc(db, "support_tickets", selectedTicket.id);
+      const newMessage = {
+          text: replyText,
+          sender: "admin",
+          createdAt: new Date().toISOString()
+      };
+
+      // تحديث مصفوفة الرسائل
+      const updatedMessages = [...(selectedTicket.messages || []), newMessage];
+      
+      await updateDoc(ticketRef, {
+          messages: updatedMessages,
+          lastUpdate: new Date().toISOString(),
+          status: 'answered'
+      });
+
+      setReplyText("");
+  };
 
   return (
-    <div className="w-full h-screen flex flex-col p-4 font-sans text-white overflow-hidden relative bg-black">
+    <div className="w-full h-full flex flex-col p-6 font-sans text-white overflow-hidden relative pb-32">
       
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-4 shrink-0 z-10">
-        <div className="flex items-center gap-3">
-            <IconShield size={32} className={`text-white ${maintenance ? 'animate-pulse text-orange-500' : ''}`} />
-            <div>
-                <h1 className="text-2xl font-black tracking-widest">NEXUS CONTROL</h1>
-                <p className="text-xs text-white/40 tracking-[0.3em] font-bold">Admin Privileges Active</p>
-            </div>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+        <div>
+            <h1 className="text-3xl font-black text-white tracking-widest flex items-center gap-2">
+                <IconShield className="text-red-500"/> COMMAND CENTER
+            </h1>
+            <p className="text-xs text-white/40 font-mono">
+                LOGGED AS: <span className="text-cyan-400 uppercase">{userData?.role || "UNKNOWN"}</span>
+            </p>
         </div>
-        <div className="flex gap-2 bg-white/5 p-1 rounded-lg">
-            {['overview','users','database','logs'].map(t => (
-                <button key={t} onClick={()=>setActiveTab(t)} className={`px-4 py-1 rounded text-xs font-bold uppercase ${activeTab===t ? 'bg-cyan-600 text-white' : 'text-white/40 hover:text-white'}`}>{t}</button>
-            ))}
+        <div className="flex gap-2">
+            <button onClick={()=>setActiveTab('users')} className={`px-4 py-2 rounded font-bold ${activeTab==='users' ? 'bg-cyan-600' : 'bg-white/10'}`}>USERS</button>
+            <button onClick={()=>setActiveTab('support')} className={`px-4 py-2 rounded font-bold ${activeTab==='support' ? 'bg-purple-600' : 'bg-white/10'}`}>SUPPORT</button>
         </div>
       </div>
 
-      {/* CONTENT AREA */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#080808] border border-white/10 rounded-2xl relative shadow-2xl">
-        
-        {/* TAB: OVERVIEW */}
-        {activeTab === 'overview' && (
-            <div className="relative h-full p-6">
-                <NeuralMap />
-                <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                    <StatCard title="AGENTS" value={users.length} color="text-cyan-400" border="border-cyan-500/30" bg="bg-cyan-900/20" />
-                    <StatCard title="DATA UNITS" value={cards.length} color="text-purple-400" border="border-purple-500/30" bg="bg-purple-900/20" />
-                    <div className={`border p-6 rounded-xl cursor-pointer flex items-center justify-center gap-4 ${maintenance ? 'bg-orange-900/40 border-orange-500' : 'bg-black/40 border-white/10'}`} onClick={toggleMaint}>
-                        <IconServer size={32} className={maintenance ? 'text-orange-500 animate-bounce' : 'text-white/20'}/>
-                        <div className="text-left"><h3 className="font-bold">MAINTENANCE</h3><p className="text-xs">{maintenance ? "ACTIVE" : "DISABLED"}</p></div>
-                    </div>
-                </div>
-                <div className="relative z-10 bg-black/60 border border-white/10 rounded-xl p-4 flex gap-4">
-                    <input value={broadcastMsg} onChange={(e) => setBroadcastMsg(e.target.value)} placeholder="GLOBAL BROADCAST MESSAGE..." className="flex-1 bg-transparent outline-none font-mono text-sm" />
-                    <button onClick={sendBroadcast} className="text-red-500 font-bold text-xs border border-red-500/50 px-4 py-2 rounded hover:bg-red-500 hover:text-white transition-all">DEPLOY</button>
-                </div>
-            </div>
-        )}
-
-        {/* TAB: USERS */}
-        {activeTab === 'users' && (
-            <div className="p-2">
-                <table className="w-full text-left text-xs md:text-sm">
-                    <thead className="bg-white/5 text-white/40 uppercase"><tr><th className="p-3">User</th><th className="p-3">XP</th><th className="p-3">Status</th><th className="p-3 text-right">Control</th></tr></thead>
-                    <tbody className="divide-y divide-white/5">
-                        {users.map(u => (
-                            <tr key={u.id} className="hover:bg-white/5">
-                                <td className="p-3 font-bold text-cyan-400 cursor-pointer hover:underline" onClick={() => openInspector(u)}>{u.email}</td>
-                                <td className="p-3 font-mono">{u.xp}</td>
-                                <td className="p-3">{u.isBanned ? <span className="text-red-500">BANNED</span> : <span className="text-emerald-500">OK</span>}</td>
-                                <td className="p-3 text-right flex justify-end gap-2">
-                                    <button onClick={() => openInspector(u)} className="text-blue-400 hover:bg-blue-900/30 p-1 rounded"><IconFileCode size={16}/></button>
-                                    <button onClick={() => kickUser(u.id)} className="text-orange-400 hover:bg-orange-900/30 p-1 rounded"><IconLogout size={16}/></button>
-                                    <button onClick={() => banUser(u.id, u.isBanned)} className="text-red-400 hover:bg-red-900/30 p-1 rounded"><IconBan size={16}/></button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        )}
-
-        {/* TAB: DATABASE */}
-        {activeTab === 'database' && (
-            <div className="flex flex-col h-full">
-                <div className="p-4 border-b border-white/10 bg-black/20 flex flex-col md:flex-row gap-4">
-                    <div className="flex-1 grid grid-cols-3 gap-2">
-                        <input value={newCard.russian} onChange={e=>setNewCard({...newCard, russian:e.target.value})} placeholder="Russian" className="bg-black border border-white/20 p-2 rounded text-sm outline-none focus:border-cyan-500"/>
-                        <input value={newCard.arabic} onChange={e=>setNewCard({...newCard, arabic:e.target.value})} placeholder="Arabic" className="bg-black border border-white/20 p-2 rounded text-sm outline-none focus:border-cyan-500 dir-rtl"/>
-                        <select value={newCard.category} onChange={e=>setNewCard({...newCard, category:e.target.value})} className="bg-black border border-white/20 p-2 rounded text-sm outline-none">
-                            <option>General</option><option>Tech</option><option>Slang</option><option>Business</option>
-                        </select>
-                    </div>
-                    <button onClick={addLibCard} className="bg-cyan-600 px-6 rounded font-bold text-sm hover:bg-cyan-500 shadow-lg">ADD</button>
-                </div>
-                
-                <div className="p-2 border-b border-white/10"><input value={searchCard} onChange={e=>setSearchCard(e.target.value)} placeholder="Search Library..." className="w-full bg-transparent p-2 outline-none text-sm font-mono text-white/50"/></div>
-                
-                <div className="flex-1 overflow-y-auto p-2 grid grid-cols-1 gap-2">
-                    {filteredCards.map(c => (
-                        <div key={c.id} className="flex justify-between items-center p-3 bg-white/5 rounded border border-white/5 hover:border-cyan-500/30 group">
-                            {editingCard?.id === c.id ? (
-                                <div className="flex gap-2 w-full">
-                                    <input value={editingCard.russian} onChange={e=>setEditingCard({...editingCard, russian:e.target.value})} className="bg-black border border-cyan-500 p-1 rounded flex-1"/>
-                                    <input value={editingCard.arabic} onChange={e=>setEditingCard({...editingCard, arabic:e.target.value})} className="bg-black border border-cyan-500 p-1 rounded flex-1"/>
-                                    <button onClick={updateLibCard} className="text-emerald-500"><IconCheck/></button>
-                                    <button onClick={()=>setEditingCard(null)} className="text-red-500"><IconX/></button>
-                                </div>
-                            ) : (
-                                <>
-                                    <div className="flex gap-4 items-center">
-                                        <span className="text-cyan-400 font-bold">{c.russian}</span>
-                                        <span className="text-white/50 text-xs">/</span>
-                                        <span className="text-white">{c.arabic}</span>
-                                        <span className="text-[10px] bg-white/10 px-2 rounded text-white/40">{c.category}</span>
-                                    </div>
-                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100">
-                                        <button onClick={()=>setEditingCard(c)} className="text-blue-400 hover:text-white"><IconEdit size={16}/></button>
-                                        <button onClick={()=>deleteLibCard(c.id)} className="text-red-400 hover:text-white"><IconTrash size={16}/></button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
+      {/* Users Tab */}
+      {activeTab === 'users' && (
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+            <table className="w-full text-left text-sm">
+                <thead className="bg-white/5 text-white/40 uppercase sticky top-0 backdrop-blur-md">
+                    <tr><th className="p-4">User</th><th className="p-4">Role</th><th className="p-4">Actions</th></tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                    {users.map(u => (
+                        <tr key={u.id} className="hover:bg-white/5 transition-colors">
+                            <td className="p-4">
+                                <div className="font-bold text-white">{u.email}</div>
+                                <div className="text-xs text-white/30">{u.id}</div>
+                            </td>
+                            <td className="p-4">
+                                <span className={`px-2 py-1 rounded text-xs font-black uppercase ${
+                                    u.role === 'admin' ? 'bg-red-500/20 text-red-500' : 
+                                    u.role === 'junior' ? 'bg-yellow-500/20 text-yellow-500' : 
+                                    'bg-gray-500/20 text-gray-400'
+                                }`}>
+                                    {u.role || 'USER'}
+                                </span>
+                            </td>
+                            <td className="p-4 flex gap-2">
+                                {isSuperAdmin && (
+                                    <>
+                                        <button onClick={()=>changeRole(u.id, 'junior')} title="Promote to Junior" className="p-2 bg-yellow-900/30 text-yellow-500 rounded hover:bg-yellow-500 hover:text-black"><IconStar size={16}/></button>
+                                        <button onClick={()=>changeRole(u.id, 'admin')} title="Promote to Admin" className="p-2 bg-red-900/30 text-red-500 rounded hover:bg-red-500 hover:text-white"><IconCrown size={16}/></button>
+                                        <button onClick={()=>changeRole(u.id, 'user')} title="Demote to User" className="p-2 bg-gray-800 text-gray-400 rounded hover:bg-gray-600"><IconUser size={16}/></button>
+                                        <div className="w-[1px] bg-white/10 mx-2"></div>
+                                        <button onClick={()=>banUser(u.id, u.isBanned)} className={`p-2 rounded ${u.isBanned ? 'bg-green-900/30 text-green-500' : 'bg-red-900/30 text-red-500'}`}>
+                                            {u.isBanned ? <IconCheck size={16}/> : <IconBan size={16}/>}
+                                        </button>
+                                    </>
+                                )}
+                            </td>
+                        </tr>
                     ))}
-                </div>
-            </div>
-        )}
+                </tbody>
+            </table>
+        </div>
+      )}
 
-        {/* TAB: LOGS (تم إصلاح الخطأ هنا) */}
-        {activeTab === 'logs' && (
-            <div className="p-4 font-mono text-xs text-green-400 space-y-1">
-                 {realLogs.length === 0 && <div className="text-white/20 text-center pt-20">NO SYSTEM LOGS FOUND.</div>}
-                 {realLogs.map((log) => (
-                    <div key={log.id} className="border-b border-white/5 py-2 flex gap-2 opacity-80 hover:opacity-100 items-center">
-                        <span className="text-white/30 min-w-[70px]">[{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '00:00:00'}]</span>
-                        {/* استخدام شرط (ternary) للتحقق من وجود البريد الإلكتروني قبل التقسيم */}
-                        <span className="text-cyan-500 font-bold w-24 truncate">
-                            {log.email ? log.email.split('@')[0] : 'SYSTEM'}
-                        </span>
-                        <span className="text-white w-24 truncate">{log.action}</span>
-                        <span className={`w-16 font-bold ${log.status==='SUCCESS'?'text-emerald-500': log.status==='FAIL' ? 'text-red-500' : 'text-yellow-500'}`}>{log.status}</span>
-                        <span className="text-white/50 truncate flex-1">{log.details}</span>
-                    </div>
-                ))}
-            </div>
-        )}
-      </div>
+      {/* Support Tab */}
+      {activeTab === 'support' && (
+          <div className="flex h-full gap-4">
+              {/* Ticket List */}
+              <div className="w-1/3 border-r border-white/10 overflow-y-auto custom-scrollbar">
+                  {supportTickets.map(ticket => (
+                      <div 
+                        key={ticket.id} 
+                        onClick={() => setSelectedTicket(ticket)}
+                        className={`p-4 border-b border-white/5 cursor-pointer hover:bg-white/5 ${selectedTicket?.id === ticket.id ? 'bg-purple-900/20 border-l-4 border-l-purple-500' : ''}`}
+                      >
+                          <div className="font-bold text-white truncate">{ticket.userEmail}</div>
+                          <div className="text-xs text-white/40 truncate">{ticket.messages[ticket.messages.length - 1]?.text}</div>
+                          <div className="text-[10px] text-right mt-1 opacity-50">{ticket.status}</div>
+                      </div>
+                  ))}
+              </div>
 
-      {/* USER INSPECTOR MODAL */}
-      {inspectUser && (
-          <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
-              <div className="bg-[#111] border border-cyan-500 rounded-xl w-full max-w-2xl h-[80vh] flex flex-col shadow-[0_0_50px_rgba(6,182,212,0.2)]">
-                  <div className="p-4 border-b border-white/10 flex justify-between items-center">
-                      <h3 className="font-bold text-cyan-400 flex items-center gap-2"><IconFileCode/> DNA INSPECTOR: {inspectUser.email}</h3>
-                      <button onClick={()=>setInspectUser(null)} className="text-red-500"><IconX/></button>
-                  </div>
-                  <div className="flex-1 p-4 bg-black overflow-hidden">
-                      <textarea 
-                        value={jsonEdit} 
-                        onChange={(e)=>setJsonEdit(e.target.value)} 
-                        className="w-full h-full bg-transparent text-green-500 font-mono text-xs outline-none resize-none"
-                        spellCheck="false"
-                      />
-                  </div>
-                  <div className="p-4 border-t border-white/10 flex justify-between items-center bg-[#151515]">
-                      <span className="text-xs text-red-400 flex items-center gap-1"><IconShield size={12}/> CAUTION: DIRECT DB WRITE</span>
-                      <button onClick={saveInspector} className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded">PATCH DNA</button>
-                  </div>
+              {/* Chat Area */}
+              <div className="flex-1 flex flex-col bg-[#050505] rounded-xl overflow-hidden border border-white/10">
+                  {selectedTicket ? (
+                      <>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                            {selectedTicket.messages?.map((msg, i) => (
+                                <div key={i} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[70%] p-3 rounded-xl text-sm ${msg.sender === 'admin' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-200'}`}>
+                                        {msg.text}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="p-3 bg-[#111] border-t border-white/10 flex gap-2">
+                            <input 
+                                value={replyText} 
+                                onChange={e => setReplyText(e.target.value)} 
+                                className="flex-1 bg-black border border-white/20 rounded p-2 text-white outline-none"
+                                placeholder="Type admin reply..."
+                            />
+                            <button onClick={sendSupportReply} className="bg-purple-600 px-4 py-2 rounded text-white font-bold">SEND</button>
+                        </div>
+                      </>
+                  ) : (
+                      <div className="flex items-center justify-center h-full text-white/20">SELECT A TICKET</div>
+                  )}
               </div>
           </div>
       )}
@@ -720,13 +836,331 @@ export default function AdminDashboard() {
   );
 }
 
-// مكون البطاقة الإحصائية (تم إدراجه هنا)
-const StatCard = ({ title, value, color, border, bg }) => (
-    <div className={`${bg} border ${border} p-6 rounded-xl`}>
-        <h3 className={`text-xs ${color} font-bold tracking-wider mb-2`}>{title}</h3>
-        <p className="text-4xl font-black text-white">{value}</p>
+
+==================================================================
+FILE: components\AITutor.jsx
+==================================================================
+
+"use client";
+import React, { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  IconRobot, IconSend, IconCpu, IconMenu2, IconX, IconPlus, 
+  IconMessage, IconTrash, IconEdit, IconCheck, IconMicrophone 
+} from "@tabler/icons-react";
+import { 
+  collection, addDoc, query, orderBy, onSnapshot, 
+  deleteDoc, doc, updateDoc, serverTimestamp 
+} from "firebase/firestore";
+import { db } from "../lib/firebase";
+
+// مفتاح API المباشر
+const API_KEY = "AIzaSyDi8-POg6RGCoBCkni6_8XNikJvTmH4z3M";
+
+export default function AITutor({ user }) {
+  // --- States ---
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // للقائمة الجانبية في الموبايل
+  
+  // إدارة الجلسات
+  const [sessions, setSessions] = useState([]); 
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [messages, setMessages] = useState([]);
+  
+  // إعادة التسمية
+  const [editingTitleId, setEditingTitleId] = useState(null);
+  const [newTitle, setNewTitle] = useState("");
+
+  const scrollRef = useRef(null);
+
+  // --- 1. تحميل قائمة المحادثات من Firebase ---
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, "users", user.uid, "ai_chats"), 
+      orderBy("lastUpdate", "desc") // الأحدث أولاً
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const loadedSessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSessions(loadedSessions);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  // --- 2. تحميل رسائل الجلسة المختارة ---
+  useEffect(() => {
+    if (currentSessionId) {
+      const session = sessions.find(s => s.id === currentSessionId);
+      if (session) setMessages(session.messages || []);
+    } else {
+      setMessages([]); // جلسة جديدة فارغة
+    }
+  }, [currentSessionId, sessions]);
+
+  // --- 3. السكرول التلقائي للأسفل ---
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  // --- Actions ---
+
+  const startNewChat = () => {
+    setCurrentSessionId(null);
+    setMessages([]);
+    setIsSidebarOpen(false);
+  };
+
+  const deleteChat = async (e, id) => {
+    e.stopPropagation();
+    if (confirm("Delete this neural memory?")) {
+      await deleteDoc(doc(db, "users", user.uid, "ai_chats", id));
+      if (currentSessionId === id) startNewChat();
+    }
+  };
+
+  const startRenaming = (e, session) => {
+    e.stopPropagation();
+    setEditingTitleId(session.id);
+    setNewTitle(session.title);
+  };
+
+  const saveTitle = async (e, id) => {
+    e.stopPropagation();
+    if (newTitle.trim()) {
+      await updateDoc(doc(db, "users", user.uid, "ai_chats", id), { title: newTitle });
+    }
+    setEditingTitleId(null);
+  };
+
+  // --- Core Logic: Send & Save ---
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return;
+
+    const userMsg = input;
+    setInput("");
+    
+    // تحديث الواجهة فوراً (Optimistic UI)
+    const newMessages = [...messages, { role: "user", text: userMsg }];
+    setMessages(newMessages);
+    setLoading(true);
+
+    try {
+      // 1. الاتصال بـ Gemini
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{ 
+                text: `You are "Russian Master AI". 
+                       Context: Teaching Russian to an Arabic speaker.
+                       User: ${userMsg}
+                       Reply concisely. If user uses Arabic, reply in Arabic. If Russian, correct errors.` 
+              }]
+            }]
+          }),
+        }
+      );
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error.message);
+      
+      const botReply = data.candidates[0].content.parts[0].text;
+      const finalMessages = [...newMessages, { role: "model", text: botReply }];
+      
+      setMessages(finalMessages);
+
+      // 2. الحفظ في Firebase
+      if (user) {
+        if (!currentSessionId) {
+          // إنشاء وثيقة جديدة لأول مرة
+          const title = userMsg.substring(0, 30) + "...";
+          const docRef = await addDoc(collection(db, "users", user.uid, "ai_chats"), {
+            title,
+            messages: finalMessages,
+            createdAt: serverTimestamp(),
+            lastUpdate: serverTimestamp()
+          });
+          setCurrentSessionId(docRef.id);
+        } else {
+          // تحديث الوثيقة الحالية
+          await updateDoc(doc(db, "users", user.uid, "ai_chats", currentSessionId), {
+            messages: finalMessages,
+            lastUpdate: serverTimestamp()
+          });
+        }
+      }
+
+    } catch (err) {
+      setMessages(prev => [...prev, { role: "model", text: `⚠️ Error: ${err.message}` }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="w-full h-full flex bg-[#050505] overflow-hidden relative font-sans text-white">
+      
+      {/* --- Sidebar (History) --- */}
+      <div className={`
+        fixed inset-y-0 left-0 z-40 w-72 bg-[#0a0a0a] border-r border-white/10 transform transition-transform duration-300 flex flex-col
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:static md:shrink-0
+      `}>
+        {/* Sidebar Header */}
+        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-cyan-950/10">
+            <h2 className="font-black tracking-widest text-cyan-500 text-sm">MEMORY LOGS</h2>
+            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden"><IconX size={20}/></button>
+        </div>
+
+        {/* New Chat Button */}
+        <div className="p-3">
+            <button 
+                onClick={startNewChat}
+                className="w-full py-3 bg-cyan-600/20 border border-cyan-500/50 rounded-xl flex items-center justify-center gap-2 hover:bg-cyan-600/40 transition-all text-cyan-400 font-bold text-xs tracking-wider"
+            >
+                <IconPlus size={16}/> NEW OPERATION
+            </button>
+        </div>
+
+        {/* List of Chats (Scrollable) */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+            {sessions.map(session => (
+                <div 
+                    key={session.id}
+                    onClick={() => { setCurrentSessionId(session.id); setIsSidebarOpen(false); }}
+                    className={`group p-3 rounded-lg flex items-center justify-between cursor-pointer transition-all border ${
+                        currentSessionId === session.id 
+                        ? 'bg-white/10 border-cyan-500/50 text-white' 
+                        : 'bg-transparent border-transparent hover:bg-white/5 text-white/50'
+                    }`}
+                >
+                    {/* Title or Edit Input */}
+                    {editingTitleId === session.id ? (
+                        <div className="flex items-center gap-1 w-full">
+                            <input 
+                                value={newTitle}
+                                onChange={(e) => setNewTitle(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="bg-black border border-cyan-500 rounded px-1 py-0.5 text-xs w-full outline-none"
+                                autoFocus
+                            />
+                            <button onClick={(e) => saveTitle(e, session.id)} className="text-green-500"><IconCheck size={14}/></button>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex items-center gap-2 truncate flex-1">
+                                <IconMessage size={14} />
+                                <span className="text-xs truncate font-mono">{session.title}</span>
+                            </div>
+                            
+                            {/* Action Buttons (Hover Only) */}
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={(e) => startRenaming(e, session)} className="hover:text-blue-400 p-1"><IconEdit size={14}/></button>
+                                <button onClick={(e) => deleteChat(e, session.id)} className="hover:text-red-400 p-1"><IconTrash size={14}/></button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            ))}
+        </div>
+      </div>
+
+      {/* --- Main Chat Area --- */}
+      <div className="flex-1 flex flex-col h-full relative min-w-0">
+        
+        {/* Header */}
+        <div className="h-16 border-b border-white/10 bg-[#0a0a0a]/90 backdrop-blur flex items-center px-4 justify-between shrink-0 z-20">
+            <div className="flex items-center gap-3">
+                <button onClick={() => setIsSidebarOpen(true)} className="md:hidden text-white/50 hover:text-white"><IconMenu2/></button>
+                <div className="w-8 h-8 rounded-full bg-cyan-900/20 border border-cyan-500/50 flex items-center justify-center animate-pulse-slow">
+                    <IconRobot size={18} className="text-cyan-400" />
+                </div>
+                <div>
+                    <h3 className="font-bold text-sm tracking-widest">RUSSIAN MENTOR AI</h3>
+                    <p className="text-[10px] text-white/30 font-mono uppercase">
+                        {currentSessionId ? "Secure Connection" : "Standby Mode"}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        {/* Messages List (THIS IS THE SCROLL FIX) */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 scroll-smooth">
+            {messages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-white/20 select-none">
+                    <IconCpu size={80} stroke={1} className="mb-4 animate-float"/>
+                    <p className="text-sm tracking-[0.3em] uppercase">System Ready</p>
+                    <p className="text-xs mt-2 font-mono">Ask anything in Arabic or Russian</p>
+                </div>
+            ) : (
+                messages.map((msg, i) => (
+                    <motion.div 
+                        key={i} 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex ${msg.role === "model" ? 'justify-start' : 'justify-end'}`}
+                    >
+                        <div className={`max-w-[85%] md:max-w-[70%] p-4 rounded-2xl border backdrop-blur-sm ${
+                            msg.role === "model"
+                            ? 'bg-[#111] border-white/10 text-gray-200 rounded-tl-none'
+                            : 'bg-cyan-950/30 border-cyan-500/30 text-cyan-50 rounded-tr-none'
+                        }`}>
+                            <div className="text-[9px] font-bold opacity-40 mb-2 uppercase flex gap-2 tracking-widest">
+                                {msg.role === "model" ? <><IconCpu size={10}/> AI CORE</> : "OPERATIVE"}
+                            </div>
+                            <p className={`whitespace-pre-wrap leading-relaxed text-sm ${/[\u0600-\u06FF]/.test(msg.text) ? 'font-cairo text-right dir-rtl' : 'font-mono'}`}>
+                                {msg.text}
+                            </p>
+                        </div>
+                    </motion.div>
+                ))
+            )}
+            
+            {/* Loading Indicator */}
+            {loading && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
+                    <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-full text-xs text-cyan-400 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-ping"></span>
+                        PROCESSING...
+                    </div>
+                </motion.div>
+            )}
+            
+            {/* Anchor for auto-scroll */}
+            <div ref={scrollRef} className="h-4" />
+        </div>
+
+        {/* Input Area (Fixed Bottom) */}
+        <div className="p-4 bg-[#0a0a0a] border-t border-white/10 shrink-0 z-20">
+            <div className="flex gap-2 max-w-4xl mx-auto items-end">
+                <div className="flex-1 bg-[#151515] border border-white/10 rounded-xl flex items-center focus-within:border-cyan-500/50 transition-colors">
+                    <input 
+                        type="text" 
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                        placeholder="Type message..." 
+                        className="w-full bg-transparent px-4 py-3 text-white outline-none font-mono text-sm"
+                        dir="auto"
+                    />
+                </div>
+                <button 
+                    onClick={sendMessage}
+                    disabled={loading || !input.trim()}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-white p-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+                >
+                    <IconSend size={20} />
+                </button>
+            </div>
+        </div>
+
+      </div>
     </div>
-);
+  );
+}
 
 
 ==================================================================
@@ -1701,13 +2135,20 @@ export default function DailyReward({ user, onClose }) {
 FILE: components\DataManager.jsx
 ==================================================================
 
+"use client";
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { IconTrash, IconPencil, IconSearch, IconDatabase, IconCpu } from "@tabler/icons-react";
+import { IconTrash, IconPencil, IconSearch, IconDatabase, IconWand, IconLoader } from "@tabler/icons-react";
 
-export function DataManager({ onAdd, onDelete, onUpdate, cards }) {
+const API_KEY = "AIzaSyDi8-POg6RGCoBCkni6_8XNikJvTmH4z3M";
+
+export function DataManager({ onAdd, onDelete, onUpdate, cards, isJunior }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
+  
+  const [newCard, setNewCard] = useState({ russian: "", arabic: "", category: "General" });
+  const [aiLoading, setAiLoading] = useState(false);
+
   const [editingId, setEditingId] = useState(null);
   const [editRus, setEditRus] = useState("");
   const [editAra, setEditAra] = useState("");
@@ -1722,112 +2163,127 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards }) {
       });
   }, [cards, search, filter]);
 
-  // --- دوال التعديل ---
+  const handleAiAutoFill = async () => {
+      if (!newCard.russian) return alert("Write the Russian word first!");
+      setAiLoading(true);
+      try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{
+                  parts: [{ 
+                    text: `Analyze this Russian text: "${newCard.russian}". 
+                           Return ONLY a JSON object with: 
+                           { "arabic": "translation", "category": "one_word_category (e.g. Verbs, Nouns, Tech, Slang)" }` 
+                  }]
+                }]
+              }),
+            }
+          );
+          const data = await response.json();
+          let text = data.candidates[0].content.parts[0].text;
+          text = text.replace(/```json|```/g, "").trim();
+          const result = JSON.parse(text);
+          setNewCard({ ...newCard, arabic: result.arabic, category: result.category });
+      } catch (e) {
+          alert("AI Error: " + e.message);
+      } finally {
+          setAiLoading(false);
+      }
+  };
+
+  const handleAddSubmit = () => {
+      if(newCard.russian && newCard.arabic) {
+          onAdd(newCard);
+          setNewCard({ russian: "", arabic: "", category: "General" });
+      }
+  };
+
   const startEdit = (card) => { setEditingId(card.id); setEditRus(card.russian); setEditAra(card.arabic); };
   const saveEdit = () => { onUpdate(editingId, editRus, editAra); setEditingId(null); };
 
   return (
-    // التغيير هنا: h-screen لملء الشاشة، و overflow-hidden لمنع تمرير الصفحة بالكامل
-    <div className="w-full h-screen flex flex-col p-6 overflow-hidden relative">
+    // التعديل هنا: تحديد ارتفاع ثابت للشاشة لتفعيل السكرول الداخلي
+    <div className="w-full h-[calc(100vh-80px)] flex flex-col p-4 md:p-6 overflow-hidden relative">
       
-      {/* Header Fixed */}
-      <div className="flex flex-col md:flex-row justify-between items-end mb-6 shrink-0 z-10">
-        <div>
-            <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-3">
-                <IconDatabase size={40} className="text-cyan-500 animate-pulse" />
-                <div>
-                    <h1 className="text-4xl font-black text-white tracking-tighter">
-                        NEURAL<span className="text-cyan-500">_</span>DATA
-                    </h1>
-                    {/* إصلاح: عداد الكلمات الإجمالي */}
-                    <div className="flex items-center gap-2 text-cyan-400/60 text-xs font-mono tracking-widest mt-1">
-                        <IconCpu size={12}/> 
-                        <span>TOTAL UNITS: <span className="text-white font-bold text-lg">{cards.length}</span></span>
-                        <span>|</span>
-                        <span>FILTERED: <span className="text-white font-bold">{filteredCards.length}</span></span>
-                    </div>
-                </div>
-            </motion.div>
+      {/* Header & Add Section */}
+      <div className="flex flex-col gap-4 mb-4 shrink-0 z-10 bg-[#0a0a0a]/90 p-4 md:p-6 rounded-2xl border border-white/10 backdrop-blur-md">
+        <div className="flex items-center gap-3">
+            <IconDatabase size={28} className="text-cyan-500" />
+            <h1 className="text-xl md:text-2xl font-black text-white">NEURAL ARCHIVE</h1>
         </div>
 
-        {/* Search */}
-        <div className="w-full md:w-80 mt-4 md:mt-0">
-             <div className="relative group">
-                <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-cyan-400 transition-colors" size={20} />
-                <input 
-                    type="text" 
-                    placeholder="SCAN DATABASE..." 
-                    className="w-full bg-cyan-900/10 border border-cyan-500/30 rounded-none border-l-2 border-r-2 border-t-0 border-b-0 py-3 pl-12 pr-4 text-white focus:bg-cyan-900/20 outline-none transition-all font-mono text-sm"
-                    value={search} 
-                    onChange={(e) => setSearch(e.target.value)} 
-                />
-                {/* زخرفة تقنية */}
-                <div className="absolute bottom-0 left-0 w-full h-[1px] bg-cyan-500/50 group-focus-within:bg-cyan-400 group-focus-within:shadow-[0_0_10px_#06b6d4] transition-all"></div>
-            </div>
-        </div>
-      </div>
-
-      {/* Filter Chips */}
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-4 shrink-0 custom-scrollbar z-10">
-        {categories.map(cat => (
-            <button
-                key={cat}
-                onClick={() => setFilter(cat)}
-                className={`px-4 py-1 text-[10px] font-bold uppercase tracking-widest border transition-all skew-x-[-10deg] ${
-                    filter === cat 
-                    ? "bg-cyan-500 text-black border-cyan-500" 
-                    : "bg-transparent text-cyan-500 border-cyan-500/30 hover:border-cyan-500 hover:text-white"
-                }`}
-            >
-                <span className="skew-x-[10deg] inline-block">{cat}</span>
-            </button>
-        ))}
-      </div>
-
-      {/* Grid Container - Scrollable Area */}
-      {/* التغيير الجوهري: هذا الكونتينر هو الوحيد الذي يقبل التمرير */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-32">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            <AnimatePresence mode="popLayout">
-                {filteredCards.map((card, i) => (
-                    <motion.div 
-                        layout
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        transition={{ duration: 0.2, delay: i * 0.02 }}
-                        key={card.id} 
-                        className="group relative bg-black/40 border border-white/5 p-5 hover:border-cyan-500/50 transition-all hover:bg-cyan-900/10"
+        {/* Input Form - يظهر فقط للأدمن أو المساعد */}
+        {isJunior && (
+            <div className="flex flex-col md:flex-row gap-3">
+                <div className="flex-1 relative">
+                    <input 
+                        value={newCard.russian} 
+                        onChange={e => setNewCard({...newCard, russian: e.target.value})}
+                        placeholder="Russian Word..." 
+                        className="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none focus:border-cyan-500"
+                    />
+                    <button 
+                        onClick={handleAiAutoFill}
+                        disabled={aiLoading || !newCard.russian}
+                        className="absolute right-2 top-2 p-1.5 bg-purple-600/20 text-purple-400 rounded-lg hover:bg-purple-600 hover:text-white transition-all disabled:opacity-50"
                     >
-                        {/* زوايا تقنية للبطاقة */}
-                        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        {aiLoading ? <IconLoader className="animate-spin" size={18}/> : <IconWand size={18}/>}
+                    </button>
+                </div>
+                <input value={newCard.arabic} onChange={e => setNewCard({...newCard, arabic: e.target.value})} placeholder="Translation (Auto)" className="flex-1 bg-black border border-white/20 p-3 rounded-xl text-white outline-none focus:border-cyan-500 dir-rtl"/>
+                <input value={newCard.category} onChange={e => setNewCard({...newCard, category: e.target.value})} placeholder="Category" className="w-full md:w-32 bg-black border border-white/20 p-3 rounded-xl text-white outline-none focus:border-cyan-500"/>
+                <button onClick={handleAddSubmit} className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-6 py-3 rounded-xl shadow-lg transition-all">ADD</button>
+            </div>
+        )}
+      </div>
 
+      {/* Search & Filter */}
+      <div className="flex flex-col gap-3 mb-2 shrink-0 z-10">
+         <div className="relative group">
+            <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" size={20} />
+            <input type="text" placeholder="SCAN DATABASE..." className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:bg-white/10 outline-none font-mono text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+            {categories.map(cat => (
+                <button key={cat} onClick={() => setFilter(cat)} className={`px-4 py-1 text-[10px] font-bold uppercase rounded-full border transition-all whitespace-nowrap ${filter === cat ? "bg-cyan-600 border-cyan-500 text-white" : "bg-transparent text-cyan-500 border-cyan-500/30"}`}>
+                    {cat}
+                </button>
+            ))}
+        </div>
+      </div>
+
+      {/* Scrollable List - min-h-0 هو الحل السحري هنا */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-24 min-h-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <AnimatePresence>
+                {filteredCards.map((card, i) => (
+                    <motion.div layout initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} key={card.id} className="group relative bg-[#0f0f0f] border border-white/5 p-5 rounded-2xl hover:border-cyan-500/50 transition-all hover:shadow-[0_0_20px_rgba(6,182,212,0.1)]">
                         {editingId === card.id ? (
                             <div className="flex flex-col gap-2 relative z-10">
-                                <input value={editRus} onChange={(e) => setEditRus(e.target.value)} className="bg-white/5 border border-cyan-500/50 p-2 text-white outline-none font-bold text-sm" autoFocus />
-                                <input value={editAra} onChange={(e) => setEditAra(e.target.value)} className="bg-white/5 border border-emerald-500/50 p-2 text-white text-right outline-none font-cairo text-sm" />
+                                <input value={editRus} onChange={(e) => setEditRus(e.target.value)} className="bg-black border border-cyan-500 p-2 rounded text-white" />
+                                <input value={editAra} onChange={(e) => setEditAra(e.target.value)} className="bg-black border border-emerald-500 p-2 rounded text-white text-right" />
                                 <div className="flex gap-2 mt-2">
-                                    <button onClick={saveEdit} className="flex-1 bg-emerald-500/20 text-emerald-400 py-1 text-[10px] font-bold hover:bg-emerald-500/30">SAVE</button>
-                                    <button onClick={() => setEditingId(null)} className="flex-1 bg-white/5 text-white/40 py-1 text-[10px] font-bold hover:bg-white/10">CANCEL</button>
+                                    <button onClick={saveEdit} className="flex-1 bg-emerald-600 text-white py-1 rounded text-xs">SAVE</button>
+                                    <button onClick={() => setEditingId(null)} className="flex-1 bg-gray-700 text-white py-1 rounded text-xs">CANCEL</button>
                                 </div>
                             </div>
                         ) : (
                             <>
-                                <div className="flex justify-between items-start mb-4 relative z-10">
-                                    <span className="text-[9px] font-mono text-cyan-500/40 uppercase truncate max-w-[70%]">
-                                        //{card.category || "NULL"}
-                                    </span>
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => startEdit(card)} className="text-blue-400 hover:text-white transition-colors"><IconPencil size={14} /></button>
-                                        <button onClick={() => onDelete(card.id)} className="text-red-400 hover:text-white transition-colors"><IconTrash size={14} /></button>
-                                    </div>
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-cyan-400 font-mono uppercase truncate max-w-[70%]">{card.category}</span>
+                                    {isJunior && (
+                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => startEdit(card)} className="text-blue-400 hover:bg-blue-900/30 p-1 rounded"><IconPencil size={16} /></button>
+                                            <button onClick={() => onDelete(card.id)} className="text-red-400 hover:bg-red-900/30 p-1 rounded"><IconTrash size={16} /></button>
+                                        </div>
+                                    )}
                                 </div>
-
-                                <div className="relative z-10">
-                                    <h3 className="text-lg font-bold text-white mb-1">{card.russian}</h3>
-                                    <p className="text-md text-cyan-200/60 dir-rtl font-cairo">{card.arabic}</p>
-                                </div>
+                                <h3 className="text-xl font-bold text-white mb-1">{card.russian}</h3>
+                                <p className="text-md text-gray-400 dir-rtl font-cairo">{card.arabic}</p>
                             </>
                         )}
                     </motion.div>
@@ -1841,110 +2297,849 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards }) {
 
 
 ==================================================================
+FILE: components\games\AudioIntercept.jsx
+==================================================================
+
+"use client";
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { IconEar, IconX, IconVolume } from "@tabler/icons-react";
+import confetti from "canvas-confetti";
+
+export default function AudioIntercept({ cards, onClose }) {
+  const [currentCard, setCurrentCard] = useState(null);
+  const [options, setOptions] = useState([]);
+  const [score, setScore] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  useEffect(() => nextRound(), []);
+
+  const playAudio = () => {
+    if(!currentCard) return;
+    setIsPlaying(true);
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(currentCard.russian);
+    u.lang = 'ru-RU';
+    u.onend = () => setIsPlaying(false);
+    window.speechSynthesis.speak(u);
+  };
+
+  const nextRound = () => {
+    const valid = cards.filter(c => c.russian && c.arabic);
+    if(valid.length < 4) return alert("Not enough data");
+    
+    const target = valid[Math.floor(Math.random() * valid.length)];
+    setCurrentCard(target);
+
+    // خيارات عشوائية (1 صحيح + 3 خطأ)
+    const others = valid.filter(c => c.id !== target.id).sort(() => 0.5 - Math.random()).slice(0, 3);
+    const all = [target, ...others].sort(() => 0.5 - Math.random());
+    setOptions(all);
+    
+    // تشغيل الصوت تلقائياً بعد قليل
+    setTimeout(() => {
+        const u = new SpeechSynthesisUtterance(target.russian);
+        u.lang = 'ru-RU';
+        window.speechSynthesis.speak(u);
+    }, 500);
+  };
+
+  const checkAnswer = (selected) => {
+    if(selected.id === currentCard.id) {
+        setScore(s => s + 100);
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+        nextRound();
+    } else {
+        setScore(s => Math.max(0, s - 50));
+        // اهتزاز
+        document.getElementById('audio-game').classList.add('animate-shake');
+        setTimeout(() => document.getElementById('audio-game').classList.remove('animate-shake'), 500);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center p-4">
+        <div id="audio-game" className="w-full max-w-lg bg-[#111] border-2 border-yellow-500 rounded-2xl p-8 shadow-[0_0_50px_rgba(234,179,8,0.2)] relative">
+            <button onClick={onClose} className="absolute top-4 right-4 text-white/50 hover:text-white"><IconX/></button>
+            
+            <div className="text-center mb-8">
+                <h2 className="text-yellow-500 font-black tracking-widest text-2xl mb-2">AUDIO INTERCEPT</h2>
+                <div className="text-4xl font-mono text-white">{score} XP</div>
+            </div>
+
+            <button 
+                onClick={playAudio}
+                className={`w-32 h-32 mx-auto rounded-full border-4 border-yellow-500 flex items-center justify-center mb-8 hover:scale-105 transition-all ${isPlaying ? 'animate-pulse bg-yellow-500/20' : 'bg-transparent'}`}
+            >
+                <IconEar size={64} className="text-yellow-500"/>
+            </button>
+
+            <div className="grid grid-cols-1 gap-3">
+                {options.map(opt => (
+                    <button 
+                        key={opt.id} 
+                        onClick={() => checkAnswer(opt)}
+                        className="p-4 border border-white/10 bg-white/5 rounded-xl hover:bg-yellow-500 hover:text-black hover:font-bold transition-all text-center"
+                    >
+                        {opt.arabic}
+                    </button>
+                ))}
+            </div>
+        </div>
+    </div>
+  );
+}
+
+
+==================================================================
+FILE: components\games\DataRain.jsx
+==================================================================
+
+"use client";
+import React, { useState, useEffect, useRef } from "react";
+import { IconCloudRain, IconX, IconBomb } from "@tabler/icons-react";
+
+export default function DataRain({ cards, onClose }) {
+  const [drops, setDrops] = useState([]); // الكلمات الساقطة
+  const [input, setInput] = useState("");
+  const [score, setScore] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
+  const gameRef = useRef(null);
+
+  // حلقة اللعبة (Game Loop)
+  useEffect(() => {
+    if (gameOver) return;
+
+    const spawner = setInterval(() => {
+        const valid = cards.filter(c => c.russian && c.arabic);
+        const random = valid[Math.floor(Math.random() * valid.length)];
+        const newDrop = {
+            id: Date.now(),
+            word: random,
+            x: Math.random() * 80 + 10, // موقع أفقي عشوائي
+            y: -10 // يبدأ من الأعلى
+        };
+        setDrops(prev => [...prev, newDrop]);
+    }, 2000); // كلمة كل ثانيتين
+
+    const mover = setInterval(() => {
+        setDrops(prev => prev.map(d => ({ ...d, y: d.y + 0.5 })).filter(d => {
+            if (d.y > 90) { // وصل للأرض
+                setGameOver(true);
+                return false;
+            }
+            return true;
+        }));
+    }, 50);
+
+    return () => { clearInterval(spawner); clearInterval(mover); };
+  }, [gameOver, cards]);
+
+  const checkInput = (e) => {
+      const val = e.target.value;
+      setInput(val);
+      
+      const matchIndex = drops.findIndex(d => d.word.russian.toLowerCase() === val.toLowerCase().trim());
+      if (matchIndex !== -1) {
+          // تدمير الكلمة
+          const newDrops = [...drops];
+          newDrops.splice(matchIndex, 1);
+          setDrops(newDrops);
+          setScore(s => s + 50);
+          setInput("");
+      }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#0a0a0a] overflow-hidden font-mono">
+        <div className="absolute inset-0 bg-pink-900/5 pointer-events-none"></div>
+        
+        {/* واجهة اللعبة */}
+        <div className="absolute top-4 left-4 text-pink-500 font-bold z-20 text-2xl">SCORE: {score}</div>
+        <button onClick={onClose} className="absolute top-4 right-4 text-white z-20"><IconX/></button>
+
+        {/* الكلمات الساقطة */}
+        {drops.map(drop => (
+            <div 
+                key={drop.id}
+                style={{ left: `${drop.x}%`, top: `${drop.y}%` }}
+                className="absolute text-pink-400 font-bold text-lg bg-black/50 px-2 rounded border border-pink-500/30 transition-all duration-75"
+            >
+                {drop.word.russian}
+            </div>
+        ))}
+
+        {/* منطقة الخطر */}
+        <div className="absolute bottom-0 w-full h-1 bg-red-600 shadow-[0_0_20px_red]"></div>
+
+        {/* الإدخال */}
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-full max-w-md z-20">
+            <input 
+                autoFocus
+                value={input}
+                onChange={checkInput}
+                placeholder="TYPE TO DESTROY..."
+                className="w-full bg-black/80 border-2 border-pink-500 p-4 text-center text-white outline-none rounded-full shadow-[0_0_30px_#ec4899] uppercase"
+            />
+        </div>
+
+        {/* شاشة الخسارة */}
+        {gameOver && (
+            <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-30">
+                <IconBomb size={80} className="text-red-500 mb-4 animate-bounce"/>
+                <h1 className="text-5xl font-black text-white mb-2">SYSTEM BREACHED</h1>
+                <p className="text-pink-500 mb-6">The data rain was too strong.</p>
+                <button onClick={() => { setGameOver(false); setDrops([]); setScore(0); }} className="bg-pink-600 text-white px-8 py-3 rounded font-bold">REBOOT</button>
+            </div>
+        )}
+    </div>
+  );
+}
+
+
+==================================================================
+FILE: components\games\LogicGate.jsx
+==================================================================
+
+"use client";
+import React, { useState, useEffect } from "react";
+import { IconPuzzle, IconX } from "@tabler/icons-react";
+
+export default function LogicGate({ cards, onClose }) {
+  const [current, setCurrent] = useState(null);
+  const [options, setOptions] = useState([]);
+  const [streak, setStreak] = useState(0);
+
+  useEffect(() => nextQuestion(), []);
+
+  const nextQuestion = () => {
+    const valid = cards.filter(c => c.russian && c.arabic);
+    const target = valid[Math.floor(Math.random() * valid.length)];
+    // خيارات عشوائية
+    const wr1 = valid[Math.floor(Math.random() * valid.length)];
+    const wr2 = valid[Math.floor(Math.random() * valid.length)];
+    const wr3 = valid[Math.floor(Math.random() * valid.length)];
+    
+    const opts = [target, wr1, wr2, wr3].sort(() => 0.5 - Math.random());
+    setCurrent(target);
+    setOptions(opts);
+  };
+
+  const handleAnswer = (ans) => {
+      if(ans.id === current.id) {
+          setStreak(s => s + 1);
+          nextQuestion();
+      } else {
+          setStreak(0);
+          document.body.classList.add('bg-red-900');
+          setTimeout(() => document.body.classList.remove('bg-red-900'), 200);
+      }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#020617] flex items-center justify-center p-4">
+        <div className="w-full max-w-2xl bg-[#0f172a] border border-cyan-500/50 p-8 rounded-3xl shadow-[0_0_60px_rgba(6,182,212,0.1)] relative">
+            <button onClick={onClose} className="absolute top-6 right-6 text-cyan-500"><IconX/></button>
+            
+            <div className="flex justify-between items-center mb-10 border-b border-cyan-900 pb-4">
+                <h2 className="text-cyan-400 font-black tracking-[0.2em] flex items-center gap-2"><IconPuzzle/> LOGIC GATE</h2>
+                <div className="bg-cyan-900/50 px-4 py-1 rounded text-cyan-200 font-mono">STREAK: {streak}</div>
+            </div>
+
+            <div className="text-center mb-10">
+                <p className="text-cyan-500/50 text-xs uppercase mb-2">Identify Translation For:</p>
+                <h1 className="text-5xl font-black text-white">{current?.russian}</h1>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {options.map((opt, i) => (
+                    <button 
+                        key={i}
+                        onClick={() => handleAnswer(opt)}
+                        className="p-6 border border-cyan-500/20 bg-cyan-950/20 hover:bg-cyan-500 hover:text-black hover:border-cyan-400 transition-all rounded-xl text-lg font-bold"
+                    >
+                        {opt.arabic}
+                    </button>
+                ))}
+            </div>
+        </div>
+    </div>
+  );
+}
+
+
+==================================================================
+FILE: components\games\RapidProtocol.jsx
+==================================================================
+
+"use client";
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { IconBolt, IconCheck, IconX } from "@tabler/icons-react";
+
+export default function RapidProtocol({ cards, onClose }) {
+  const [currentPair, setCurrentPair] = useState(null); // { russian, arabic, isCorrect }
+  const [score, setScore] = useState(0);
+  const [timer, setTimer] = useState(50); // شريط الوقت
+  const [gameOver, setGameOver] = useState(false);
+
+  useEffect(() => nextRound(), []);
+
+  // مؤقت سريع جداً
+  useEffect(() => {
+    let interval;
+    if (!gameOver) {
+      interval = setInterval(() => {
+        setTimer(t => {
+            if(t <= 0) { setGameOver(true); return 0; }
+            return t - 1;
+        });
+      }, 50); // سريع جداً
+    }
+    return () => clearInterval(interval);
+  }, [gameOver]);
+
+  const nextRound = () => {
+    const valid = cards.filter(c => c.russian && c.arabic);
+    const target = valid[Math.floor(Math.random() * valid.length)];
+    
+    // 50% احتمال أن تكون الترجمة صحيحة
+    const isCorrect = Math.random() > 0.5;
+    let displayedArabic = target.arabic;
+
+    if (!isCorrect) {
+        const randomOther = valid[Math.floor(Math.random() * valid.length)];
+        displayedArabic = randomOther.arabic;
+    }
+
+    setCurrentPair({ russian: target.russian, arabic: displayedArabic, isRealMatch: isCorrect });
+    setTimer(100); // إعادة تعيين الوقت (100 وحدة)
+  };
+
+  const handleChoice = (choice) => {
+      if(gameOver) return;
+      
+      if (choice === currentPair.isRealMatch) {
+          setScore(s => s + 1);
+          nextRound();
+      } else {
+          setGameOver(true);
+      }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-red-950/20 backdrop-blur-xl flex items-center justify-center p-4 font-mono">
+        <div className="w-full max-w-md bg-black border-4 border-red-600 p-8 text-center shadow-[0_0_100px_#dc2626] relative overflow-hidden">
+            
+            {gameOver ? (
+                <div>
+                    <h2 className="text-6xl font-black text-red-600 mb-4">FAILED</h2>
+                    <p className="text-white mb-6">PROTOCOL TERMINATED</p>
+                    <div className="text-4xl text-white font-bold mb-8">SCORE: {score}</div>
+                    <button onClick={() => { setGameOver(false); setScore(0); nextRound(); }} className="bg-red-600 text-white px-8 py-3 font-bold">RETRY</button>
+                    <button onClick={onClose} className="block mt-4 text-red-500 hover:underline mx-auto">EXIT</button>
+                </div>
+            ) : (
+                <>
+                    <div className="flex justify-between items-center mb-8 text-red-500 font-bold">
+                        <span className="flex items-center gap-2"><IconBolt/> RAPID FIRE</span>
+                        <span>SCORE: {score}</span>
+                    </div>
+
+                    {/* شريط الوقت */}
+                    <div className="h-4 bg-red-900/50 w-full mb-8 rounded-full overflow-hidden">
+                        <motion.div 
+                            animate={{ width: `${timer}%` }} 
+                            className="h-full bg-red-500"
+                        />
+                    </div>
+
+                    <div className="mb-12">
+                        <h1 className="text-5xl font-black text-white mb-4">{currentPair?.russian}</h1>
+                        <div className="text-xl text-red-400">=</div>
+                        <h2 className="text-3xl font-bold text-red-200 mt-4 dir-rtl">{currentPair?.arabic}</h2>
+                    </div>
+
+                    <div className="flex gap-4">
+                        <button onClick={() => handleChoice(true)} className="flex-1 bg-green-600 hover:bg-green-500 py-6 rounded text-3xl flex justify-center"><IconCheck/></button>
+                        <button onClick={() => handleChoice(false)} className="flex-1 bg-red-600 hover:bg-red-500 py-6 rounded text-3xl flex justify-center"><IconX/></button>
+                    </div>
+                </>
+            )}
+        </div>
+    </div>
+  );
+}
+
+
+==================================================================
+FILE: components\GamesHub.jsx
+==================================================================
+
+"use client";
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { 
+  IconCpu, IconBrain, IconAbc, IconPlayerPlay, IconDeviceGamepad, 
+  IconEar, IconBolt, IconPuzzle, IconCloudRain 
+} from "@tabler/icons-react";
+
+// استيراد الألعاب القديمة
+import HackingGame from "./HackingGame";
+import MemoryGame from "./MemoryGame";
+import ScrambleGame from "./ScrambleGame";
+
+// استيراد الألعاب الجديدة (سننشئها الآن)
+import AudioIntercept from "./games/AudioIntercept";
+import RapidProtocol from "./games/RapidProtocol";
+import LogicGate from "./games/LogicGate";
+import DataRain from "./games/DataRain";
+
+export default function GamesHub({ cards }) {
+  const [activeGame, setActiveGame] = useState(null);
+
+  const GAMES = [
+    // --- الألعاب القديمة ---
+    { 
+        id: 'hacking', title: 'NEURAL BREACH', desc: 'Speed typing defense.', 
+        color: 'text-green-500', border: 'border-green-500', bg: 'bg-green-500/10', icon: <IconCpu size={32}/> 
+    },
+    { 
+        id: 'memory', title: 'MEMORY CORE', desc: 'Sync data pairs.', 
+        color: 'text-purple-500', border: 'border-purple-500', bg: 'bg-purple-500/10', icon: <IconBrain size={32}/> 
+    },
+    { 
+        id: 'scramble', title: 'CRYPTIC CIPHER', desc: 'Reconstruct data.', 
+        color: 'text-blue-500', border: 'border-blue-500', bg: 'bg-blue-500/10', icon: <IconAbc size={32}/> 
+    },
+    // --- الألعاب الجديدة ---
+    { 
+        id: 'audio', title: 'AUDIO INTERCEPT', desc: 'Listen & decode.', 
+        color: 'text-yellow-500', border: 'border-yellow-500', bg: 'bg-yellow-500/10', icon: <IconEar size={32}/> 
+    },
+    { 
+        id: 'rapid', title: 'RAPID PROTOCOL', desc: 'True/False speed run.', 
+        color: 'text-red-500', border: 'border-red-500', bg: 'bg-red-500/10', icon: <IconBolt size={32}/> 
+    },
+    { 
+        id: 'logic', title: 'LOGIC GATE', desc: 'Multiple choice exam.', 
+        color: 'text-cyan-500', border: 'border-cyan-500', bg: 'bg-cyan-500/10', icon: <IconPuzzle size={32}/> 
+    },
+    { 
+        id: 'rain', title: 'DATA RAIN', desc: 'Type falling words.', 
+        color: 'text-pink-500', border: 'border-pink-500', bg: 'bg-pink-500/10', icon: <IconCloudRain size={32}/> 
+    },
+  ];
+
+  // Router للألعاب
+  if (activeGame === 'hacking') return <HackingGame cards={cards} onClose={() => setActiveGame(null)} />;
+  if (activeGame === 'memory') return <MemoryGame cards={cards} onClose={() => setActiveGame(null)} />;
+  if (activeGame === 'scramble') return <ScrambleGame cards={cards} onClose={() => setActiveGame(null)} />;
+  
+  // الألعاب الجديدة
+  if (activeGame === 'audio') return <AudioIntercept cards={cards} onClose={() => setActiveGame(null)} />;
+  if (activeGame === 'rapid') return <RapidProtocol cards={cards} onClose={() => setActiveGame(null)} />;
+  if (activeGame === 'logic') return <LogicGate cards={cards} onClose={() => setActiveGame(null)} />;
+  if (activeGame === 'rain') return <DataRain cards={cards} onClose={() => setActiveGame(null)} />;
+
+  return (
+    <div className="w-full h-full flex flex-col p-6 overflow-y-auto custom-scrollbar pb-32">
+      
+      <div className="mb-10 text-center relative z-10">
+          <div className="w-20 h-20 mx-auto bg-gradient-to-br from-gray-900 to-black rounded-full border-2 border-white/20 flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+              <IconDeviceGamepad size={40} className="text-white"/>
+          </div>
+          <h1 className="text-4xl font-black text-white tracking-[0.2em] mb-2">CYBER ARCADE</h1>
+          <p className="text-white/40 font-mono text-sm">SELECT TRAINING MODULE</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-w-7xl mx-auto w-full z-10">
+          {GAMES.map((game, i) => (
+              <motion.div 
+                key={game.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.05 }}
+                onClick={() => setActiveGame(game.id)}
+                className={`group relative h-64 cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-[#0a0a0a] hover:border-opacity-100 transition-all hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(0,0,0,0.5)]`}
+              >
+                  <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${game.bg}`}></div>
+                  
+                  <div className="absolute inset-0 p-6 flex flex-col justify-between z-20">
+                      <div className="flex justify-between items-start">
+                          <div className={`p-3 rounded-2xl w-fit ${game.bg} ${game.color} border border-white/10`}>
+                              {game.icon}
+                          </div>
+                          <IconPlayerPlay className={`opacity-0 group-hover:opacity-100 transition-opacity ${game.color}`}/>
+                      </div>
+                      
+                      <div>
+                          <h3 className={`text-xl font-black ${game.color} tracking-widest mb-1`}>{game.title}</h3>
+                          <p className="text-white/50 text-xs font-mono">{game.desc}</p>
+                      </div>
+                  </div>
+              </motion.div>
+          ))}
+      </div>
+    </div>
+  );
+}
+
+
+==================================================================
+FILE: components\HackingGame.jsx
+==================================================================
+
+"use client";
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { IconCpu, IconSkull, IconTerminal, IconKeyboard, IconPlayerPlay, IconX } from "@tabler/icons-react";
+import confetti from "canvas-confetti";
+import { useAudio } from "../hooks/useAudio"; 
+
+export default function HackingGame({ cards, onClose }) {
+  const [gameState, setGameState] = useState("start"); // start, playing, gameover
+  const [currentWord, setCurrentWord] = useState(null);
+  const [input, setInput] = useState("");
+  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(30); 
+  const [health, setHealth] = useState(100);
+  const inputRef = useRef(null);
+  
+  // استدعاء الصوتيات
+  const { playSFX } = useAudio();
+
+  // تصفية الكلمات الصالحة للعب (يجب أن تحتوي على روسي وعربي)
+  const playableCards = cards.filter(c => c.russian && c.arabic);
+
+  // منطق المؤقت ونهاية اللعبة
+  useEffect(() => {
+    let timer;
+    if (gameState === "playing" && timeLeft > 0 && health > 0) {
+      timer = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    } else if (gameState === "playing" && (timeLeft === 0 || health <= 0)) {
+      setGameState("gameover");
+      playSFX("error");
+    }
+    return () => clearInterval(timer);
+  }, [gameState, timeLeft, health, playSFX]);
+
+  const startGame = () => {
+    setGameState("playing");
+    setScore(0);
+    setTimeLeft(30);
+    setHealth(100);
+    nextWord();
+    playSFX("click");
+  };
+
+  const nextWord = () => {
+    if (playableCards.length === 0) return;
+    const random = playableCards[Math.floor(Math.random() * playableCards.length)];
+    setCurrentWord(random);
+    setInput("");
+    // التركيز التلقائي على حقل الإدخال
+    setTimeout(() => {
+        if(inputRef.current) inputRef.current.focus();
+    }, 100);
+  };
+
+  const checkAnswer = (e) => {
+    e.preventDefault();
+    if (!currentWord) return;
+
+    // تنظيف النصوص للمقارنة (حذف المسافات وتحويل لحروف صغيرة)
+    const normalize = (text) => text ? text.trim().toLowerCase() : "";
+    
+    if (normalize(input) === normalize(currentWord.arabic)) {
+      // إجابة صحيحة
+      playSFX("success");
+      setScore(s => s + 100 + (timeLeft * 2)); // بونص للسرعة
+      setTimeLeft(t => Math.min(t + 5, 60)); // زيادة الوقت
+      
+      // تأثير القصاصات
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 }, colors: ['#00ff00', '#000000'] });
+      nextWord();
+    } else {
+      // إجابة خاطئة
+      playSFX("error");
+      setHealth(h => Math.max(0, h - 25)); // خصم الصحة
+      setInput("");
+      
+      // اهتزاز الشاشة
+      const gameContainer = document.getElementById("hacking-container");
+      if(gameContainer) {
+          gameContainer.classList.add("animate-shake");
+          setTimeout(() => gameContainer.classList.remove("animate-shake"), 500);
+      }
+    }
+  };
+
+  // إذا لم تكن هناك كلمات
+  if (playableCards.length === 0) {
+      return (
+          <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center text-red-500 font-mono">
+              <div className="text-center">
+                  <IconSkull size={64} className="mx-auto mb-4"/>
+                  <h2>NO DATA FOUND</h2>
+                  <p>Please add words to the Archive first.</p>
+                  <button onClick={onClose} className="mt-4 border border-red-500 px-4 py-2 hover:bg-red-500 hover:text-white">CLOSE</button>
+              </div>
+          </div>
+      )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center font-mono overflow-hidden">
+      
+      {/* الخلفيات والمؤثرات */}
+      <div className="absolute inset-0 bg-[url('https://media.giphy.com/media/26tn33aiTi1jkl6H6/giphy.gif')] opacity-5 bg-cover pointer-events-none"></div>
+      <div className="absolute inset-0 bg-green-900/5 pointer-events-none scanlines"></div>
+      
+      {/* زر الخروج في الأعلى */}
+      <button onClick={onClose} className="absolute top-6 right-6 text-green-500/50 hover:text-red-500 z-50 transition-colors">
+          <IconX size={32} />
+      </button>
+
+      <AnimatePresence mode="wait">
+        
+        {/* --- 1. شاشة البداية --- */}
+        {gameState === "start" && (
+          <motion.div 
+            key="start"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 1.5, opacity: 0, filter: "blur(10px)" }}
+            className="z-10 text-center space-y-6 p-8 border-2 border-green-500 bg-black/90 shadow-[0_0_50px_#00ff00] max-w-md w-full mx-4"
+          >
+            <IconTerminal size={80} className="mx-auto text-green-500 animate-pulse" />
+            <div>
+                <h1 className="text-4xl md:text-5xl font-black text-green-500 tracking-widest glitch-text mb-2" data-text="NEURAL BREACH">NEURAL BREACH</h1>
+                <p className="text-green-400/60 uppercase text-xs tracking-[0.5em]">System Vulnerable. Inject Code.</p>
+            </div>
+            
+            <button 
+                onClick={startGame}
+                className="group relative w-full py-4 bg-green-900/20 border border-green-500 text-green-500 font-bold uppercase tracking-widest hover:bg-green-500 hover:text-black transition-all overflow-hidden"
+            >
+                <span className="relative z-10 flex items-center justify-center gap-2"><IconPlayerPlay/> INITIATE HACK</span>
+                <div className="absolute inset-0 bg-green-500 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
+            </button>
+          </motion.div>
+        )}
+
+        {/* --- 2. شاشة اللعب --- */}
+        {gameState === "playing" && (
+          <motion.div 
+            key="playing"
+            id="hacking-container"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="z-10 w-full max-w-2xl p-6 relative"
+          >
+            {/* HUD العلوي */}
+            <div className="flex justify-between items-end mb-8 border-b-2 border-green-500/50 pb-4">
+                <div>
+                    <div className="text-xs text-green-500/50 uppercase tracking-widest">Score Data</div>
+                    <div className="text-4xl font-black text-green-500 font-sans">{score.toString().padStart(6, '0')}</div>
+                </div>
+                <div className="text-right">
+                    <div className="text-xs text-red-500/50 uppercase tracking-widest animate-pulse">Time Remaining</div>
+                    <div className={`text-4xl font-black font-sans ${timeLeft < 10 ? 'text-red-500 animate-ping' : 'text-green-500'}`}>
+                        00:{timeLeft.toString().padStart(2, '0')}
+                    </div>
+                </div>
+            </div>
+
+            {/* منطقة الكلمة (المشفرة) */}
+            <div className="relative mb-12 text-center py-10 bg-green-900/10 border border-green-500/30 rounded-lg overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-green-500 animate-[loading_2s_linear_infinite]"></div>
+                
+                <h2 className="text-5xl md:text-7xl font-black text-white glitch-text relative z-10 font-sans" data-text={currentWord?.russian}>
+                    {currentWord?.russian}
+                </h2>
+                
+                <div className="absolute top-2 right-2 text-[10px] text-green-500 border border-green-500 px-2 rounded uppercase">
+                    {currentWord?.category || "UNKNOWN"}
+                </div>
+            </div>
+
+            {/* شريط الصحة */}
+            <div className="w-full h-2 bg-gray-900 mb-6 rounded-full overflow-hidden border border-gray-700">
+                <motion.div 
+                    initial={{ width: "100%" }}
+                    animate={{ width: `${health}%` }}
+                    className={`h-full ${health > 50 ? 'bg-green-500' : 'bg-red-600'} shadow-[0_0_10px_currentColor]`}
+                />
+            </div>
+
+            {/* الإدخال */}
+            <form onSubmit={checkAnswer} className="relative group">
+                <input 
+                    ref={inputRef}
+                    autoFocus
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="DECRYPT_TRANSLATION..."
+                    className="w-full bg-black border-2 border-green-500/50 p-6 text-2xl text-center text-green-400 outline-none focus:border-green-400 focus:shadow-[0_0_30px_rgba(0,255,0,0.3)] placeholder:text-green-900 font-bold dir-rtl font-cairo transition-all"
+                />
+                <IconKeyboard className="absolute right-4 top-1/2 -translate-y-1/2 text-green-700 animate-pulse pointer-events-none" size={30}/>
+            </form>
+
+          </motion.div>
+        )}
+
+        {/* --- 3. شاشة الخسارة --- */}
+        {gameState === "gameover" && (
+          <motion.div 
+            key="gameover"
+            initial={{ scale: 2, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="z-10 text-center space-y-6 bg-red-950/90 p-10 border-4 border-red-600 shadow-[0_0_100px_#ff0000] relative overflow-hidden max-w-md w-full mx-4"
+          >
+            <div className="absolute inset-0 bg-[url('https://media.giphy.com/media/L20mbc7qR5f9u/giphy.gif')] opacity-10 mix-blend-overlay pointer-events-none"></div>
+            <IconSkull size={80} className="mx-auto text-red-500 animate-bounce" />
+            
+            <div>
+                <h1 className="text-5xl font-black text-red-500 tracking-tighter mb-2">SYSTEM FAILURE</h1>
+                <p className="text-red-300 font-mono text-sm">NEURAL LINK TERMINATED</p>
+            </div>
+
+            <div className="py-4 border-y border-red-500/30 my-4">
+                <div className="text-xs text-red-400 uppercase tracking-widest">Final Score</div>
+                <div className="text-6xl font-black text-white font-sans">{score}</div>
+            </div>
+
+            <div className="flex gap-4 justify-center">
+                <button onClick={startGame} className="px-6 py-3 bg-white text-red-900 font-black hover:scale-105 transition-transform uppercase text-sm">Reboot System</button>
+                <button onClick={onClose} className="px-6 py-3 border border-red-500 text-red-500 font-bold hover:bg-red-500 hover:text-white transition-colors uppercase text-sm">Exit</button>
+            </div>
+          </motion.div>
+        )}
+
+      </AnimatePresence>
+    </div>
+  );
+}
+
+
+==================================================================
 FILE: components\HeroSection.jsx
 ==================================================================
 
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
-import { IconRocket, IconActivity, IconBrain } from "@tabler/icons-react";
+import { IconRocket, IconActivity, IconBrain, IconTerminal, IconSkull, IconBolt } from "@tabler/icons-react";
+import { TextGenerateEffect } from "./ui/text-generate-effect";
 
-// 1. تعريف المكون الفرعي في الأعلى لتجنب أخطاء التعريف (Hoisting Issues)
-const StatBox = ({ icon, label, value, color }) => (
-    <div className="flex-1 bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-3">
-        <div className={`p-2 rounded-lg bg-black/50 ${color}`}>
-            {icon}
-        </div>
-        <div>
-            <div className="text-white font-bold text-lg">{value}</div>
-            <div className="text-white/30 text-[10px] uppercase tracking-wider">{label}</div>
-        </div>
-    </div>
-);
-
-export function HeroSection({ onStart, user }) {
-  // التأكد من وجود اسم للمستخدم لتجنب الأخطاء
-  const userName = user?.displayName || user?.email?.split('@')[0] || "Operative";
+export function HeroSection({ onStart, onOpenGame, user }) {
+  const userName = user?.email?.split('@')[0].toUpperCase() || "OPERATIVE";
 
   return (
-    <div className="min-h-[80vh] w-full flex flex-col items-center justify-center relative font-sans p-6 overflow-hidden">
+    <div className="w-full h-full flex flex-col md:flex-row items-center justify-between p-6 md:p-12 relative z-10 gap-10">
       
-      {/* الخلفية الشبكية المتحركة */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] z-0 pointer-events-none"></div>
+      {/* --- اليسار: الترحيب والبيانات --- */}
+      <motion.div 
+        initial={{ opacity: 0, x: -50 }} 
+        animate={{ opacity: 1, x: 0 }} 
+        className="flex-1 space-y-8"
+      >
+        {/* شارة الحالة */}
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-cyan-500/30 bg-cyan-950/20 text-cyan-400 text-xs font-mono tracking-widest animate-pulse">
+            <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+            SYSTEM STATUS: ONLINE
+        </div>
 
-      {/* المحتوى الرئيسي - لوحة القيادة */}
-      <div className="relative z-10 w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-        
-        {/* العمود الأيسر: البيانات */}
-        <motion.div 
-            initial={{ opacity: 0, x: -50 }} 
-            animate={{ opacity: 1, x: 0 }} 
-            transition={{ duration: 0.8 }}
-            className="flex flex-col gap-6"
+        <div>
+            <h1 className="text-5xl md:text-7xl font-black text-white leading-tight mb-2">
+                WELCOME BACK, <br/>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500 drop-shadow-[0_0_10px_rgba(6,182,212,0.5)]">
+                    {userName}
+                </span>
+            </h1>
+            <div className="text-white/40 font-mono text-sm md:text-base border-l-2 border-purple-500 pl-4 mt-4">
+                <p>&gt; Neural Interface Ready.</p>
+                <p>&gt; Objectives Loaded.</p>
+                <p>&gt; Awaiting Command Protocol.</p>
+            </div>
+        </div>
+
+        {/* بطاقات الإحصائيات (تصميم جديد) */}
+        <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-4 backdrop-blur-sm hover:bg-white/10 transition-colors group">
+                <div className="p-3 bg-cyan-500/10 rounded-lg text-cyan-400 group-hover:scale-110 transition-transform">
+                    <IconActivity size={24} />
+                </div>
+                <div>
+                    <div className="text-2xl font-bold text-white">100%</div>
+                    <div className="text-[10px] text-white/40 uppercase tracking-wider">Sync Rate</div>
+                </div>
+            </div>
+            <div className="bg-white/5 border border-white/10 p-4 rounded-xl flex items-center gap-4 backdrop-blur-sm hover:bg-white/10 transition-colors group">
+                <div className="p-3 bg-purple-500/10 rounded-lg text-purple-400 group-hover:scale-110 transition-transform">
+                    <IconBrain size={24} />
+                </div>
+                <div>
+                    <div className="text-2xl font-bold text-white">Active</div>
+                    <div className="text-[10px] text-white/40 uppercase tracking-wider">Neural Net</div>
+                </div>
+            </div>
+        </div>
+      </motion.div>
+
+      {/* --- اليمين: مركز التحكم والأزرار --- */}
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }} 
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.2 }}
+        className="flex-1 flex flex-col items-center justify-center gap-8 relative"
+      >
+        {/* خلفية دائرية مشعة */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/10 to-purple-500/10 blur-3xl rounded-full pointer-events-none"></div>
+
+        {/* زر البداية الرئيسي (المفاعل) */}
+        <button 
+            onClick={onStart}
+            className="group relative w-64 h-64 flex items-center justify-center focus:outline-none"
         >
-            <div className="border-l-4 border-cyan-500 pl-6">
-                <h2 className="text-cyan-400 text-sm tracking-[0.3em] uppercase mb-2">System Status: Online</h2>
-                <h1 className="text-5xl md:text-7xl font-black text-white leading-tight">
-                    WELCOME BACK, <br/>
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-600">
-                        {userName.toUpperCase()}
-                    </span>
-                </h1>
+            {/* الحلقات الدوارة */}
+            <div className="absolute inset-0 rounded-full border-2 border-dashed border-cyan-500/30 animate-[spin_10s_linear_infinite]"></div>
+            <div className="absolute inset-4 rounded-full border border-purple-500/30 animate-[spin_15s_linear_infinite_reverse]"></div>
+            
+            {/* الدائرة المركزية */}
+            <div className="w-48 h-48 rounded-full bg-gradient-to-br from-[#0a0a0a] to-[#1a1a1a] border-4 border-cyan-500/50 shadow-[0_0_50px_rgba(6,182,212,0.4)] group-hover:shadow-[0_0_80px_rgba(168,85,247,0.6)] group-hover:border-purple-500 transition-all duration-500 flex flex-col items-center justify-center z-10">
+                <IconRocket size={48} className="text-white mb-2 group-hover:-translate-y-2 transition-transform duration-300" />
+                <span className="text-2xl font-black text-white tracking-[0.2em]">START</span>
+                <span className="text-[10px] text-cyan-400 uppercase mt-1 group-hover:text-purple-400">Initialize Session</span>
             </div>
+        </button>
 
-            <div className="text-white/50 text-lg max-w-md border border-white/10 bg-black/40 p-4 rounded-xl backdrop-blur-md">
-                <div className="flex items-center gap-2 mb-1">
-                    <span className="text-cyan-400 font-bold"> &gt; </span> Neural Interface Ready.
-                </div>
-                <div className="flex items-center gap-2 mb-1">
-                    <span className="text-cyan-400 font-bold"> &gt; </span> Objectives Loaded.
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-emerald-400 font-bold"> &gt; </span> Awaiting Command.
-                </div>
-            </div>
-
-            <div className="flex gap-4">
-                <StatBox 
-                    icon={<IconActivity size={24} />} 
-                    label="Sync Rate" 
-                    value="100%" 
-                    color="text-emerald-400" 
-                />
-                <StatBox 
-                    icon={<IconBrain size={24} />} 
-                    label="Knowledge" 
-                    value="Loading..." 
-                    color="text-purple-400" 
-                />
-            </div>
-        </motion.div>
-
-        {/* العمود الأيمن: زر الإطلاق العملاق */}
-        <motion.div 
-            initial={{ opacity: 0, scale: 0.8 }} 
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3, duration: 0.8 }}
-            className="flex justify-center md:justify-end py-10 md:py-0"
+        {/* زر الاختراق (التصميم الجديد) */}
+        {/* تم وضعه هنا ليكون تحت زر البداية مباشرة وبشكل متناسق */}
+        <button 
+            onClick={onOpenGame}
+            className="relative group w-full max-w-sm overflow-hidden rounded-xl border border-red-500/30 bg-red-950/10 px-6 py-4 transition-all hover:bg-red-950/30 hover:border-red-500 hover:shadow-[0_0_30px_rgba(220,38,38,0.4)]"
         >
-            <button 
-                onClick={onStart}
-                className="group relative w-64 h-64 rounded-full border border-white/10 flex items-center justify-center transition-all hover:scale-105 active:scale-95 outline-none"
-            >
-                {/* الحلقات الدوارة */}
-                <div className="absolute inset-0 rounded-full border border-cyan-500/30 border-dashed animate-[spin_10s_linear_infinite]"></div>
-                <div className="absolute inset-4 rounded-full border border-purple-500/30 animate-[spin_15s_linear_infinite_reverse]"></div>
-                
-                {/* قلب الزر */}
-                <div className="w-48 h-48 rounded-full bg-gradient-to-br from-cyan-900/50 to-purple-900/50 backdrop-blur-xl border border-white/20 flex flex-col items-center justify-center shadow-[0_0_50px_rgba(6,182,212,0.3)] group-hover:shadow-[0_0_80px_rgba(168,85,247,0.5)] transition-all z-20">
-                    <IconRocket size={48} className="text-white mb-2 group-hover:-translate-y-1 transition-transform" />
-                    <span className="text-2xl font-black text-white tracking-widest">START</span>
-                    <span className="text-[10px] text-cyan-400 uppercase mt-1">Initialize Session</span>
+            <div className="relative z-10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-red-500/10 rounded text-red-500 group-hover:animate-pulse">
+                        <IconTerminal size={24} />
+                    </div>
+                    <div className="text-left">
+                        <div className="text-sm font-bold text-red-500 tracking-widest group-hover:text-white transition-colors">NEURAL BREACH</div>
+                        <div className="text-[10px] text-red-400/50 font-mono">HACKING PROTOCOL: READY</div>
+                    </div>
                 </div>
-            </button>
-        </motion.div>
+                <IconSkull className="text-red-500/20 group-hover:text-red-500 group-hover:rotate-12 transition-all" size={32} />
+            </div>
+            
+            {/* تأثير الخطوط المتحركة للخلفية */}
+            <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(220,38,38,0.1)_50%,transparent_75%,transparent_100%)] bg-[length:250%_250%,100%_100%] bg-[position:200%_0,0_0] bg-no-repeat group-hover:bg-[position:-200%_0,0_0] transition-[background-position] duration-[1500ms] ease-in-out" />
+        </button>
 
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -2155,6 +3350,139 @@ export default function LeaderboardView({ currentUserEmail }) {
 
 
 ==================================================================
+FILE: components\MemoryGame.jsx
+==================================================================
+
+"use client";
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { IconBrain, IconCheck, IconX, IconRefresh } from "@tabler/icons-react";
+import confetti from "canvas-confetti";
+
+export default function MemoryGame({ cards, onClose }) {
+  const [gameCards, setGameCards] = useState([]);
+  const [flipped, setFlipped] = useState([]);
+  const [solved, setSolved] = useState([]);
+  const [disabled, setDisabled] = useState(false);
+  const [won, setWon] = useState(false);
+
+  // تحضير البطاقات (خلط الروسي والعربي)
+  useEffect(() => {
+    initializeGame();
+  }, []);
+
+  const initializeGame = () => {
+    // نأخذ عينة عشوائية من 6 كلمات (12 بطاقة)
+    const sample = cards
+      .filter(c => c.russian && c.arabic)
+      .sort(() => 0.5 - Math.random())
+      .slice(0, 6);
+
+    const russianCards = sample.map(c => ({ id: c.id, content: c.russian, type: 'ru', pairId: c.id }));
+    const arabicCards = sample.map(c => ({ id: c.id + '_ar', content: c.arabic, type: 'ar', pairId: c.id }));
+
+    const combined = [...russianCards, ...arabicCards].sort(() => 0.5 - Math.random());
+    setGameCards(combined);
+    setFlipped([]);
+    setSolved([]);
+    setWon(false);
+  };
+
+  const handleClick = (id) => {
+    if (disabled || flipped.includes(id) || solved.includes(id)) return;
+
+    if (flipped.length === 0) {
+      setFlipped([id]);
+      return;
+    }
+
+    if (flipped.length === 1) {
+      setDisabled(true);
+      setFlipped([...flipped, id]);
+      checkForMatch(flipped[0], id);
+    }
+  };
+
+  const checkForMatch = (id1, id2) => {
+    const card1 = gameCards.find(c => c.id === id1);
+    const card2 = gameCards.find(c => c.id === id2);
+
+    if (card1.pairId === card2.pairId) {
+      setSolved(prev => [...prev, id1, id2]);
+      setFlipped([]);
+      setDisabled(false);
+      if (solved.length + 2 === gameCards.length) handleWin();
+    } else {
+      setTimeout(() => {
+        setFlipped([]);
+        setDisabled(false);
+      }, 1000);
+    }
+  };
+
+  const handleWin = () => {
+    setWon(true);
+    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col items-center justify-center p-4">
+      <div className="absolute inset-0 bg-purple-900/10 pointer-events-none scanlines"></div>
+      
+      <div className="flex justify-between w-full max-w-4xl mb-8 items-center z-10">
+        <h2 className="text-3xl font-black text-purple-500 tracking-widest flex items-center gap-2">
+            <IconBrain size={32}/> MEMORY CORE
+        </h2>
+        <button onClick={onClose} className="px-4 py-2 border border-red-500 text-red-500 rounded hover:bg-red-500 hover:text-white transition-colors">EXIT</button>
+      </div>
+
+      {!won ? (
+        <div className="grid grid-cols-3 md:grid-cols-4 gap-4 max-w-4xl w-full z-10">
+            {gameCards.map((card) => {
+                const isFlipped = flipped.includes(card.id) || solved.includes(card.id);
+                const isSolved = solved.includes(card.id);
+                return (
+                    <motion.div
+                        key={card.id}
+                        initial={{ rotateY: 0 }}
+                        animate={{ rotateY: isFlipped ? 180 : 0 }}
+                        transition={{ duration: 0.3 }}
+                        onClick={() => handleClick(card.id)}
+                        className="relative h-32 cursor-pointer perspective-1000"
+                    >
+                        {/* الوجه الخلفي (مخفي) */}
+                        <div className="absolute inset-0 bg-gray-900 border-2 border-purple-500/30 rounded-xl flex items-center justify-center backface-hidden">
+                            <IconBrain className="text-purple-500/20" size={40}/>
+                        </div>
+                        {/* الوجه الأمامي (النص) */}
+                        <div 
+                            className={`absolute inset-0 rounded-xl flex items-center justify-center p-2 text-center text-sm font-bold border-2 backface-hidden transition-colors ${
+                                isSolved 
+                                ? 'bg-green-900/20 border-green-500 text-green-400' 
+                                : 'bg-purple-900/20 border-purple-500 text-white'
+                            }`}
+                            style={{ transform: "rotateY(180deg)" }}
+                        >
+                            {card.content}
+                        </div>
+                    </motion.div>
+                );
+            })}
+        </div>
+      ) : (
+        <div className="text-center z-10 animate-in zoom-in duration-500">
+            <h1 className="text-6xl font-black text-green-500 mb-4">DATA SYNCED</h1>
+            <button onClick={initializeGame} className="px-8 py-3 bg-white text-black font-bold rounded-full hover:scale-105 transition-transform flex items-center gap-2 mx-auto">
+                <IconRefresh/> REPLAY
+            </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+==================================================================
 FILE: components\MusicPlayer.jsx
 ==================================================================
 
@@ -2248,6 +3576,112 @@ export function MusicPlayer({ music }) {
 
 
 ==================================================================
+FILE: components\ScrambleGame.jsx
+==================================================================
+
+"use client";
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { IconAbc, IconCheck, IconX, IconRefresh } from "@tabler/icons-react";
+import confetti from "canvas-confetti";
+
+export default function ScrambleGame({ cards, onClose }) {
+  const [currentCard, setCurrentCard] = useState(null);
+  const [shuffledLetters, setShuffledLetters] = useState([]);
+  const [userAnswer, setUserAnswer] = useState([]);
+  const [message, setMessage] = useState(null); // 'correct' | 'wrong'
+
+  useEffect(() => nextWord(), []);
+
+  const nextWord = () => {
+    const valid = cards.filter(c => c.russian && c.russian.length > 3);
+    if(valid.length === 0) return;
+    const random = valid[Math.floor(Math.random() * valid.length)];
+    
+    setCurrentCard(random);
+    const letters = random.russian.split('').map((l, i) => ({ id: i, char: l }));
+    setShuffledLetters(letters.sort(() => Math.random() - 0.5));
+    setUserAnswer([]);
+    setMessage(null);
+  };
+
+  const handleSelect = (letter) => {
+    setShuffledLetters(prev => prev.filter(l => l.id !== letter.id));
+    setUserAnswer(prev => [...prev, letter]);
+  };
+
+  const handleDeselect = (letter) => {
+    setUserAnswer(prev => prev.filter(l => l.id !== letter.id));
+    setShuffledLetters(prev => [...prev, letter]);
+  };
+
+  const checkAnswer = () => {
+    const formed = userAnswer.map(l => l.char).join('');
+    if (formed.toLowerCase() === currentCard.russian.toLowerCase()) {
+      setMessage('correct');
+      confetti({ particleCount: 100, origin: { y: 0.6 } });
+      setTimeout(nextWord, 1500);
+    } else {
+      setMessage('wrong');
+      setTimeout(() => setMessage(null), 1000);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col items-center justify-center p-6 font-mono">
+      <div className="absolute inset-0 bg-blue-900/10 pointer-events-none scanlines"></div>
+      
+      {/* Header */}
+      <div className="flex justify-between w-full max-w-2xl mb-12 items-center z-10">
+        <h2 className="text-2xl font-black text-blue-500 tracking-widest flex items-center gap-2">
+            <IconAbc size={28}/> CRYPTIC CIPHER
+        </h2>
+        <button onClick={onClose} className="text-white/50 hover:text-red-500"><IconX/></button>
+      </div>
+
+      <div className="text-center w-full max-w-2xl z-10">
+        <p className="text-white/50 mb-2 uppercase tracking-widest text-sm">Decipher this meaning:</p>
+        <h3 className="text-3xl text-white mb-10 font-cairo dir-rtl">{currentCard?.arabic}</h3>
+
+        {/* منطقة الإجابة */}
+        <div className={`min-h-[80px] border-b-2 ${message === 'correct' ? 'border-green-500' : message === 'wrong' ? 'border-red-500' : 'border-blue-500/50'} flex items-center justify-center gap-2 mb-10 flex-wrap p-4 transition-colors`}>
+            {userAnswer.map(l => (
+                <motion.button 
+                    layoutId={l.id} 
+                    key={l.id} 
+                    onClick={() => handleDeselect(l)}
+                    className="w-10 h-10 bg-blue-600 rounded text-white font-bold text-xl flex items-center justify-center hover:bg-red-500 transition-colors"
+                >
+                    {l.char}
+                </motion.button>
+            ))}
+        </div>
+
+        {/* الحروف المبعثرة */}
+        <div className="flex gap-2 justify-center flex-wrap mb-12">
+            {shuffledLetters.map(l => (
+                <motion.button 
+                    layoutId={l.id} 
+                    key={l.id} 
+                    onClick={() => handleSelect(l)}
+                    className="w-12 h-12 bg-white/10 border border-white/20 rounded text-blue-400 font-bold text-xl flex items-center justify-center hover:bg-blue-500/20 hover:scale-110 transition-all"
+                >
+                    {l.char}
+                </motion.button>
+            ))}
+        </div>
+
+        <div className="flex gap-4 justify-center">
+            <button onClick={checkAnswer} className="px-8 py-3 bg-blue-600 text-white font-bold rounded-lg shadow-[0_0_20px_#2563eb] hover:scale-105 transition-transform">DECRYPT</button>
+            <button onClick={nextWord} className="px-4 py-3 bg-white/10 rounded-lg hover:bg-white/20"><IconRefresh/></button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+==================================================================
 FILE: components\SettingsView.jsx
 ==================================================================
 
@@ -2255,155 +3689,63 @@ FILE: components\SettingsView.jsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  IconVolume, 
-  IconLogout, 
-  IconTrash, 
-  IconUser, 
-  IconShield, 
-  IconSettings, // تأكدنا من استيراد الأيقونة هنا
-  IconCheck
+  IconVolume, IconLogout, IconTrash, IconUser, IconShield, IconSettings, IconCheck, IconMessageExclamation 
 } from '@tabler/icons-react';
 import { useStudySystem } from '../hooks/useStudySystem';
-import { auth } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
+import SupportModal from './SupportModal'; // المكون الجديد
 
-// قائمة الصور الرمزية المتاحة
 const AVATARS = ["👤", "🤖", "👽", "👾", "💀", "🐱", "🦉", "⚡", "🔥", "💎", "🐉", "🚀"];
 
-export default function SettingsView({ onLogout, resetProgress }) {
-  // استخدام الهوك للوصول لبيانات المستخدم وتحديثها
-  // نمرر auth.currentUser لتجنب الأخطاء إذا لم يتم تمرير user كـ prop
-  const { setAvatar, stats } = useStudySystem(auth.currentUser);
-  
-  // حالة محلية للصوت (للعرض فقط إذا لم يكن هناك هوك إعدادات عام)
+export default function SettingsView({ onLogout, resetProgress, user }) {
+  const { setAvatar, stats } = useStudySystem(user);
   const [soundEnabled, setSoundEnabled] = useState(true); 
-
-  const handleSoundToggle = () => {
-      setSoundEnabled(!soundEnabled);
-      // هنا يمكنك إضافة منطق حفظ الإعداد في LocalStorage مستقبلاً
-  };
+  const [showSupport, setShowSupport] = useState(false);
 
   return (
     <div className="w-full h-full flex flex-col p-6 font-sans text-white pb-32 overflow-y-auto custom-scrollbar">
       
+      {/* Support Modal */}
+      {showSupport && <SupportModal user={user} onClose={() => setShowSupport(false)} />}
+
       <div className="max-w-3xl mx-auto w-full space-y-8">
         
-        {/* --- HEADER --- */}
-        <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="border-b border-white/10 pb-6"
-        >
-            <h2 className="text-4xl font-black tracking-widest flex items-center gap-3 text-white">
-                <IconSettings size={40} className="text-cyan-500 animate-[spin_10s_linear_infinite]"/>
-                SYSTEM CONFIG
-            </h2>
-            <p className="text-white/40 text-xs font-bold uppercase tracking-[0.3em] mt-2 ml-14">
-                Neural Interface Customization
-            </p>
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="border-b border-white/10 pb-6 flex justify-between items-end">
+            <div>
+                <h2 className="text-4xl font-black tracking-widest flex items-center gap-3 text-white">
+                    <IconSettings size={40} className="text-cyan-500 animate-[spin_10s_linear_infinite]"/>
+                    SYSTEM CONFIG
+                </h2>
+                <p className="text-white/40 text-xs font-bold uppercase tracking-[0.3em] mt-2 ml-14">
+                    Neural Interface Customization
+                </p>
+            </div>
+            {/* زر الدعم الفني */}
+            <button onClick={() => setShowSupport(true)} className="bg-purple-600/20 border border-purple-500 text-purple-400 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-purple-600 hover:text-white transition-all">
+                <IconMessageExclamation size={18} /> CONTACT HQ
+            </button>
         </motion.div>
 
-        {/* --- AVATAR SELECTION --- */}
+        {/* Avatar Section */}
         <section className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 blur-[50px] rounded-full pointer-events-none"></div>
-            
-            <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-cyan-400">
-                <IconUser/> OPERATIVE IDENTITY
-            </h3>
-            
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-cyan-400"><IconUser/> OPERATIVE IDENTITY</h3>
             <div className="grid grid-cols-4 md:grid-cols-6 gap-4">
                 {AVATARS.map((avi, index) => {
                     const isSelected = stats?.avatar === avi;
                     return (
-                        <motion.button 
-                            key={index} 
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => setAvatar(avi)}
-                            className={`aspect-square rounded-xl flex items-center justify-center text-3xl transition-all relative ${
-                                isSelected 
-                                ? 'bg-cyan-600/20 border-2 border-cyan-500 shadow-[0_0_15px_#06b6d4]' 
-                                : 'bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/30'
-                            }`}
-                        >
+                        <button key={index} onClick={() => setAvatar(avi)} className={`aspect-square rounded-xl flex items-center justify-center text-3xl transition-all relative ${isSelected ? 'bg-cyan-600/20 border-2 border-cyan-500' : 'bg-white/5 border border-white/10 hover:bg-white/10'}`}>
                             {avi}
-                            {isSelected && (
-                                <div className="absolute -top-2 -right-2 bg-cyan-500 rounded-full p-0.5 text-black">
-                                    <IconCheck size={12} stroke={4} />
-                                </div>
-                            )}
-                        </motion.button>
+                            {isSelected && <div className="absolute -top-2 -right-2 bg-cyan-500 rounded-full p-0.5 text-black"><IconCheck size={12} stroke={4} /></div>}
+                        </button>
                     );
                 })}
             </div>
         </section>
 
-        {/* --- SYSTEM CONTROLS --- */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Audio Settings */}
-            <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6 flex flex-col justify-between">
-                <div>
-                    <h3 className="text-lg font-bold mb-2 flex items-center gap-2 text-purple-400">
-                        <IconVolume/> AUDIO FEED
-                    </h3>
-                    <p className="text-white/40 text-xs">Enable synthetic voice & interface sounds.</p>
-                </div>
-                <div className="mt-6 flex items-center justify-between bg-black/40 p-3 rounded-lg border border-white/5">
-                    <span className={`text-sm font-mono font-bold ${soundEnabled ? "text-emerald-500" : "text-gray-500"}`}>
-                        {soundEnabled ? "ONLINE" : "MUTED"}
-                    </span>
-                    <button 
-                        onClick={handleSoundToggle}
-                        className={`w-12 h-6 rounded-full relative transition-colors duration-300 ${
-                            soundEnabled ? 'bg-emerald-500 shadow-[0_0_10px_#10b981]' : 'bg-gray-700'
-                        }`}
-                    >
-                        <motion.div 
-                            layout
-                            className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm"
-                            initial={false}
-                            animate={{ left: soundEnabled ? "1.75rem" : "0.25rem" }}
-                        />
-                    </button>
-                </div>
-            </div>
-
-            {/* Danger Zone */}
-            <div className="bg-red-950/10 border border-red-500/30 rounded-2xl p-6 relative overflow-hidden">
-                <div className="absolute -right-4 -bottom-4 opacity-10">
-                    <IconTrash size={100} />
-                </div>
-                <h3 className="text-lg font-bold mb-2 flex items-center gap-2 text-red-500">
-                    <IconShield/> DANGER ZONE
-                </h3>
-                <p className="text-red-400/50 text-xs mb-6">
-                    Actions here are irreversible. Tread carefully.
-                </p>
-                
-                <button 
-                    onClick={resetProgress}
-                    className="w-full py-3 bg-red-500/10 border border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition-all group"
-                >
-                    <IconTrash size={16} className="group-hover:rotate-12 transition-transform"/> WIPE ALL DATA
-                </button>
-            </div>
-        </section>
-
-        {/* --- LOGOUT --- */}
-        <motion.button 
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={onLogout}
-            className="w-full py-5 bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:border-white/30 rounded-2xl font-black tracking-widest flex items-center justify-center gap-3 transition-all group mt-4"
-        >
-            <IconLogout className="group-hover:-translate-x-1 text-cyan-500 transition-transform"/> 
-            DISCONNECT FROM NEURAL NET
-        </motion.button>
-
-        <div className="text-center text-white/10 text-[10px] font-mono pt-4">
-            RUSSIAN_MASTER_OS // V.10.2.4 // SECURE
-        </div>
-
+        {/* Logout */}
+        <button onClick={onLogout} className="w-full py-5 bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-2xl font-black tracking-widest flex items-center justify-center gap-3 transition-all">
+            <IconLogout className="text-cyan-500"/> DISCONNECT
+        </button>
       </div>
     </div>
   );
@@ -2532,17 +3874,15 @@ export function StudyCard({ card, onResult, speak }) {
       }
   };
 
-  // --- دالة ذكية لتحديد حجم الخط بناءً على طول الكلمة ---
   const getFontSize = (text) => {
       if (!text) return "text-4xl";
       const len = text.length;
-      if (len > 25) return "text-xl md:text-2xl"; // للكلمات الطويلة جداً
-      if (len > 15) return "text-2xl md:text-3xl"; // للكلمات المتوسطة
-      return "text-4xl md:text-5xl"; // للكلمات القصيرة
+      if (len > 25) return "text-xl md:text-2xl"; 
+      if (len > 15) return "text-2xl md:text-3xl"; 
+      return "text-4xl md:text-5xl"; 
   };
 
   return (
-    // إضافة overflow-y-auto هنا للسماح بالتمرير إذا كانت البطاقة طويلة جداً في شاشات صغيرة
     <div className="perspective-1000 w-full h-[600px] flex flex-col items-center justify-center relative overflow-y-auto custom-scrollbar p-4">
       
       <div className="flex gap-4 mb-8 z-20 shrink-0">
@@ -2565,15 +3905,14 @@ export function StudyCard({ card, onResult, speak }) {
           className="w-full h-full relative preserve-3d"
         >
           
-          {/* --- الوجه الأمامي (السؤال) --- */}
+          {/* الوجه الروسي (يبقى كما هو Cyberpunk) */}
           <div className="absolute inset-0 backface-hidden rounded-[2rem] border border-cyan-500/20 bg-black/80 backdrop-blur-2xl shadow-[0_0_50px_-10px_rgba(6,182,212,0.15)] flex flex-col items-center justify-center p-6 overflow-hidden">
             <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent shadow-[0_0_10px_#06b6d4]"></div>
             <div className="absolute top-4 left-4 w-2 h-2 bg-cyan-500 rounded-full animate-ping"></div>
             <div className="absolute top-4 right-4 text-[10px] text-cyan-500/50 font-mono tracking-widest">SECURE_DATA</div>
 
-            {/* تم الإصلاح هنا: كسر الكلمات + حجم خط ديناميكي */}
             <div className="flex-1 flex items-center justify-center w-full">
-                <h1 className={`${getFontSize(card.russian)} font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] text-center break-words w-full px-2 leading-tight`}>
+                <h1 className={`${getFontSize(card.russian)} font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] text-center break-words w-full px-2 leading-tight font-mono`}>
                     {card.russian}
                 </h1>
             </div>
@@ -2603,13 +3942,20 @@ export function StudyCard({ card, onResult, speak }) {
             </button>
           </div>
 
-          {/* --- الوجه الخلفي (الإجابة) --- */}
+          {/* --- الوجه العربي (تم الإصلاح هنا) --- */}
           <div className="absolute inset-0 backface-hidden rounded-[2rem] border border-purple-500/20 bg-[#0a0510]/95 backdrop-blur-2xl shadow-[0_0_50px_-10px_rgba(168,85,247,0.15)] flex flex-col items-center justify-center p-6 overflow-hidden" style={{ transform: "rotateY(180deg)" }}>
              <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent shadow-[0_0_10px_#a855f7]"></div>
              <div className="absolute top-4 left-4 text-[10px] text-purple-500/50 font-mono tracking-widest">TRANSLATION_MATRIX</div>
              
              <div className="flex-1 flex items-center justify-center w-full">
-                <h1 className={`${getFontSize(card.arabic)} font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-300 text-center dir-rtl leading-normal break-words w-full`}>
+                {/* 
+                    الإصلاحات:
+                    1. font-cairo: استخدام خط عربي حصراً.
+                    2. tracking-normal: إلغاء التباعد بين الحروف.
+                    3. dir="rtl": ضمان الاتجاه الصحيح.
+                    4. حذف font-mono.
+                */}
+                <h1 className={`${getFontSize(card.arabic)} font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-300 text-center dir-rtl leading-normal break-words w-full font-cairo tracking-normal`}>
                     {card.arabic}
                 </h1>
              </div>
@@ -2627,6 +3973,95 @@ export function StudyCard({ card, onResult, speak }) {
 
         </motion.div>
       </motion.div>
+    </div>
+  );
+}
+
+
+==================================================================
+FILE: components\SupportModal.jsx
+==================================================================
+
+"use client";
+import React, { useState, useEffect, useRef } from 'react';
+import { db } from '../lib/firebase';
+import { doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot } from "firebase/firestore";
+import { IconX, IconSend, IconMessage2 } from '@tabler/icons-react';
+
+export default function SupportModal({ user, onClose }) {
+  const [message, setMessage] = useState("");
+  const [chatHistory, setChatHistory] = useState([]);
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    // جلب أو إنشاء تذكرة الدعم الخاصة بالمستخدم
+    const ticketRef = doc(db, "support_tickets", user.uid);
+    
+    const unsubscribe = onSnapshot(ticketRef, (docSnap) => {
+        if (docSnap.exists()) {
+            setChatHistory(docSnap.data().messages || []);
+        } else {
+            // إنشاء تذكرة فارغة إذا لم تكن موجودة
+            setDoc(ticketRef, {
+                userId: user.uid,
+                userEmail: user.email,
+                messages: [],
+                status: 'open',
+                lastUpdate: new Date().toISOString()
+            });
+        }
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatHistory]);
+
+  const sendMessage = async () => {
+      if(!message.trim()) return;
+      const ticketRef = doc(db, "support_tickets", user.uid);
+      const msgObj = { text: message, sender: 'user', createdAt: new Date().toISOString() };
+      
+      await updateDoc(ticketRef, {
+          messages: arrayUnion(msgObj),
+          lastUpdate: new Date().toISOString(),
+          status: 'open'
+      });
+      setMessage("");
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-[#111] border border-purple-500 rounded-2xl flex flex-col h-[600px] shadow-[0_0_50px_rgba(168,85,247,0.2)]">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-purple-900/20">
+                <h3 className="font-bold text-purple-400 flex items-center gap-2"><IconMessage2/> SUPPORT LINE</h3>
+                <button onClick={onClose} className="text-white/50 hover:text-white"><IconX/></button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-black">
+                {chatHistory.length === 0 && <div className="text-center text-white/30 text-sm mt-10">Send a message to Admins...</div>}
+                {chatHistory.map((msg, i) => (
+                    <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[80%] p-3 rounded-xl text-sm ${msg.sender === 'user' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-300'}`}>
+                            {msg.text}
+                        </div>
+                    </div>
+                ))}
+                <div ref={scrollRef}></div>
+            </div>
+
+            <div className="p-4 border-t border-white/10 flex gap-2">
+                <input 
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                    placeholder="Describe your issue..." 
+                    className="flex-1 bg-[#222] border border-white/10 rounded-lg px-3 py-2 text-white outline-none focus:border-purple-500"
+                />
+                <button onClick={sendMessage} className="bg-purple-600 p-2 rounded-lg text-white hover:bg-purple-500"><IconSend size={20}/></button>
+            </div>
+        </div>
     </div>
   );
 }
