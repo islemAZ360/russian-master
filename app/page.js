@@ -7,6 +7,7 @@ import {
   IconMessageCircle, IconRobot 
 } from '@tabler/icons-react';
 
+// --- Components ---
 import { HeroSection } from '../components/HeroSection';
 import { CategorySelect } from '../components/CategorySelect';
 import { StudyCard } from '../components/StudyCard';
@@ -17,19 +18,21 @@ import CommunicationHub from '../components/CommunicationHub';
 import SettingsView from '../components/SettingsView'; 
 import AdminDashboard from '../components/AdminDashboard'; 
 import AITutor from '../components/AITutor';
+import HackingGame from '../components/HackingGame'; // <-- اللعبة الجديدة
 import { FloatingDock } from '../components/ui/floating-dock';
 import DigitalRain from '../components/ui/DigitalRain'; 
 import IntroSequence from '../components/IntroSequence'; 
 import { BossBattleWrapper } from '../components/BossBattleWrapper'; 
 import DailyReward from '../components/DailyReward';
 
+// --- Hooks & Libs ---
 import { useStudySystem } from '../hooks/useStudySystem';
 import { useAudio } from '../hooks/useAudio';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot, updateDoc, setDoc, getDoc } from "firebase/firestore";
 
-// الإيميل الرئيسي (السوبر أدمن)
+// Master Email
 const MASTER_EMAIL = "islamaz@bomba.com";
 
 export default function RussianApp() {
@@ -42,6 +45,9 @@ export default function RussianApp() {
   const [maintenance, setMaintenance] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  
+  // Game State
+  const [showGame, setShowGame] = useState(false); // حالة اللعبة
 
   const [battleResult, setBattleResult] = useState(null); 
   const [battleTrigger, setBattleTrigger] = useState(0);
@@ -59,7 +65,7 @@ export default function RussianApp() {
             setUser(u);
             const userRef = doc(db, "users", u.uid);
             
-            // --- تصحيح صلاحيات السوبر أدمن تلقائياً ---
+            // Super Admin Fix
             if (u.email === MASTER_EMAIL) {
                 const snap = await getDoc(userRef);
                 if (snap.exists() && snap.data().role !== 'admin') {
@@ -68,7 +74,6 @@ export default function RussianApp() {
                     await setDoc(userRef, { email: u.email, role: 'admin', xp: 0 });
                 }
             }
-            // -------------------------------------------
 
             onSnapshot(userRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -102,11 +107,10 @@ export default function RussianApp() {
       return [...new Set(cards.map(c => c.category || "General"))];
   }, [cards]);
 
-  // --- التحقق من الصلاحيات (تم التعديل هنا) ---
-  const isMaster = user?.email === MASTER_EMAIL; // صلاحية مطلقة للإيميل
+  const isMaster = user?.email === MASTER_EMAIL;
   const isAdmin = userData?.role === 'admin' || isMaster;
   const isJunior = userData?.role === 'junior' || isAdmin;
-  const isBanned = userData?.isBanned && !isMaster; // السوبر أدمن لا يحظر
+  const isBanned = userData?.isBanned && !isMaster;
 
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
 
@@ -142,16 +146,43 @@ export default function RussianApp() {
     { title: "Config", icon: <IconSettings className="w-full text-neutral-400" />, onClick: () => setCurrentView('settings') },
   ];
   
-  // شرط ظهور زر الأدمن
   if (isJunior) {
       navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
   }
 
   const renderContent = () => {
+    // --- عرض اللعبة إذا كانت مفعلة ---
+    if (showGame) return <HackingGame cards={cards} onClose={() => setShowGame(false)} />;
+
     if (currentView === 'admin' && !isJunior) return <HeroSection onStart={() => setCurrentView('category')} user={user} />;
 
     switch (currentView) {
-      case 'home': return <HeroSection onStart={() => setCurrentView('category')} user={user} />;
+      case 'home': 
+        return (
+            <div className="relative w-full h-full flex flex-col items-center justify-center">
+                <HeroSection onStart={() => setCurrentView('category')} user={user} />
+                
+                {/* زر تشغيل اللعبة الجديد المبهر */}
+                <motion.div 
+                    initial={{ y: 50, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 1 }}
+                    className="absolute bottom-32 md:bottom-20 z-20"
+                >
+                    <button 
+                        onClick={() => setShowGame(true)}
+                        className="group relative px-8 py-3 bg-black border border-green-500/50 text-green-500 font-mono text-xs uppercase tracking-[0.3em] hover:bg-green-500 hover:text-black transition-all overflow-hidden rounded shadow-[0_0_20px_rgba(0,255,0,0.2)]"
+                    >
+                        <span className="relative z-10 flex items-center gap-2 font-bold">
+                            <IconCpu size={16} className="animate-spin-slow"/> 
+                            INITIATE HACKING PROTOCOL
+                        </span>
+                        <div className="absolute inset-0 bg-green-500/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    </button>
+                </motion.div>
+            </div>
+        );
+        
       case 'ai-tutor': return <AITutor user={user} />;
       case 'chat': return <CommunicationHub user={user} />;
       case 'category': return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
@@ -184,7 +215,6 @@ export default function RussianApp() {
             </div>
         );
       case 'data': 
-        // تمرير صلاحية الأدمن لصفحة البيانات لتفعيل الأزرار
         return <DataManager cards={cards} onAdd={addCard} onDelete={deleteCard} onUpdate={updateCard} isJunior={isJunior} />;
       case 'leaderboard': 
         return <CyberDeck user={user} stats={stats || { xp: 0, streak: 0, avatar: '👤' }} cards={cards || []} />;

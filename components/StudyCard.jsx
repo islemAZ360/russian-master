@@ -32,17 +32,15 @@ export function StudyCard({ card, onResult, speak }) {
       }
   };
 
-  // --- دالة ذكية لتحديد حجم الخط بناءً على طول الكلمة ---
   const getFontSize = (text) => {
       if (!text) return "text-4xl";
       const len = text.length;
-      if (len > 25) return "text-xl md:text-2xl"; // للكلمات الطويلة جداً
-      if (len > 15) return "text-2xl md:text-3xl"; // للكلمات المتوسطة
-      return "text-4xl md:text-5xl"; // للكلمات القصيرة
+      if (len > 25) return "text-xl md:text-2xl"; 
+      if (len > 15) return "text-2xl md:text-3xl"; 
+      return "text-4xl md:text-5xl"; 
   };
 
   return (
-    // إضافة overflow-y-auto هنا للسماح بالتمرير إذا كانت البطاقة طويلة جداً في شاشات صغيرة
     <div className="perspective-1000 w-full h-[600px] flex flex-col items-center justify-center relative overflow-y-auto custom-scrollbar p-4">
       
       <div className="flex gap-4 mb-8 z-20 shrink-0">
@@ -65,15 +63,14 @@ export function StudyCard({ card, onResult, speak }) {
           className="w-full h-full relative preserve-3d"
         >
           
-          {/* --- الوجه الأمامي (السؤال) --- */}
+          {/* الوجه الروسي (يبقى كما هو Cyberpunk) */}
           <div className="absolute inset-0 backface-hidden rounded-[2rem] border border-cyan-500/20 bg-black/80 backdrop-blur-2xl shadow-[0_0_50px_-10px_rgba(6,182,212,0.15)] flex flex-col items-center justify-center p-6 overflow-hidden">
             <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent shadow-[0_0_10px_#06b6d4]"></div>
             <div className="absolute top-4 left-4 w-2 h-2 bg-cyan-500 rounded-full animate-ping"></div>
             <div className="absolute top-4 right-4 text-[10px] text-cyan-500/50 font-mono tracking-widest">SECURE_DATA</div>
 
-            {/* تم الإصلاح هنا: كسر الكلمات + حجم خط ديناميكي */}
             <div className="flex-1 flex items-center justify-center w-full">
-                <h1 className={`${getFontSize(card.russian)} font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] text-center break-words w-full px-2 leading-tight`}>
+                <h1 className={`${getFontSize(card.russian)} font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] text-center break-words w-full px-2 leading-tight font-mono`}>
                     {card.russian}
                 </h1>
             </div>
@@ -103,13 +100,20 @@ export function StudyCard({ card, onResult, speak }) {
             </button>
           </div>
 
-          {/* --- الوجه الخلفي (الإجابة) --- */}
+          {/* --- الوجه العربي (تم الإصلاح هنا) --- */}
           <div className="absolute inset-0 backface-hidden rounded-[2rem] border border-purple-500/20 bg-[#0a0510]/95 backdrop-blur-2xl shadow-[0_0_50px_-10px_rgba(168,85,247,0.15)] flex flex-col items-center justify-center p-6 overflow-hidden" style={{ transform: "rotateY(180deg)" }}>
              <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent shadow-[0_0_10px_#a855f7]"></div>
              <div className="absolute top-4 left-4 text-[10px] text-purple-500/50 font-mono tracking-widest">TRANSLATION_MATRIX</div>
              
              <div className="flex-1 flex items-center justify-center w-full">
-                <h1 className={`${getFontSize(card.arabic)} font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-300 text-center dir-rtl leading-normal break-words w-full`}>
+                {/* 
+                    الإصلاحات:
+                    1. font-cairo: استخدام خط عربي حصراً.
+                    2. tracking-normal: إلغاء التباعد بين الحروف.
+                    3. dir="rtl": ضمان الاتجاه الصحيح.
+                    4. حذف font-mono.
+                */}
+                <h1 className={`${getFontSize(card.arabic)} font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-300 text-center dir-rtl leading-normal break-words w-full font-cairo tracking-normal`}>
                     {card.arabic}
                 </h1>
              </div>

@@ -171,3 +171,58 @@ h1, h2, h3, h4, p, span, div, button, input, textarea {
   color: white;
   text-shadow: 0 0 5px var(--neon-cyan);
 }
+/* في نهاية الملف */
+
+.glitch-text {
+  position: relative;
+}
+.glitch-text::before,
+.glitch-text::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: black;
+}
+.glitch-text::before {
+  left: 2px;
+  text-shadow: -1px 0 red;
+  clip: rect(24px, 550px, 90px, 0);
+  animation: glitch-anim-2 3s infinite linear alternate-reverse;
+}
+.glitch-text::after {
+  left: -2px;
+  text-shadow: -1px 0 #00ff00;
+  clip: rect(85px, 550px, 140px, 0);
+  animation: glitch-anim 2.5s infinite linear alternate-reverse;
+}
+
+@keyframes glitch-anim {
+  0% { clip: rect(14px, 9999px, 129px, 0); }
+  20% { clip: rect(40px, 9999px, 69px, 0); }
+  40% { clip: rect(96px, 9999px, 12px, 0); }
+  60% { clip: rect(6px, 9999px, 147px, 0); }
+  80% { clip: rect(69px, 9999px, 19px, 0); }
+  100% { clip: rect(122px, 9999px, 20px, 0); }
+}
+@keyframes glitch-anim-2 {
+  0% { clip: rect(126px, 9999px, 142px, 0); }
+  20% { clip: rect(3px, 9999px, 25px, 0); }
+  40% { clip: rect(63px, 9999px, 164px, 0); }
+  60% { clip: rect(124px, 9999px, 14px, 0); }
+  80% { clip: rect(138px, 9999px, 73px, 0); }
+  100% { clip: rect(39px, 9999px, 107px, 0); }
+}
+
+.animate-shake {
+  animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
