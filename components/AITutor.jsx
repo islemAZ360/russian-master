@@ -1,20 +1,59 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
-import { IconRobot, IconSend, IconCpu } from "@tabler/icons-react";
+import { IconRobot, IconSend, IconCpu, IconAlertTriangle } from "@tabler/icons-react";
 
-// مفتاحك المباشر
+// مفتاحك
 const API_KEY = "AIzaSyDi8-POg6RGCoBCkni6_8XNikJvTmH4z3M";
 
 export default function AITutor({ user }) {
   const userName = user?.email?.split('@')[0] || 'Operative';
   
+  // الحالة لتخزين اسم الموديل الذي سنجده تلقائياً
+  const [activeModel, setActiveModel] = useState(null);
+  
   const [messages, setMessages] = useState([
-    { role: "model", text: `System Online (Gemini Pro).\nWelcome, ${userName}. Select AI Core and state objective.` }
+    { role: "model", text: `Initializing Neural Link...\nScanning for available AI Cores...` }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef(null);
+
+  // 1. البحث التلقائي عن الموديل الصحيح عند فتح الصفحة
+  useEffect(() => {
+    const findBestModel = async () => {
+      try {
+        // نطلب من جوجل قائمة الموديلات
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`);
+        const data = await res.json();
+        
+        if (data.error) throw new Error(data.error.message);
+
+        // نبحث عن الموديلات التي تدعم الشات (generateContent)
+        const chatModels = data.models.filter(m => m.supportedGenerationMethods.includes("generateContent"));
+        
+        // نحاول العثور على Flash لأنه الأسرع، وإلا نأخذ Pro، وإلا نأخذ أي واحد متاح
+        let bestModel = chatModels.find(m => m.name.includes("flash")) || 
+                        chatModels.find(m => m.name.includes("pro")) || 
+                        chatModels[0];
+
+        if (bestModel) {
+          // ملاحظة: الاسم يأتي بصيغة models/gemini-pro ونحن نحتاجه كما هو
+          setActiveModel(bestModel.name); 
+          setMessages(prev => [
+            { role: "model", text: `System Online. Connected to Core: [${bestModel.displayName}].\nWelcome, ${userName}. State your objective.` }
+          ]);
+        } else {
+          throw new Error("No chat models found.");
+        }
+
+      } catch (err) {
+        setMessages(prev => [{ role: "model", text: `⚠️ Critical Error: Could not find any AI Core. (${err.message})` }]);
+      }
+    };
+
+    findBestModel();
+  }, []);
 
   // التمرير التلقائي
   useEffect(() => {
@@ -22,7 +61,7 @@ export default function AITutor({ user }) {
   }, [messages, loading]);
 
   const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || !activeModel) return;
 
     const userMsg = input;
     setInput(""); 
@@ -30,45 +69,33 @@ export default function AITutor({ user }) {
     setLoading(true);
 
     try {
-      // ✅ التغيير هنا: استخدمنا gemini-pro لأنه الأكثر استقراراً وتوفراً
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`,
-        {
+      // نستخدم activeModel الذي جلبناه تلقائياً من جوجل
+      // الرابط لا يحتاج لكلمة models/ إضافية لأن الاسم المخزن يحتوي عليها
+      const url = `https://generativelanguage.googleapis.com/v1beta/${activeModel}:generateContent?key=${API_KEY}`;
+
+      const response = await fetch(url, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { 
-                    // نرسل التوجيه (System Prompt) مع رسالة المستخدم
-                    text: `You are "Russian Master AI", a Cyberpunk Russian Tutor. 
-                           User Message: ${userMsg}
-                           Reply concisely in Russian then English.` 
-                  }
-                ]
-              }
-            ]
+            contents: [{
+              parts: [{ 
+                text: `You are "Russian Master AI". User: ${userMsg}. Reply concisely in Russian then English.` 
+              }]
+            }]
           }),
         }
       );
 
       const data = await response.json();
 
-      // إذا حدث خطأ، اعرضه بوضوح
-      if (data.error) {
-        throw new Error(data.error.message);
-      }
+      if (data.error) throw new Error(data.error.message);
 
       const botReply = data.candidates[0].content.parts[0].text;
       setMessages(prev => [...prev, { role: "model", text: botReply }]);
 
     } catch (err) {
-      console.error("Fetch Error:", err);
-      // طباعة الخطأ في الشات للمساعدة
-      setMessages(prev => [...prev, { role: "model", text: `⚠️ API Error: ${err.message}` }]);
+      console.error(err);
+      setMessages(prev => [...prev, { role: "model", text: `⚠️ Error: ${err.message}` }]);
     } finally {
       setLoading(false);
     }
@@ -84,7 +111,9 @@ export default function AITutor({ user }) {
         </div>
         <div>
             <h2 className="text-xl font-black text-white tracking-widest">AI MENTOR</h2>
-            <p className="text-[10px] text-cyan-400/60 font-mono uppercase">Core: Gemini Pro</p>
+            <p className="text-[10px] text-cyan-400/60 font-mono uppercase">
+                {activeModel ? `LINKED: ${activeModel.replace('models/', '').toUpperCase()}` : "SCANNING..."}
+            </p>
         </div>
       </div>
 
@@ -118,7 +147,7 @@ export default function AITutor({ user }) {
              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
                  <div className="bg-cyan-950/10 border border-cyan-500/20 p-3 rounded-2xl rounded-tl-none flex gap-2 items-center text-cyan-500 text-xs font-mono animate-pulse">
                      <IconCpu size={16} className="animate-spin" />
-                     <span>ESTABLISHING UPLINK...</span>
+                     <span>PROCESSING...</span>
                  </div>
              </motion.div>
          )}
@@ -132,12 +161,13 @@ export default function AITutor({ user }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-            placeholder="Transmission..." 
-            className="flex-1 bg-[#111] border border-white/10 rounded-xl px-5 py-4 text-white outline-none focus:border-cyan-500 transition-all font-mono text-sm"
+            disabled={!activeModel} // نمنع الكتابة حتى يتم العثور على موديل
+            placeholder={activeModel ? "Transmission..." : "Initializing..."} 
+            className="flex-1 bg-[#111] border border-white/10 rounded-xl px-5 py-4 text-white outline-none focus:border-cyan-500 transition-all font-mono text-sm disabled:opacity-50"
           />
           <button 
             onClick={sendMessage}
-            disabled={loading}
+            disabled={loading || !activeModel}
             className="bg-cyan-600 hover:bg-cyan-500 text-white p-4 rounded-xl transition-all disabled:opacity-50"
           >
               <IconSend size={24} />
