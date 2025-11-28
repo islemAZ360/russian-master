@@ -1,90 +1,121 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
-import { IconRobot, IconSend, IconCpu, IconSettings, IconAlertTriangle } from "@tabler/icons-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  IconRobot, IconSend, IconCpu, IconMenu2, IconX, IconPlus, 
+  IconMessage, IconTrash, IconEdit, IconCheck, IconMicrophone 
+} from "@tabler/icons-react";
+import { 
+  collection, addDoc, query, orderBy, onSnapshot, 
+  deleteDoc, doc, updateDoc, serverTimestamp 
+} from "firebase/firestore";
+import { db } from "../lib/firebase";
 
-// مفتاحك
+// مفتاح API المباشر
 const API_KEY = "AIzaSyDi8-POg6RGCoBCkni6_8XNikJvTmH4z3M";
 
 export default function AITutor({ user }) {
-  const userName = user?.email?.split('@')[0] || 'Operative';
-  
-  // حالة الموديل النشط (يتم تعيينه تلقائياً)
-  const [activeModel, setActiveModel] = useState(null);
-  
-  const [messages, setMessages] = useState([
-    { role: "model", text: `Scanning Google Neural Network...` }
-  ]);
+  // --- States ---
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // للقائمة الجانبية في الموبايل
+  
+  // إدارة الجلسات
+  const [sessions, setSessions] = useState([]); 
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [messages, setMessages] = useState([]);
+  
+  // إعادة التسمية
+  const [editingTitleId, setEditingTitleId] = useState(null);
+  const [newTitle, setNewTitle] = useState("");
+
   const scrollRef = useRef(null);
 
-  // --- 1. البحث التلقائي عن الموديل عند فتح الصفحة ---
+  // --- 1. تحميل قائمة المحادثات من Firebase ---
   useEffect(() => {
-    const findBestModel = async () => {
-      try {
-        // نطلب من جوجل قائمة الموديلات المتاحة لهذا المفتاح
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`);
-        const data = await res.json();
-        
-        if (data.error) throw new Error(data.error.message);
+    if (!user) return;
+    const q = query(
+      collection(db, "users", user.uid, "ai_chats"), 
+      orderBy("lastUpdate", "desc") // الأحدث أولاً
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const loadedSessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setSessions(loadedSessions);
+    });
+    return () => unsubscribe();
+  }, [user]);
 
-        // نبحث عن الموديلات التي تدعم الشات
-        const chatModels = data.models.filter(m => m.supportedGenerationMethods.includes("generateContent"));
-        
-        // الأولوية: Flash (سريع) -> Pro (ذكي) -> أي شيء آخر
-        let bestModel = chatModels.find(m => m.name.includes("flash")) || 
-                        chatModels.find(m => m.name.includes("pro")) || 
-                        chatModels[0];
+  // --- 2. تحميل رسائل الجلسة المختارة ---
+  useEffect(() => {
+    if (currentSessionId) {
+      const session = sessions.find(s => s.id === currentSessionId);
+      if (session) setMessages(session.messages || []);
+    } else {
+      setMessages([]); // جلسة جديدة فارغة
+    }
+  }, [currentSessionId, sessions]);
 
-        if (bestModel) {
-          // وجدنا الموديل! نحفظ اسمه كما هو (مثلاً models/gemini-1.5-flash)
-          setActiveModel(bestModel.name); 
-          setMessages(prev => [
-            { role: "model", text: `Link Established: [${bestModel.displayName}].\nHello ${userName}. I am ready to teach you Russian.` }
-          ]);
-        } else {
-          throw new Error("No chat models found.");
-        }
-
-      } catch (err) {
-        setMessages(prev => [{ role: "model", text: `⚠️ CRITICAL FAILURE: ${err.message}` }]);
-      }
-    };
-
-    findBestModel();
-  }, []);
-
-  // التمرير التلقائي
+  // --- 3. السكرول التلقائي للأسفل ---
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  // --- Actions ---
+
+  const startNewChat = () => {
+    setCurrentSessionId(null);
+    setMessages([]);
+    setIsSidebarOpen(false);
+  };
+
+  const deleteChat = async (e, id) => {
+    e.stopPropagation();
+    if (confirm("Delete this neural memory?")) {
+      await deleteDoc(doc(db, "users", user.uid, "ai_chats", id));
+      if (currentSessionId === id) startNewChat();
+    }
+  };
+
+  const startRenaming = (e, session) => {
+    e.stopPropagation();
+    setEditingTitleId(session.id);
+    setNewTitle(session.title);
+  };
+
+  const saveTitle = async (e, id) => {
+    e.stopPropagation();
+    if (newTitle.trim()) {
+      await updateDoc(doc(db, "users", user.uid, "ai_chats", id), { title: newTitle });
+    }
+    setEditingTitleId(null);
+  };
+
+  // --- Core Logic: Send & Save ---
   const sendMessage = async () => {
-    if (!input.trim() || loading || !activeModel) return;
+    if (!input.trim() || loading) return;
 
     const userMsg = input;
-    setInput(""); 
-    setMessages(prev => [...prev, { role: "user", text: userMsg }]);
+    setInput("");
+    
+    // تحديث الواجهة فوراً (Optimistic UI)
+    const newMessages = [...messages, { role: "user", text: userMsg }];
+    setMessages(newMessages);
     setLoading(true);
 
     try {
-      // --- 2. الاتصال بالموديل الذي وجدناه تلقائياً ---
-      // الرابط يستخدم activeModel الذي تم اكتشافه
-      const url = `https://generativelanguage.googleapis.com/v1beta/${activeModel}:generateContent?key=${API_KEY}`;
-
-      const response = await fetch(url, {
+      // 1. الاتصال بـ Gemini
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
+        {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [{
               parts: [{ 
-                // التعليمات: كن معلماً، وتحدث العربية إذا لزم الأمر
                 text: `You are "Russian Master AI". 
-                       Rule 1: If user speaks Arabic, reply in Arabic.
-                       Rule 2: If user speaks Russian, correct them and translate to Arabic/English.
-                       Tone: Cyberpunk/Professional.
-                       User Message: ${userMsg}` 
+                       Context: Teaching Russian to an Arabic speaker.
+                       User: ${userMsg}
+                       Reply concisely. If user uses Arabic, reply in Arabic. If Russian, correct errors.` 
               }]
             }]
           }),
@@ -92,14 +123,35 @@ export default function AITutor({ user }) {
       );
 
       const data = await response.json();
-
       if (data.error) throw new Error(data.error.message);
-
+      
       const botReply = data.candidates[0].content.parts[0].text;
-      setMessages(prev => [...prev, { role: "model", text: botReply }]);
+      const finalMessages = [...newMessages, { role: "model", text: botReply }];
+      
+      setMessages(finalMessages);
+
+      // 2. الحفظ في Firebase
+      if (user) {
+        if (!currentSessionId) {
+          // إنشاء وثيقة جديدة لأول مرة
+          const title = userMsg.substring(0, 30) + "...";
+          const docRef = await addDoc(collection(db, "users", user.uid, "ai_chats"), {
+            title,
+            messages: finalMessages,
+            createdAt: serverTimestamp(),
+            lastUpdate: serverTimestamp()
+          });
+          setCurrentSessionId(docRef.id);
+        } else {
+          // تحديث الوثيقة الحالية
+          await updateDoc(doc(db, "users", user.uid, "ai_chats", currentSessionId), {
+            messages: finalMessages,
+            lastUpdate: serverTimestamp()
+          });
+        }
+      }
 
     } catch (err) {
-      console.error(err);
       setMessages(prev => [...prev, { role: "model", text: `⚠️ Error: ${err.message}` }]);
     } finally {
       setLoading(false);
@@ -107,81 +159,161 @@ export default function AITutor({ user }) {
   };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-4 pb-24 md:pb-4 relative overflow-hidden font-sans">
+    <div className="w-full h-full flex bg-[#050505] overflow-hidden relative font-sans text-white">
       
-      {/* رأس الشات */}
-      <div className="w-full max-w-4xl bg-cyan-950/40 border border-cyan-500/30 p-4 rounded-t-2xl flex items-center gap-4 backdrop-blur-md z-10">
-        <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center border border-cyan-400 shadow-[0_0_10px_#06b6d4]">
-            <IconRobot size={28} className="text-cyan-400 animate-pulse" />
+      {/* --- Sidebar (History) --- */}
+      <div className={`
+        fixed inset-y-0 left-0 z-40 w-72 bg-[#0a0a0a] border-r border-white/10 transform transition-transform duration-300 flex flex-col
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:static md:shrink-0
+      `}>
+        {/* Sidebar Header */}
+        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-cyan-950/10">
+            <h2 className="font-black tracking-widest text-cyan-500 text-sm">MEMORY LOGS</h2>
+            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden"><IconX size={20}/></button>
         </div>
-        <div>
-            <h2 className="text-xl font-black text-white tracking-widest">AI MENTOR</h2>
-            {/* عرض اسم الموديل المتصل */}
-            <p className="text-[10px] text-cyan-400/60 font-mono uppercase">
-                {activeModel ? `CONNECTED: ${activeModel.replace('models/', '').toUpperCase()}` : "SCANNING NETWORK..."}
-            </p>
+
+        {/* New Chat Button */}
+        <div className="p-3">
+            <button 
+                onClick={startNewChat}
+                className="w-full py-3 bg-cyan-600/20 border border-cyan-500/50 rounded-xl flex items-center justify-center gap-2 hover:bg-cyan-600/40 transition-all text-cyan-400 font-bold text-xs tracking-wider"
+            >
+                <IconPlus size={16}/> NEW OPERATION
+            </button>
+        </div>
+
+        {/* List of Chats (Scrollable) */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+            {sessions.map(session => (
+                <div 
+                    key={session.id}
+                    onClick={() => { setCurrentSessionId(session.id); setIsSidebarOpen(false); }}
+                    className={`group p-3 rounded-lg flex items-center justify-between cursor-pointer transition-all border ${
+                        currentSessionId === session.id 
+                        ? 'bg-white/10 border-cyan-500/50 text-white' 
+                        : 'bg-transparent border-transparent hover:bg-white/5 text-white/50'
+                    }`}
+                >
+                    {/* Title or Edit Input */}
+                    {editingTitleId === session.id ? (
+                        <div className="flex items-center gap-1 w-full">
+                            <input 
+                                value={newTitle}
+                                onChange={(e) => setNewTitle(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="bg-black border border-cyan-500 rounded px-1 py-0.5 text-xs w-full outline-none"
+                                autoFocus
+                            />
+                            <button onClick={(e) => saveTitle(e, session.id)} className="text-green-500"><IconCheck size={14}/></button>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex items-center gap-2 truncate flex-1">
+                                <IconMessage size={14} />
+                                <span className="text-xs truncate font-mono">{session.title}</span>
+                            </div>
+                            
+                            {/* Action Buttons (Hover Only) */}
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={(e) => startRenaming(e, session)} className="hover:text-blue-400 p-1"><IconEdit size={14}/></button>
+                                <button onClick={(e) => deleteChat(e, session.id)} className="hover:text-red-400 p-1"><IconTrash size={14}/></button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            ))}
         </div>
       </div>
 
-      {/* منطقة الرسائل */}
-      <div className="flex-1 w-full max-w-4xl bg-black/80 border-x border-cyan-500/20 backdrop-blur-sm overflow-y-auto custom-scrollbar p-4 space-y-6 relative">
-         {messages.map((msg, i) => {
-             const isBot = msg.role === "model";
-             return (
-                 <motion.div 
-                    key={i} 
-                    initial={{ opacity: 0, y: 10, x: isBot ? -10 : 10 }}
-                    animate={{ opacity: 1, y: 0, x: 0 }}
-                    className={`flex ${isBot ? 'justify-start' : 'justify-end'}`}
-                 >
-                     <div className={`max-w-[85%] md:max-w-[70%] p-4 rounded-2xl border backdrop-blur-md shadow-lg ${
-                         isBot 
-                         ? 'bg-cyan-950/30 border-cyan-500/30 rounded-tl-none text-cyan-50' 
-                         : 'bg-purple-950/30 border-purple-500/30 rounded-tr-none text-purple-50'
-                     }`}>
-                         <div className={`text-[9px] font-bold mb-2 uppercase tracking-widest flex items-center gap-1 ${isBot ? 'text-cyan-400' : 'text-purple-400'}`}>
-                             {isBot ? <IconCpu size={10}/> : null}
-                             {isBot ? "AI CORE" : "OPERATIVE"}
-                         </div>
-                         {/* هنا نستخدم font-cairo للعربية و font-mono للإنجليزية تلقائياً */}
-                         <p className={`whitespace-pre-wrap leading-relaxed text-sm md:text-base ${/[\u0600-\u06FF]/.test(msg.text) ? 'font-cairo text-right dir-rtl tracking-normal' : 'font-mono text-left'}`} dir="auto">
-                            {msg.text}
-                         </p>
-                     </div>
-                 </motion.div>
-             )
-         })}
-         
-         {loading && (
-             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-                 <div className="bg-cyan-950/10 border border-cyan-500/20 p-3 rounded-2xl rounded-tl-none flex gap-2 items-center text-cyan-500 text-xs font-mono animate-pulse">
-                     <IconCpu size={16} className="animate-spin" />
-                     <span>PROCESSING...</span>
-                 </div>
-             </motion.div>
-         )}
-         <div ref={scrollRef} className="h-4" />
-      </div>
+      {/* --- Main Chat Area --- */}
+      <div className="flex-1 flex flex-col h-full relative min-w-0">
+        
+        {/* Header */}
+        <div className="h-16 border-b border-white/10 bg-[#0a0a0a]/90 backdrop-blur flex items-center px-4 justify-between shrink-0 z-20">
+            <div className="flex items-center gap-3">
+                <button onClick={() => setIsSidebarOpen(true)} className="md:hidden text-white/50 hover:text-white"><IconMenu2/></button>
+                <div className="w-8 h-8 rounded-full bg-cyan-900/20 border border-cyan-500/50 flex items-center justify-center animate-pulse-slow">
+                    <IconRobot size={18} className="text-cyan-400" />
+                </div>
+                <div>
+                    <h3 className="font-bold text-sm tracking-widest">RUSSIAN MENTOR AI</h3>
+                    <p className="text-[10px] text-white/30 font-mono uppercase">
+                        {currentSessionId ? "Secure Connection" : "Standby Mode"}
+                    </p>
+                </div>
+            </div>
+        </div>
 
-      {/* منطقة الإدخال */}
-      <div className="w-full max-w-4xl bg-[#050505] border border-cyan-500/30 p-4 rounded-b-2xl z-10 flex gap-3 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-          <input 
-            type="text" 
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-            disabled={!activeModel}
-            placeholder={activeModel ? "Type message..." : "Initializing..."} 
-            className="flex-1 bg-[#111] border border-white/10 rounded-xl px-5 py-4 text-white outline-none focus:border-cyan-500 transition-all font-mono text-sm text-right"
-            dir="auto"
-          />
-          <button 
-            onClick={sendMessage}
-            disabled={loading || !activeModel}
-            className="bg-cyan-600 hover:bg-cyan-500 text-white p-4 rounded-xl transition-all disabled:opacity-50"
-          >
-              <IconSend size={24} />
-          </button>
+        {/* Messages List (THIS IS THE SCROLL FIX) */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 scroll-smooth">
+            {messages.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-white/20 select-none">
+                    <IconCpu size={80} stroke={1} className="mb-4 animate-float"/>
+                    <p className="text-sm tracking-[0.3em] uppercase">System Ready</p>
+                    <p className="text-xs mt-2 font-mono">Ask anything in Arabic or Russian</p>
+                </div>
+            ) : (
+                messages.map((msg, i) => (
+                    <motion.div 
+                        key={i} 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex ${msg.role === "model" ? 'justify-start' : 'justify-end'}`}
+                    >
+                        <div className={`max-w-[85%] md:max-w-[70%] p-4 rounded-2xl border backdrop-blur-sm ${
+                            msg.role === "model"
+                            ? 'bg-[#111] border-white/10 text-gray-200 rounded-tl-none'
+                            : 'bg-cyan-950/30 border-cyan-500/30 text-cyan-50 rounded-tr-none'
+                        }`}>
+                            <div className="text-[9px] font-bold opacity-40 mb-2 uppercase flex gap-2 tracking-widest">
+                                {msg.role === "model" ? <><IconCpu size={10}/> AI CORE</> : "OPERATIVE"}
+                            </div>
+                            <p className={`whitespace-pre-wrap leading-relaxed text-sm ${/[\u0600-\u06FF]/.test(msg.text) ? 'font-cairo text-right dir-rtl' : 'font-mono'}`}>
+                                {msg.text}
+                            </p>
+                        </div>
+                    </motion.div>
+                ))
+            )}
+            
+            {/* Loading Indicator */}
+            {loading && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
+                    <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-full text-xs text-cyan-400 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-ping"></span>
+                        PROCESSING...
+                    </div>
+                </motion.div>
+            )}
+            
+            {/* Anchor for auto-scroll */}
+            <div ref={scrollRef} className="h-4" />
+        </div>
+
+        {/* Input Area (Fixed Bottom) */}
+        <div className="p-4 bg-[#0a0a0a] border-t border-white/10 shrink-0 z-20">
+            <div className="flex gap-2 max-w-4xl mx-auto items-end">
+                <div className="flex-1 bg-[#151515] border border-white/10 rounded-xl flex items-center focus-within:border-cyan-500/50 transition-colors">
+                    <input 
+                        type="text" 
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                        placeholder="Type message..." 
+                        className="w-full bg-transparent px-4 py-3 text-white outline-none font-mono text-sm"
+                        dir="auto"
+                    />
+                </div>
+                <button 
+                    onClick={sendMessage}
+                    disabled={loading || !input.trim()}
+                    className="bg-cyan-600 hover:bg-cyan-500 text-white p-3 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+                >
+                    <IconSend size={20} />
+                </button>
+            </div>
+        </div>
+
       </div>
     </div>
   );

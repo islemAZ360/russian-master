@@ -4,10 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
   IconShield, IconLock, IconAlertTriangle, IconServer,
-  IconMessageCircle, IconRobot 
+  IconMessageCircle, IconRobot, IconDeviceGamepad 
 } from '@tabler/icons-react';
 
-// --- Components ---
+// --- استيراد المكونات (Components) ---
 import { HeroSection } from '../components/HeroSection';
 import { CategorySelect } from '../components/CategorySelect';
 import { StudyCard } from '../components/StudyCard';
@@ -18,25 +18,25 @@ import CommunicationHub from '../components/CommunicationHub';
 import SettingsView from '../components/SettingsView'; 
 import AdminDashboard from '../components/AdminDashboard'; 
 import AITutor from '../components/AITutor';
-import HackingGame from '../components/HackingGame'; // استيراد اللعبة
+import GamesHub from '../components/GamesHub'; // <-- قسم الألعاب الجديد
 import { FloatingDock } from '../components/ui/floating-dock';
 import DigitalRain from '../components/ui/DigitalRain'; 
 import IntroSequence from '../components/IntroSequence'; 
 import { BossBattleWrapper } from '../components/BossBattleWrapper'; 
 import DailyReward from '../components/DailyReward';
 
-// --- Hooks & Libs ---
+// --- المكتبات والخطافات (Hooks) ---
 import { useStudySystem } from '../hooks/useStudySystem';
 import { useAudio } from '../hooks/useAudio';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot, updateDoc, setDoc, getDoc } from "firebase/firestore";
 
-// الإيميل الرئيسي (السوبر أدمن) - سيحصل على الصلاحيات دائماً
+// الإيميل الرئيسي (السوبر أدمن - لا يمكن حظره ويملك كل الصلاحيات)
 const MASTER_EMAIL = "islamaz@bomba.com";
 
 export default function RussianApp() {
-  // --- الحالات (States) ---
+  // --- تعريف الحالات (States) ---
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null); 
   const [currentView, setCurrentView] = useState('home');
@@ -46,15 +46,12 @@ export default function RussianApp() {
   const [maintenance, setMaintenance] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  
-  // حالة اللعبة (جديد)
-  const [showGame, setShowGame] = useState(false); 
 
-  // حالات المعركة في الدراسة
+  // حالات المعركة (لصفحة الدراسة)
   const [battleResult, setBattleResult] = useState(null); 
   const [battleTrigger, setBattleTrigger] = useState(0);
 
-  // استدعاء الهوكات
+  // استدعاء منطق النظام
   const { 
     cards, currentCard, stats, handleSwipe, resetProgress, 
     addCard, deleteCard, updateCard 
@@ -62,7 +59,7 @@ export default function RussianApp() {
 
   const { speak, playSFX } = useAudio();
 
-  // --- 1. مراقبة الدخول وتصحيح الأدمن ---
+  // --- 1. مراقبة المستخدم والصلاحيات ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
         if (u) {
@@ -73,19 +70,17 @@ export default function RussianApp() {
             if (u.email === MASTER_EMAIL) {
                 const snap = await getDoc(userRef);
                 if (!snap.exists()) {
-                    // إنشاء حساب أدمن إذا لم يكن موجوداً
                     await setDoc(userRef, { email: u.email, role: 'admin', xp: 0, createdAt: new Date().toISOString() });
                 } else if (snap.data().role !== 'admin') {
-                    // ترقية قسرية إذا لم يكن أدمن
                     await updateDoc(userRef, { role: 'admin' });
                 }
             }
 
-            // مراقبة بيانات المستخدم الحية
+            // مراقبة بيانات المستخدم الحية (للحظر الفوري أو تغيير الرتبة)
             onSnapshot(userRef, (docSnap) => {
                 if (docSnap.exists()) {
                     setUserData(docSnap.data());
-                    // التحقق من الطرد القسري
+                    // الطرد الأمني
                     if (docSnap.data().forceLogout) {
                         auth.signOut();
                         window.location.reload();
@@ -102,7 +97,7 @@ export default function RussianApp() {
     return () => unsubscribe();
   }, []);
 
-  // --- 2. مراقبة حالة النظام والبث ---
+  // --- 2. مراقبة حالة النظام (رسائل الإدارة والصيانة) ---
   useEffect(() => {
     const unsubBroad = onSnapshot(doc(db, "system", "broadcast"), (d) => setBroadcast(d.exists() && d.data().active ? d.data().message : null));
     const unsubMaint = onSnapshot(doc(db, "system", "status"), (d) => setMaintenance(d.exists() ? d.data().maintenance : false));
@@ -111,75 +106,90 @@ export default function RussianApp() {
 
   const handleLogout = () => auth.signOut().then(() => window.location.reload());
 
+  // تصفية الفئات للدراسة
   const categories = useMemo(() => {
       if (!cards) return [];
       return [...new Set(cards.map(c => c.category || "General"))];
   }, [cards]);
 
-  // --- تعريف الصلاحيات ---
+  // --- تحديد الصلاحيات ---
   const isMaster = user?.email === MASTER_EMAIL;
   const isAdmin = userData?.role === 'admin' || isMaster;
   const isJunior = userData?.role === 'junior' || isAdmin;
-  const isBanned = userData?.isBanned && !isMaster; // السوبر أدمن لا يمكن حظره
+  const isBanned = userData?.isBanned && !isMaster;
 
-  // --- الشاشات الأولية والتحذيرية ---
+  // --- الشاشات الافتتاحية والتحذيرية ---
+  
+  // 1. مقدمة سينمائية
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
 
+  // 2. وضع الصيانة (يستثنى منه الأدمن)
   if (maintenance && !isAdmin) return (
       <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-orange-500 relative overflow-hidden font-mono">
           <DigitalRain />
-          <div className="z-10 text-center bg-black/90 p-12 border border-orange-500/50 rounded-3xl backdrop-blur-xl">
-             <IconServer size={100} className="mx-auto mb-6 animate-pulse" />
+          <div className="z-10 text-center bg-black/90 p-12 border border-orange-500/50 rounded-3xl backdrop-blur-xl shadow-[0_0_50px_#ea580c]">
+             <IconServer size={100} className="mx-auto mb-6 animate-pulse text-orange-500" />
              <h1 className="text-5xl font-black mb-4 text-white">SYSTEM UPDATING</h1>
-             <p>MAINTENANCE MODE ACTIVE</p>
+             <p className="text-orange-400/80 tracking-[0.2em] uppercase text-sm">Server connection severed by Admin.</p>
           </div>
       </div>
   );
 
+  // 3. شاشة الحظر
   if (isBanned) return (
-    <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-red-500 space-y-6 font-mono">
+    <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-red-500 space-y-6 font-mono relative overflow-hidden">
         <IconLock size={80} className="animate-pulse" />
-        <h1 className="text-6xl font-black">ACCESS DENIED</h1>
-        <button onClick={handleLogout} className="px-8 py-3 border border-red-500 rounded">LOGOUT</button>
+        <h1 className="text-6xl font-black tracking-widest text-center">ACCESS DENIED</h1>
+        <p className="text-red-500/50 uppercase tracking-widest">Neural Link Terminated.</p>
+        <button onClick={handleLogout} className="px-8 py-3 border border-red-500 rounded hover:bg-red-900/20 transition-colors">LOGOUT</button>
     </div>
   );
 
-  if (loadingAuth) return <div className="h-screen bg-black text-cyan-500 flex items-center justify-center">LOADING NEURAL LINK...</div>;
+  // 4. شاشة التحميل
+  if (loadingAuth) return <div className="h-screen bg-black text-cyan-500 flex items-center justify-center font-mono animate-pulse">LOADING NEURAL LINK...</div>;
+  
+  // 5. شاشة تسجيل الدخول
   if (!user) return <AuthScreen onLoginSuccess={setUser} />;
 
-  // --- إعداد القائمة السفلية ---
+  // --- إعداد القائمة السفلية (Navigation Dock) ---
   let navLinks = [
-    { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => { setCurrentView('home'); setShowGame(false); } },
-    { title: "AI Mentor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => { setCurrentView('ai-tutor'); setShowGame(false); } },
-    { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => { setCurrentView('chat'); setShowGame(false); } },
-    { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => { setCurrentView('category'); setShowGame(false); } },
-    { title: "Archive", icon: <IconDatabase className="w-full text-emerald-400" />, onClick: () => { setCurrentView('data'); setShowGame(false); } }, 
-    { title: "ID Card", icon: <IconTrophy className="w-full text-yellow-500" />, onClick: () => { setCurrentView('leaderboard'); setShowGame(false); } },
-    { title: "Config", icon: <IconSettings className="w-full text-neutral-400" />, onClick: () => { setCurrentView('settings'); setShowGame(false); } },
+    { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
+    { title: "AI Mentor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => setCurrentView('ai-tutor') },
+    // الزر الجديد للألعاب
+    { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
+    
+    { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
+    { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
+    { title: "Archive", icon: <IconDatabase className="w-full text-emerald-400" />, onClick: () => setCurrentView('data') }, 
+    { title: "ID Card", icon: <IconTrophy className="w-full text-yellow-500" />, onClick: () => setCurrentView('leaderboard') },
+    { title: "Config", icon: <IconSettings className="w-full text-neutral-400" />, onClick: () => setCurrentView('settings') },
   ];
   
-  // إضافة زر الأدمن إذا كان يملك الصلاحية
+  // زر الأدمن يظهر فقط للمصرح لهم
   if (isJunior) {
-      navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => { setCurrentView('admin'); setShowGame(false); } });
+      navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
   }
 
-  // --- محول العرض (Router) ---
+  // --- محول العرض (Routing Logic) ---
   const renderContent = () => {
-    // 1. عرض اللعبة إذا كانت مفعلة
-    if (showGame) return <HackingGame cards={cards} onClose={() => setShowGame(false)} />;
+    // حماية رابط الأدمن
+    if (currentView === 'admin' && !isJunior) return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
 
-    // 2. حماية صفحة الأدمن
-    if (currentView === 'admin' && !isJunior) return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setShowGame(true)} user={user} />;
-
-    // 3. باقي الصفحات
     switch (currentView) {
       case 'home': 
-        // تمرير دالة فتح اللعبة إلى HeroSection
-        return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setShowGame(true)} user={user} />;
+        return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
       
-      case 'ai-tutor': return <AITutor user={user} />;
-      case 'chat': return <CommunicationHub user={user} />;
-      case 'category': return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
+      case 'ai-tutor':
+        return <AITutor user={user} />;
+      
+      case 'games':
+        return <GamesHub cards={cards} />; // قسم الألعاب الجديد
+      
+      case 'chat':
+        return <CommunicationHub user={user} />;
+      
+      case 'category': 
+        return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
       
       case 'study':
         return (
@@ -204,7 +214,7 @@ export default function RussianApp() {
                     <div className="text-center p-10 bg-black/60 border border-cyan-500/50 rounded-2xl backdrop-blur-md">
                         <IconCpu size={64} className="text-cyan-500 mx-auto mb-4 animate-pulse" />
                         <h2 className="text-3xl font-black text-cyan-400 mb-2">MISSION ACCOMPLISHED</h2>
-                        <button onClick={() => setCurrentView('home')} className="px-8 py-3 bg-cyan-600 text-white font-bold rounded-full">BASE</button>
+                        <button onClick={() => setCurrentView('home')} className="px-8 py-3 bg-cyan-600 text-white font-bold rounded-full hover:bg-cyan-500 shadow-[0_0_20px_#06b6d4]">BASE</button>
                     </div>
                 )}
             </div>
@@ -222,34 +232,42 @@ export default function RussianApp() {
       case 'admin':
         return <AdminDashboard currentUser={user} userData={userData} />;
       
-      default: return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setShowGame(true)} user={user} />;
+      default: 
+        return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
     }
   };
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black selection:bg-cyan-500/30 selection:text-cyan-200">
       
-      {/* المؤثرات الخلفية */}
+      {/* 1. الخلفية الرقمية */}
       <DigitalRain />
       
-      {/* النوافذ المنبثقة */}
+      {/* 2. النوافذ العائمة */}
       {showDailyReward && <DailyReward user={user} onClose={() => setShowDailyReward(false)} />}
+      
+      {/* 3. شريط البث المباشر (للأدمن) */}
       <AnimatePresence>
         {broadcast && (
-            <motion.div initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} className="fixed top-0 w-full bg-red-900/90 text-white text-center py-3 z-[100] font-bold border-b border-red-500 backdrop-blur">
-                <IconAlertTriangle className="inline mr-2" /> {broadcast}
+            <motion.div 
+                initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} 
+                className="fixed top-0 w-full bg-red-900/90 border-b border-red-500 text-white text-center py-3 z-[100] font-bold shadow-[0_0_30px_rgba(220,38,38,0.5)] flex justify-center items-center gap-3 backdrop-blur-xl"
+            >
+                <IconAlertTriangle className="animate-pulse text-yellow-400" />
+                <span className="tracking-widest uppercase text-sm md:text-base">{broadcast}</span>
             </motion.div>
         )}
       </AnimatePresence>
 
-      {/* منطقة المحتوى الرئيسية */}
+      {/* 4. الحاوية الرئيسية للعرض */}
       <main className="relative z-10 flex flex-col items-center justify-center min-h-screen w-full pt-10 md:pt-0">
            <AnimatePresence mode="wait">
              <motion.div 
-                key={currentView + showGame} 
-                initial={{ opacity: 0, scale: 0.95 }} 
-                animate={{ opacity: 1, scale: 1 }} 
-                exit={{ opacity: 0, scale: 1.05 }} 
+                key={currentView} 
+                initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }} 
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }} 
+                exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }} 
+                transition={{ duration: 0.3 }} 
                 className="w-full h-full flex justify-center"
              >
                 {renderContent()}
@@ -257,7 +275,7 @@ export default function RussianApp() {
            </AnimatePresence>
       </main>
 
-      {/* القائمة السفلية العائمة */}
+      {/* 5. القائمة السفلية العائمة */}
       <div className="fixed bottom-8 left-0 w-full z-50 flex justify-center pointer-events-none">
           <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="pointer-events-auto">
               <FloatingDock items={navLinks} />
