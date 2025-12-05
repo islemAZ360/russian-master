@@ -5,7 +5,7 @@ import {
   IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
   IconShield, IconLock, IconAlertTriangle, IconServer,
   IconMessageCircle, IconRobot, IconDeviceGamepad,
-  IconMap, IconVideo, IconScript, IconSword, IconRank
+  IconMap, IconVideo, IconScript, IconSword, IconMilitaryRank
 } from '@tabler/icons-react';
 
 // --- استيراد المكونات الجديدة ---
@@ -192,7 +192,7 @@ export default function RussianApp() {
     { title: "Invasion", icon: <IconSword className="w-full text-red-500" />, onClick: () => setCurrentView('invasion') },
     { title: "Live", icon: <IconVideo className="w-full text-purple-500" />, onClick: () => setCurrentView('live') },
     { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
-    { title: "Rank", icon: <IconRank className="w-full text-yellow-500" />, onClick: () => setCurrentView('rank') },
+    { title: "Rank", icon: <IconMilitaryRank className="w-full text-yellow-500" />, onClick: () => setCurrentView('rank') },
     { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
     { title: "Archive", icon: <IconDatabase className="w-full text-emerald-400" />, onClick: () => setCurrentView('data') }, 
     { title: "Editor", icon: <IconScript className="w-full text-orange-500" />, onClick: () => setCurrentView('scenario-editor') },
