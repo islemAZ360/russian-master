@@ -1,46 +1,50 @@
-// FILE: app/not-found.js
-"use client";
+"use client"; // <--- هذا السطر ضروري جداً لاستخدام useEffect
 
-import React, { useEffect } from "react";
+import React, { useEffect } from "react"; // <--- تأكد من استيراد useEffect
 import Link from "next/link";
-import { IconAlertTriangle } from "@tabler/icons-react";
+import { IconAlertTriangle, IconHome } from "@tabler/icons-react";
 
 export default function NotFound() {
   
-  // هذا الاستدعاء يضمن عدم ظهور خطأ "useEffect is not defined"
+  // نستخدم useEffect هنا فقط لتوضيح سبب المشكلة السابقة (الآن ستعمل لأننا استوردناها)
   useEffect(() => {
-    console.log("System Error: 404 Route Not Found");
+    console.error("PAGE NOT FOUND: 404 Error Triggered");
   }, []);
 
   return (
-    <div className="h-screen w-full flex flex-col items-center justify-center bg-black text-white font-mono p-4 overflow-hidden relative">
-      {/* خلفية رقمية بسيطة */}
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-black text-white font-mono relative overflow-hidden selection:bg-red-500/30">
+      
+      {/* خلفية مشوشة */}
       <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
       
-      <div className="z-10 text-center border border-red-500/50 p-10 rounded-3xl bg-red-950/10 backdrop-blur-md shadow-[0_0_50px_rgba(220,38,38,0.2)]">
-        <IconAlertTriangle size={80} className="mx-auto text-red-500 mb-6 animate-pulse" />
+      {/* التوهج الخلفي */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-red-600/10 blur-[100px] rounded-full pointer-events-none"></div>
+
+      <div className="relative z-10 text-center p-8 border border-red-500/30 bg-black/80 backdrop-blur-xl rounded-3xl shadow-[0_0_60px_rgba(220,38,38,0.15)] max-w-lg w-full">
         
-        <h1 className="text-6xl font-black mb-2 text-red-500 tracking-tighter">404</h1>
-        <h2 className="text-2xl font-bold text-white mb-6 uppercase tracking-widest">Signal Lost</h2>
+        <IconAlertTriangle size={80} stroke={1.5} className="mx-auto text-red-500 mb-6 animate-pulse" />
         
-        <p className="text-red-400/60 mb-8 max-w-md text-sm leading-relaxed">
-          The requested data vector could not be located in the neural network. 
-          It may have been deleted or corrupted.
+        <h1 className="text-7xl font-black text-white mb-2 tracking-tighter drop-shadow-lg">404</h1>
+        
+        <div className="h-px w-full bg-gradient-to-r from-transparent via-red-500 to-transparent my-6 opacity-50"></div>
+
+        <h2 className="text-xl font-bold text-red-400 mb-4 uppercase tracking-[0.2em]">Connection Severed</h2>
+        
+        <p className="text-white/50 mb-8 text-sm leading-relaxed">
+          The neural link you are trying to access does not exist or has been terminated by the mainframe administrators.
         </p>
 
         <Link 
           href="/"
-          className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg transition-all shadow-[0_0_20px_rgba(220,38,38,0.4)] uppercase tracking-wider"
+          className="group relative inline-flex items-center gap-3 px-8 py-4 bg-red-900/20 border border-red-500/50 hover:bg-red-600 hover:border-red-500 text-white font-bold rounded-xl transition-all duration-300 shadow-[0_0_20px_rgba(220,38,38,0.1)] hover:shadow-[0_0_30px_rgba(220,38,38,0.4)]"
         >
-          Return to Base
+          <IconHome size={20} className="group-hover:-translate-y-1 transition-transform" />
+          <span>RETURN TO BASE</span>
         </Link>
       </div>
 
-      {/* تأثيرات خلفية */}
-      <div className="absolute bottom-10 left-10 text-xs text-white/20 font-mono">
-        ERROR_CODE: PAGE_NOT_FOUND
-        <br />
-        SYSTEM_HALTED
+      <div className="absolute bottom-6 text-[10px] text-red-500/30 font-mono">
+        ERROR_CODE: 0x404_DATA_MISSING
       </div>
     </div>
   );
