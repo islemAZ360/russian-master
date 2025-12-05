@@ -6,7 +6,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@200;400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
 
 :root {
-  --bg-dark: #030014;
+  --bg-dark: #020204;
+  --neon-blue: #00f3ff;
+  --neon-purple: #bc13fe;
+  --neon-red: #ff003c;
+  --grid-color: rgba(255, 255, 255, 0.03);
 }
 
 body {
@@ -15,42 +19,62 @@ body {
   font-family: 'Cairo', sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  background-image: 
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: center 0;
 }
 
-/* Scrollbar Modernization */
-::-webkit-scrollbar {
-  width: 8px;
+/* --- Scrollbar --- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #050505; }
+::-webkit-scrollbar-thumb { 
+  background: #333; 
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background-clip: content-box;
 }
-::-webkit-scrollbar-track {
-  background: #0a0a0a;
-}
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #7000ff, #00f0ff);
-  border-radius: 4px;
-}
+::-webkit-scrollbar-thumb:hover { background-color: var(--neon-blue); }
 
-/* Glassmorphism Utilities */
+/* --- Advanced Glassmorphism --- */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(10, 10, 10, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
-.glass-panel-hover:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
-  transition: all 0.3s ease;
+.glass-panel-heavy {
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Text Glows */
-.text-glow {
-  text-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
+/* --- Neon Glow Utilities --- */
+.glow-text-blue { text-shadow: 0 0 10px rgba(0, 243, 255, 0.7); }
+.glow-text-red { text-shadow: 0 0 10px rgba(255, 0, 60, 0.7); }
+.glow-text-purple { text-shadow: 0 0 10px rgba(188, 19, 254, 0.7); }
+
+.glow-box-blue { box-shadow: 0 0 20px rgba(0, 243, 255, 0.15), inset 0 0 10px rgba(0, 243, 255, 0.05); }
+.glow-box-red { box-shadow: 0 0 20px rgba(255, 0, 60, 0.15), inset 0 0 10px rgba(255, 0, 60, 0.05); }
+
+/* --- Animations --- */
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+.scanline::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 999;
+  background-size: 100% 2px, 3px 100%;
+  pointer-events: none;
 }
 
-/* Utility for code/numbers */
-.font-mono {
-  font-family: 'JetBrains Mono', monospace !important;
-}
+.font-mono { font-family: 'JetBrains Mono', monospace !important; }
+.custom-scrollbar { scrollbar-width: thin; }

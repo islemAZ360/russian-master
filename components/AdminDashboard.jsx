@@ -1,119 +1,150 @@
+// FILE: components/AdminDashboard.jsx
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, query, orderBy, where, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, query, orderBy, limit, addDoc } from "firebase/firestore";
 import { 
-  IconShield, IconBan, IconUser, IconMessage, IconCheck, IconX, IconCrown, 
-  IconStar, IconChartBar, IconSearch, IconAlertTriangle, IconActivity 
+  IconShield, IconBan, IconUser, IconTerminal, IconActivity, IconSearch, 
+  IconServer, IconAlertTriangle, IconDatabase, IconClock 
 } from '@tabler/icons-react';
 import { motion } from 'framer-motion';
 
 export default function AdminDashboard({ currentUser, userData }) {
-  const [users, setUsers] = useState([]);
   const [activeTab, setActiveTab] = useState('overview'); 
-  const [supportTickets, setSupportTickets] = useState([]);
-  const [broadcastMsg, setBroadcastMsg] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [stats, setStats] = useState({ totalUsers: 0, activeToday: 0, banned: 0 });
+  const [users, setUsers] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [terminalOutput, setTerminalOutput] = useState(["> System Initialized.", "> Awaiting input..."]);
+  const [cmdInput, setCmdInput] = useState("");
+  const terminalEndRef = useRef(null);
 
-  const isSuperAdmin = userData?.role === 'admin';
-
+  // Real-time Listeners
   useEffect(() => {
-    // مراقبة المستخدمين
-    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
-        const usersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setUsers(usersList);
-        setStats({
-            totalUsers: usersList.length,
-            activeToday: usersList.filter(u => u.lastLogin && new Date(u.lastLogin).getDate() === new Date().getDate()).length,
-            banned: usersList.filter(u => u.isBanned).length
-        });
-    });
-
-    // مراقبة التذاكر
-    const unsubSupport = onSnapshot(query(collection(db, "support_tickets"), orderBy("lastUpdate", "desc")), (snap) => {
-        setSupportTickets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-
-    return () => { unsubUsers(); unsubSupport(); };
+    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => setUsers(snap.docs.map(d => ({id:d.id, ...d.data()}))));
+    const unsubLogs = onSnapshot(query(collection(db, "system_logs"), orderBy("timestamp", "desc"), limit(20)), (snap) => setLogs(snap.docs.map(d => d.data())));
+    return () => { unsubUsers(); unsubLogs(); };
   }, []);
 
-  const handleBroadcast = async () => {
-      await updateDoc(doc(db, "system", "broadcast"), { message: broadcastMsg, active: !!broadcastMsg });
-      alert("System Broadcast Updated");
+  // Terminal Logic
+  const executeCommand = async (e) => {
+    if (e.key !== 'Enter') return;
+    const cmd = cmdInput.trim().toLowerCase();
+    const newOutput = [...terminalOutput, `$ ${cmdInput}`];
+    
+    if (cmd === 'clear') {
+        setTerminalOutput(["> Terminal Cleared."]);
+    } else if (cmd === 'status') {
+        newOutput.push(`> System Status: ONLINE`, `> Users: ${users.length}`, `> Latency: 24ms`);
+        setTerminalOutput(newOutput);
+    } else if (cmd.startsWith('ban ')) {
+        const email = cmd.split(' ')[1];
+        const target = users.find(u => u.email === email);
+        if (target) {
+            await updateDoc(doc(db, "users", target.id), { isBanned: true });
+            newOutput.push(`> SUCCESS: User ${email} has been banned.`);
+        } else {
+            newOutput.push(`> ERROR: User not found.`);
+        }
+        setTerminalOutput(newOutput);
+    } else {
+        newOutput.push(`> Unknown command: ${cmd}`);
+        setTerminalOutput(newOutput);
+    }
+    setCmdInput("");
+    setTimeout(() => terminalEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   };
 
-  const filteredUsers = users.filter(u => u.email?.toLowerCase().includes(searchTerm.toLowerCase()));
+  const navItems = [
+    { id: 'overview', icon: IconActivity, label: 'Overview' },
+    { id: 'users', icon: IconUser, label: 'Operatives' },
+    { id: 'terminal', icon: IconTerminal, label: 'Console' },
+    { id: 'logs', icon: IconClock, label: 'Audit Logs' },
+  ];
 
   return (
-    <div className="w-full h-full flex flex-col bg-[#050505] text-white overflow-hidden relative">
-      {/* Top Bar */}
-      <div className="h-20 border-b border-white/10 flex items-center justify-between px-8 bg-black/50 backdrop-blur-md z-10">
-        <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-500/20 rounded-lg text-red-500"><IconShield size={24}/></div>
-            <h1 className="text-xl font-black tracking-[0.2em]">GOD MODE</h1>
+    <div className="w-full h-full flex bg-[#050505] text-white overflow-hidden font-sans">
+      
+      {/* Sidebar Navigation */}
+      <div className="w-20 md:w-64 border-r border-white/10 flex flex-col bg-black/50 backdrop-blur-xl">
+        <div className="p-6 flex items-center gap-3 border-b border-white/5">
+            <div className="w-8 h-8 bg-red-600 rounded flex items-center justify-center shadow-[0_0_15px_#dc2626]"><IconShield size={18}/></div>
+            <span className="font-black text-lg tracking-widest hidden md:block">ADMIN_OS</span>
         </div>
-        <div className="flex gap-1 bg-white/5 p-1 rounded-lg">
-            {['overview', 'users', 'support', 'system'].map(tab => (
+        <div className="flex-1 py-4 space-y-1 px-2">
+            {navItems.map(item => (
                 <button 
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all ${activeTab === tab ? 'bg-red-600 text-white shadow-lg' : 'text-white/50 hover:text-white'}`}
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                        activeTab === item.id 
+                        ? 'bg-white/10 text-white border-l-2 border-red-500' 
+                        : 'text-white/40 hover:text-white hover:bg-white/5'
+                    }`}
                 >
-                    {tab}
+                    <item.icon size={20} />
+                    <span className="hidden md:block text-sm font-bold uppercase tracking-wider">{item.label}</span>
                 </button>
             ))}
         </div>
+        <div className="p-4 border-t border-white/5">
+            <div className="text-[10px] text-white/20 font-mono text-center md:text-left">V3.0.1 STABLE</div>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-8 relative">
+        
+        {/* Background Grid */}
+        <div className="absolute inset-0 pointer-events-none opacity-20" 
+             style={{ backgroundImage: 'linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)', backgroundSize: '40px 40px' }}>
+        </div>
+
         {activeTab === 'overview' && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <StatCard title="Total Operatives" value={stats.totalUsers} icon={IconUser} color="text-cyan-400" />
-                <StatCard title="Active Today" value={stats.activeToday} icon={IconActivity} color="text-green-400" />
-                <StatCard title="Banned Units" value={stats.banned} icon={IconBan} color="text-red-400" />
+            <div className="relative z-10 space-y-6">
+                <h2 className="text-3xl font-black mb-6 glow-text-red">SYSTEM OVERVIEW</h2>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <StatBox title="Total Users" value={users.length} icon={IconUser} color="border-cyan-500/50" text="text-cyan-400" />
+                    <StatBox title="System Load" value="12%" icon={IconServer} color="border-green-500/50" text="text-green-400" />
+                    <StatBox title="Security" value="SECURE" icon={IconShield} color="border-red-500/50" text="text-red-400" />
+                    <StatBox title="Database" value="CONNECTED" icon={IconDatabase} color="border-purple-500/50" text="text-purple-400" />
+                </div>
                 
-                {/* Mock Chart Area */}
-                <div className="md:col-span-3 h-64 glass-panel rounded-2xl p-6 flex items-end justify-between gap-2 mt-4 relative overflow-hidden">
-                    <div className="absolute top-4 left-4 font-bold text-white/50 text-xs uppercase">Network Traffic (7 Days)</div>
-                    {[40, 65, 30, 80, 55, 90, 70].map((h, i) => (
-                        <div key={i} className="w-full bg-gradient-to-t from-red-900/50 to-red-500/50 rounded-t-lg transition-all hover:opacity-100 opacity-70" style={{ height: `${h}%` }}></div>
+                {/* Simulated Traffic Graph */}
+                <div className="glass-panel p-6 rounded-2xl h-64 flex items-end justify-between gap-1 mt-8 relative overflow-hidden">
+                    <div className="absolute top-4 left-4 text-xs font-mono text-white/50">NETWORK TRAFFIC (REAL-TIME)</div>
+                    {Array.from({length: 40}).map((_, i) => (
+                        <div key={i} 
+                             className="w-full bg-red-500/20 rounded-t hover:bg-red-500 transition-all duration-300"
+                             style={{ height: `${Math.random() * 80 + 10}%` }}
+                        ></div>
                     ))}
                 </div>
             </div>
         )}
 
         {activeTab === 'users' && (
-            <div className="glass-panel rounded-2xl overflow-hidden flex flex-col h-full">
-                <div className="p-4 border-b border-white/10 flex gap-4">
-                    <div className="relative flex-1">
-                        <IconSearch className="absolute left-3 top-3 text-white/30" size={18} />
-                        <input 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder="Search by email..."
-                            className="w-full bg-black/50 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-white focus:border-red-500 outline-none"
-                        />
+            <div className="relative z-10">
+                <div className="glass-panel rounded-2xl overflow-hidden">
+                    <div className="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">
+                        <h3 className="font-bold flex items-center gap-2"><IconUser size={18}/> USER DATABASE</h3>
+                        <div className="bg-black/50 border border-white/10 rounded-lg px-3 py-1 flex items-center gap-2">
+                            <IconSearch size={14} className="text-white/50"/>
+                            <input placeholder="Search query..." className="bg-transparent border-none outline-none text-xs w-48 text-white"/>
+                        </div>
                     </div>
-                </div>
-                <div className="flex-1 overflow-y-auto">
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-white/5 text-white/40 uppercase sticky top-0 backdrop-blur-md">
-                            <tr><th className="p-4">User</th><th className="p-4">Role</th><th className="p-4">XP</th><th className="p-4">Actions</th></tr>
+                        <thead className="bg-black/40 text-white/40 uppercase font-mono text-xs">
+                            <tr><th className="p-4">ID</th><th className="p-4">Identity</th><th className="p-4">Rank</th><th className="p-4">Status</th></tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
-                            {filteredUsers.map(u => (
+                        <tbody className="divide-y divide-white/5 font-mono text-xs">
+                            {users.map(u => (
                                 <tr key={u.id} className="hover:bg-white/5 transition-colors">
-                                    <td className="p-4 font-mono">{u.email}</td>
-                                    <td className="p-4"><Badge role={u.role} /></td>
-                                    <td className="p-4 text-cyan-400 font-bold">{u.xp || 0}</td>
-                                    <td className="p-4 flex gap-2">
-                                        {isSuperAdmin && (
-                                            <>
-                                                <ActionBtn icon={IconCrown} onClick={() => confirm(`Promote ${u.email}?`) && updateDoc(doc(db,"users",u.id),{role:'admin'})} color="text-yellow-500" />
-                                                <ActionBtn icon={IconBan} onClick={() => updateDoc(doc(db,"users",u.id),{isBanned:!u.isBanned})} color={u.isBanned ? "text-green-500" : "text-red-500"} />
-                                            </>
-                                        )}
+                                    <td className="p-4 text-white/30">{u.id.substring(0,8)}...</td>
+                                    <td className="p-4 text-white font-bold">{u.email}</td>
+                                    <td className="p-4 text-cyan-400">{u.role || 'USER'}</td>
+                                    <td className="p-4">
+                                        <span className={`px-2 py-1 rounded ${u.isBanned ? 'bg-red-500/20 text-red-500' : 'bg-green-500/20 text-green-500'}`}>
+                                            {u.isBanned ? 'BANNED' : 'ACTIVE'}
+                                        </span>
                                     </td>
                                 </tr>
                             ))}
@@ -123,44 +154,52 @@ export default function AdminDashboard({ currentUser, userData }) {
             </div>
         )}
 
-        {activeTab === 'system' && (
-            <div className="max-w-2xl mx-auto space-y-6">
-                <div className="glass-panel p-6 rounded-2xl">
-                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><IconAlertTriangle className="text-yellow-500"/> Emergency Broadcast</h3>
-                    <textarea 
-                        value={broadcastMsg}
-                        onChange={(e) => setBroadcastMsg(e.target.value)}
-                        className="w-full bg-black/50 border border-white/20 rounded-xl p-4 text-white h-32 mb-4 focus:border-red-500 outline-none"
-                        placeholder="Type system-wide alert message..."
+        {activeTab === 'terminal' && (
+            <div className="relative z-10 h-full flex flex-col">
+                <div className="flex-1 bg-black border border-white/20 rounded-xl p-4 font-mono text-xs text-green-500 overflow-y-auto shadow-inner shadow-black">
+                    {terminalOutput.map((line, i) => <div key={i} className="mb-1">{line}</div>)}
+                    <div ref={terminalEndRef}></div>
+                </div>
+                <div className="mt-4 flex gap-2">
+                    <span className="text-green-500 font-mono py-3 pl-2">{">"}</span>
+                    <input 
+                        value={cmdInput}
+                        onChange={(e) => setCmdInput(e.target.value)}
+                        onKeyDown={executeCommand}
+                        autoFocus
+                        className="flex-1 bg-black border border-white/20 rounded-lg p-3 text-white font-mono text-sm outline-none focus:border-green-500"
+                        placeholder="Enter command (try 'status' or 'clear')..."
                     />
-                    <button onClick={handleBroadcast} className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow-[0_0_20px_#dc2626]">
-                        DEPLOY MESSAGE
-                    </button>
                 </div>
             </div>
         )}
+
+        {activeTab === 'logs' && (
+            <div className="relative z-10 space-y-2 font-mono text-xs">
+                {logs.map((log, i) => (
+                    <div key={i} className="glass-panel p-3 rounded flex gap-4 items-center">
+                        <span className="text-white/30">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                        <span className={`${log.status === 'FAIL' ? 'text-red-500' : 'text-green-500'}`}>[{log.status}]</span>
+                        <span className="text-white">{log.action}</span>
+                        <span className="text-white/50 ml-auto">{log.details}</span>
+                    </div>
+                ))}
+            </div>
+        )}
+
       </div>
     </div>
   );
 }
 
-const StatCard = ({ title, value, icon: Icon, color }) => (
-    <div className="glass-panel p-6 rounded-2xl flex items-center justify-between group hover:border-white/20 transition-all">
-        <div>
-            <div className="text-white/40 text-xs font-bold uppercase tracking-widest mb-1">{title}</div>
-            <div className="text-4xl font-black text-white">{value}</div>
-        </div>
-        <div className={`p-4 rounded-xl bg-white/5 ${color} group-hover:scale-110 transition-transform`}>
-            <Icon size={32} />
+const StatBox = ({ title, value, icon: Icon, color, text }) => (
+    <div className={`glass-panel p-6 rounded-xl border-l-4 ${color}`}>
+        <div className="flex justify-between items-start">
+            <div>
+                <div className="text-white/40 text-[10px] uppercase font-bold tracking-widest mb-1">{title}</div>
+                <div className="text-3xl font-black text-white">{value}</div>
+            </div>
+            <Icon size={24} className={text} />
         </div>
     </div>
-);
-
-const Badge = ({ role }) => {
-    const colors = { admin: "bg-red-500/20 text-red-400", junior: "bg-yellow-500/20 text-yellow-400", user: "bg-gray-500/20 text-gray-400" };
-    return <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${colors[role] || colors.user}`}>{role || 'USER'}</span>
-};
-
-const ActionBtn = ({ icon: Icon, onClick, color }) => (
-    <button onClick={onClick} className={`p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors ${color}`}><Icon size={16}/></button>
 );
