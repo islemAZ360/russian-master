@@ -4,10 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
   IconShield, IconLock, IconAlertTriangle, IconServer,
-  IconMessageCircle, IconRobot, IconDeviceGamepad 
+  IconMessageCircle, IconRobot, IconDeviceGamepad,
+  IconMap, IconVideo, IconScript, IconSword, IconRank
 } from '@tabler/icons-react';
 
-// --- استيراد المكونات (Components) ---
+// --- استيراد المكونات الجديدة ---
 import { HeroSection } from '../components/HeroSection';
 import { CategorySelect } from '../components/CategorySelect';
 import { StudyCard } from '../components/StudyCard';
@@ -18,25 +19,31 @@ import CommunicationHub from '../components/CommunicationHub';
 import SettingsView from '../components/SettingsView'; 
 import AdminDashboard from '../components/AdminDashboard'; 
 import AITutor from '../components/AITutor';
-import GamesHub from '../components/GamesHub'; // <-- قسم الألعاب الجديد
+import GamesHub from '../components/GamesHub';
 import { FloatingDock } from '../components/ui/floating-dock';
 import DigitalRain from '../components/ui/DigitalRain'; 
 import IntroSequence from '../components/IntroSequence'; 
 import { BossBattleWrapper } from '../components/BossBattleWrapper'; 
 import DailyReward from '../components/DailyReward';
 
-// --- المكتبات والخطافات (Hooks) ---
+// --- المكونات الجديدة ---
+import RussianInvasion from '../components/games/RussianInvasion';
+import LiveStream from '../components/live/LiveStream';
+import ScenarioEditor from '../components/scenarios/ScenarioEditor';
+import RankSystem from '../components/ranks/RankSystem';
+
+// --- المكتبات والخطافات الجديدة ---
 import { useStudySystem } from '../hooks/useStudySystem';
+import { useSmartSRS } from '../hooks/useSmartSRS'; // الجديد
 import { useAudio } from '../hooks/useAudio';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot, updateDoc, setDoc, getDoc } from "firebase/firestore";
 
-// الإيميل الرئيسي (السوبر أدمن - لا يمكن حظره ويملك كل الصلاحيات)
 const MASTER_EMAIL = "islamaz@bomba.com";
 
 export default function RussianApp() {
-  // --- تعريف الحالات (States) ---
+  // --- تعريف الحالات الجديدة ---
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null); 
   const [currentView, setCurrentView] = useState('home');
@@ -46,42 +53,54 @@ export default function RussianApp() {
   const [maintenance, setMaintenance] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [userXP, setUserXP] = useState(0);
+  const [conqueredCities, setConqueredCities] = useState([]);
+  const [scenarios, setScenarios] = useState([]);
 
-  // حالات المعركة (لصفحة الدراسة)
+  // حالات المعركة
   const [battleResult, setBattleResult] = useState(null); 
   const [battleTrigger, setBattleTrigger] = useState(0);
 
-  // استدعاء منطق النظام
-  const { 
-    cards, currentCard, stats, handleSwipe, resetProgress, 
-    addCard, deleteCard, updateCard 
-  } = useStudySystem(user);
-
+  // استخدام النظام الذكي الجديد
+  const { cards, currentCard, stats, handleSwipe, resetProgress, addCard, deleteCard, updateCard } = useStudySystem(user);
+  const { dueCards, updateCard: updateSRS, generateStudyPlan } = useSmartSRS(user?.uid, cards);
   const { speak, playSFX } = useAudio();
 
-  // --- 1. مراقبة المستخدم والصلاحيات ---
+  // --- 1. مراقبة المستخدم والبيانات ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
         if (u) {
             setUser(u);
             const userRef = doc(db, "users", u.uid);
             
-            // إصلاح صلاحيات السوبر أدمن تلقائياً عند الدخول
+            // إصلاح صلاحيات السوبر أدمن
             if (u.email === MASTER_EMAIL) {
                 const snap = await getDoc(userRef);
                 if (!snap.exists()) {
-                    await setDoc(userRef, { email: u.email, role: 'admin', xp: 0, createdAt: new Date().toISOString() });
+                    await setDoc(userRef, { 
+                        email: u.email, 
+                        role: 'admin', 
+                        xp: 0, 
+                        createdAt: new Date().toISOString(),
+                        conqueredCities: [],
+                        scenarios: [],
+                        rank: 'recruit'
+                    });
                 } else if (snap.data().role !== 'admin') {
                     await updateDoc(userRef, { role: 'admin' });
                 }
             }
 
-            // مراقبة بيانات المستخدم الحية (للحظر الفوري أو تغيير الرتبة)
+            // مراقبة بيانات المستخدم
             onSnapshot(userRef, (docSnap) => {
                 if (docSnap.exists()) {
-                    setUserData(docSnap.data());
-                    // الطرد الأمني
-                    if (docSnap.data().forceLogout) {
+                    const data = docSnap.data();
+                    setUserData(data);
+                    setUserXP(data.xp || 0);
+                    setConqueredCities(data.conqueredCities || []);
+                    setScenarios(data.scenarios || []);
+                    
+                    if (data.forceLogout) {
                         auth.signOut();
                         window.location.reload();
                     }
@@ -91,22 +110,41 @@ export default function RussianApp() {
         } else {
             setUser(null);
             setUserData(null);
+            setUserXP(0);
         }
         setLoadingAuth(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // --- 2. مراقبة حالة النظام (رسائل الإدارة والصيانة) ---
+  // --- 2. مراقبة حالة النظام ---
   useEffect(() => {
-    const unsubBroad = onSnapshot(doc(db, "system", "broadcast"), (d) => setBroadcast(d.exists() && d.data().active ? d.data().message : null));
-    const unsubMaint = onSnapshot(doc(db, "system", "status"), (d) => setMaintenance(d.exists() ? d.data().maintenance : false));
+    const unsubBroad = onSnapshot(doc(db, "system", "broadcast"), (d) => 
+        setBroadcast(d.exists() && d.data().active ? d.data().message : null)
+    );
+    const unsubMaint = onSnapshot(doc(db, "system", "status"), (d) => 
+        setMaintenance(d.exists() ? d.data().maintenance : false)
+    );
     return () => { unsubBroad(); unsubMaint(); };
   }, []);
 
   const handleLogout = () => auth.signOut().then(() => window.location.reload());
 
-  // تصفية الفئات للدراسة
+  // معالجة فوز في لعبة الغزو
+  const handleCityConquered = async (cityReward) => {
+    if (!user) return;
+    
+    const userRef = doc(db, "users", user.uid);
+    await updateDoc(userRef, {
+        xp: userXP + cityReward.xp,
+        conqueredCities: [...conqueredCities, cityReward.id],
+        [`inventory.${cityReward.cards[0]}`]: true
+    });
+    
+    playSFX('victory');
+  };
+
+  // تصفية الفئات
   const categories = useMemo(() => {
       if (!cards) return [];
       return [...new Set(cards.map(c => c.category || "General"))];
@@ -120,10 +158,8 @@ export default function RussianApp() {
 
   // --- الشاشات الافتتاحية والتحذيرية ---
   
-  // 1. مقدمة سينمائية
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
 
-  // 2. وضع الصيانة (يستثنى منه الأدمن)
   if (maintenance && !isAdmin) return (
       <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-orange-500 relative overflow-hidden font-mono">
           <DigitalRain />
@@ -135,7 +171,6 @@ export default function RussianApp() {
       </div>
   );
 
-  // 3. شاشة الحظر
   if (isBanned) return (
     <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-red-500 space-y-6 font-mono relative overflow-hidden">
         <IconLock size={80} className="animate-pulse" />
@@ -145,51 +180,92 @@ export default function RussianApp() {
     </div>
   );
 
-  // 4. شاشة التحميل
   if (loadingAuth) return <div className="h-screen bg-black text-cyan-500 flex items-center justify-center font-mono animate-pulse">LOADING NEURAL LINK...</div>;
   
-  // 5. شاشة تسجيل الدخول
   if (!user) return <AuthScreen onLoginSuccess={setUser} />;
 
-  // --- إعداد القائمة السفلية (Navigation Dock) ---
+  // --- إعداد القائمة السفلية الجديدة ---
   let navLinks = [
     { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
     { title: "AI Mentor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => setCurrentView('ai-tutor') },
-    // الزر الجديد للألعاب
     { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
-    
+    { title: "Invasion", icon: <IconSword className="w-full text-red-500" />, onClick: () => setCurrentView('invasion') },
+    { title: "Live", icon: <IconVideo className="w-full text-purple-500" />, onClick: () => setCurrentView('live') },
     { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
+    { title: "Rank", icon: <IconRank className="w-full text-yellow-500" />, onClick: () => setCurrentView('rank') },
     { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
     { title: "Archive", icon: <IconDatabase className="w-full text-emerald-400" />, onClick: () => setCurrentView('data') }, 
-    { title: "ID Card", icon: <IconTrophy className="w-full text-yellow-500" />, onClick: () => setCurrentView('leaderboard') },
+    { title: "Editor", icon: <IconScript className="w-full text-orange-500" />, onClick: () => setCurrentView('scenario-editor') },
     { title: "Config", icon: <IconSettings className="w-full text-neutral-400" />, onClick: () => setCurrentView('settings') },
   ];
   
-  // زر الأدمن يظهر فقط للمصرح لهم
+  // زر الأدمن
   if (isJunior) {
       navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
   }
 
-  // --- محول العرض (Routing Logic) ---
+  // --- محول العرض الجديد ---
   const renderContent = () => {
-    // حماية رابط الأدمن
-    if (currentView === 'admin' && !isJunior) return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
+    if (currentView === 'admin' && !isJunior) {
+        return <HeroSection 
+            onStart={() => setCurrentView('category')} 
+            onOpenGame={() => setCurrentView('games')} 
+            user={user} 
+        />;
+    }
 
     switch (currentView) {
       case 'home': 
-        return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
+        return <HeroSection 
+            onStart={() => setCurrentView('category')} 
+            onOpenGame={() => setCurrentView('games')} 
+            user={user} 
+        />;
       
       case 'ai-tutor':
         return <AITutor user={user} />;
       
       case 'games':
-        return <GamesHub cards={cards} />; // قسم الألعاب الجديد
+        return <GamesHub cards={cards} />;
+      
+      case 'invasion':
+        return <RussianInvasion 
+            cards={cards} 
+            user={user} 
+            onClose={() => setCurrentView('home')}
+            onVictory={handleCityConquered}
+        />;
+      
+      case 'live':
+        return <LiveStream 
+            user={user} 
+            onClose={() => setCurrentView('home')} 
+        />;
+      
+      case 'scenario-editor':
+        return <ScenarioEditor />;
+      
+      case 'rank':
+        return <RankSystem 
+            userXP={userXP}
+            userStats={userData || {}}
+            onRankUp={(rank, rewards) => {
+                playSFX('levelup');
+            }}
+        />;
       
       case 'chat':
         return <CommunicationHub user={user} />;
       
       case 'category': 
-        return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
+        return <CategorySelect 
+            categories={categories} 
+            activeCategory={activeCategory} 
+            onSelect={(cat) => { 
+                setActiveCategory(cat); 
+                setCurrentView('study'); 
+            }} 
+        />;
       
       case 'study':
         return (
@@ -221,19 +297,40 @@ export default function RussianApp() {
         );
       
       case 'data': 
-        return <DataManager cards={cards} onAdd={addCard} onDelete={deleteCard} onUpdate={updateCard} isJunior={isJunior} />;
+        return <DataManager 
+            cards={cards} 
+            onAdd={addCard} 
+            onDelete={deleteCard} 
+            onUpdate={updateCard} 
+            isJunior={isJunior} 
+        />;
       
       case 'leaderboard': 
-        return <CyberDeck user={user} stats={stats || { xp: 0, streak: 0, avatar: '👤' }} cards={cards || []} />;
+        return <CyberDeck 
+            user={user} 
+            stats={stats || { xp: userXP, streak: 0, avatar: '👤' }} 
+            cards={cards || []} 
+        />;
       
       case 'settings': 
-        return <SettingsView user={user} resetProgress={resetProgress} onLogout={handleLogout} />;
+        return <SettingsView 
+            user={user} 
+            resetProgress={resetProgress} 
+            onLogout={handleLogout} 
+        />;
       
       case 'admin':
-        return <AdminDashboard currentUser={user} userData={userData} />;
+        return <AdminDashboard 
+            currentUser={user} 
+            userData={userData} 
+        />;
       
       default: 
-        return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
+        return <HeroSection 
+            onStart={() => setCurrentView('category')} 
+            onOpenGame={() => setCurrentView('games')} 
+            user={user} 
+        />;
     }
   };
 
@@ -246,7 +343,7 @@ export default function RussianApp() {
       {/* 2. النوافذ العائمة */}
       {showDailyReward && <DailyReward user={user} onClose={() => setShowDailyReward(false)} />}
       
-      {/* 3. شريط البث المباشر (للأدمن) */}
+      {/* 3. شريط البث المباشر */}
       <AnimatePresence>
         {broadcast && (
             <motion.div 
@@ -259,7 +356,7 @@ export default function RussianApp() {
         )}
       </AnimatePresence>
 
-      {/* 4. الحاوية الرئيسية للعرض */}
+      {/* 4. الحاوية الرئيسية */}
       <main className="relative z-10 flex flex-col items-center justify-center min-h-screen w-full pt-10 md:pt-0">
            <AnimatePresence mode="wait">
              <motion.div 
@@ -275,7 +372,7 @@ export default function RussianApp() {
            </AnimatePresence>
       </main>
 
-      {/* 5. القائمة السفلية العائمة */}
+      {/* 5. القائمة السفلية */}
       <div className="fixed bottom-8 left-0 w-full z-50 flex justify-center pointer-events-none">
           <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="pointer-events-auto">
               <FloatingDock items={navLinks} />

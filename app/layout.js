@@ -2,6 +2,13 @@ import { JetBrains_Mono, Cairo } from "next/font/google";
 import "./globals.css";
 // استدعاء ملف الكونتكست الذي أنشأناه للتو
 import { SettingsProvider } from "../context/SettingsContext";
+// إضافة هذه السطر بعد الاستيرادات
+import { registerServiceWorker } from './service-worker-registration';
+
+// داخل مكون RootLayout، قبل return:
+useEffect(() => {
+  registerServiceWorker();
+}, []);
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin", "cyrillic"],
