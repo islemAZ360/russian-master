@@ -1,14 +1,8 @@
+// FILE: app/layout.js
 import { JetBrains_Mono, Cairo } from "next/font/google";
 import "./globals.css";
-// استدعاء ملف الكونتكست الذي أنشأناه للتو
 import { SettingsProvider } from "../context/SettingsContext";
-// إضافة هذه السطر بعد الاستيرادات
-import { registerServiceWorker } from './service-worker-registration';
-
-// داخل مكون RootLayout، قبل return:
-useEffect(() => {
-  registerServiceWorker();
-}, []);
+import ServiceWorkerRegister from "../components/ServiceWorkerRegister"; // استيراد المكون الجديد
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin", "cyrillic"],
@@ -43,8 +37,10 @@ export default function RootLayout({ children }) {
     <html lang="ar" dir="ltr" className={`${jetbrainsMono.variable} ${cairo.variable}`}>
       <body className="antialiased bg-[#050505] text-white overflow-hidden selection:bg-cyan-500/30 selection:text-cyan-100">
         
-        {/* إضافة مزود الإعدادات هنا */}
         <SettingsProvider>
+            {/* استدعاء مسجل Service Worker هنا */}
+            <ServiceWorkerRegister />
+
             {/* الخلفيات والمؤثرات */}
             <div className="scanlines"></div>
             <div className="vignette"></div>

@@ -394,20 +394,76 @@ export default function RootLayout({ children }) {
 
 
 ==================================================================
+FILE: app\not-found.js
+==================================================================
+
+"use client"; // <--- هذا السطر ضروري جداً لاستخدام useEffect
+
+import React, { useEffect } from "react"; // <--- تأكد من استيراد useEffect
+import Link from "next/link";
+import { IconAlertTriangle, IconHome } from "@tabler/icons-react";
+
+export default function NotFound() {
+  
+  // نستخدم useEffect هنا فقط لتوضيح سبب المشكلة السابقة (الآن ستعمل لأننا استوردناها)
+  useEffect(() => {
+    console.error("PAGE NOT FOUND: 404 Error Triggered");
+  }, []);
+
+  return (
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-black text-white font-mono relative overflow-hidden selection:bg-red-500/30">
+      
+      {/* خلفية مشوشة */}
+      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
+      
+      {/* التوهج الخلفي */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-red-600/10 blur-[100px] rounded-full pointer-events-none"></div>
+
+      <div className="relative z-10 text-center p-8 border border-red-500/30 bg-black/80 backdrop-blur-xl rounded-3xl shadow-[0_0_60px_rgba(220,38,38,0.15)] max-w-lg w-full">
+        
+        <IconAlertTriangle size={80} stroke={1.5} className="mx-auto text-red-500 mb-6 animate-pulse" />
+        
+        <h1 className="text-7xl font-black text-white mb-2 tracking-tighter drop-shadow-lg">404</h1>
+        
+        <div className="h-px w-full bg-gradient-to-r from-transparent via-red-500 to-transparent my-6 opacity-50"></div>
+
+        <h2 className="text-xl font-bold text-red-400 mb-4 uppercase tracking-[0.2em]">Connection Severed</h2>
+        
+        <p className="text-white/50 mb-8 text-sm leading-relaxed">
+          The neural link you are trying to access does not exist or has been terminated by the mainframe administrators.
+        </p>
+
+        <Link 
+          href="/"
+          className="group relative inline-flex items-center gap-3 px-8 py-4 bg-red-900/20 border border-red-500/50 hover:bg-red-600 hover:border-red-500 text-white font-bold rounded-xl transition-all duration-300 shadow-[0_0_20px_rgba(220,38,38,0.1)] hover:shadow-[0_0_30px_rgba(220,38,38,0.4)]"
+        >
+          <IconHome size={20} className="group-hover:-translate-y-1 transition-transform" />
+          <span>RETURN TO BASE</span>
+        </Link>
+      </div>
+
+      <div className="absolute bottom-6 text-[10px] text-red-500/30 font-mono">
+        ERROR_CODE: 0x404_DATA_MISSING
+      </div>
+    </div>
+  );
+}
+
+
+==================================================================
 FILE: app\page.js
 ==================================================================
 
+// FILE: app/page.js
 "use client";
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
-  IconShield, IconLock, IconAlertTriangle, IconServer,
-  IconMessageCircle, IconRobot, IconDeviceGamepad,
-  IconMap, IconVideo, IconScript, IconSword, IconMilitaryRank
+  IconShield, IconMessageCircle, IconRobot, IconDeviceGamepad 
 } from '@tabler/icons-react';
 
-// --- استيراد المكونات الجديدة ---
+// --- استيراد المكونات (Components) ---
 import { HeroSection } from '../components/HeroSection';
 import { CategorySelect } from '../components/CategorySelect';
 import { StudyCard } from '../components/StudyCard';
@@ -425,81 +481,56 @@ import IntroSequence from '../components/IntroSequence';
 import { BossBattleWrapper } from '../components/BossBattleWrapper'; 
 import DailyReward from '../components/DailyReward';
 
-// --- المكونات الجديدة ---
-import RussianInvasion from '../components/games/RussianInvasion';
-import LiveStream from '../components/live/LiveStream';
-import ScenarioEditor from '../components/scenarios/ScenarioEditor';
-import RankSystem from '../components/ranks/RankSystem';
-
-// --- المكتبات والخطافات الجديدة ---
+// --- المكتبات والخطافات (Hooks) ---
 import { useStudySystem } from '../hooks/useStudySystem';
-import { useSmartSRS } from '../hooks/useSmartSRS'; // الجديد
 import { useAudio } from '../hooks/useAudio';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot, updateDoc, setDoc, getDoc } from "firebase/firestore";
 
+// الإيميل الرئيسي
 const MASTER_EMAIL = "islamaz@bomba.com";
 
 export default function RussianApp() {
-  // --- تعريف الحالات الجديدة ---
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null); 
   const [currentView, setCurrentView] = useState('home');
   const [activeCategory, setActiveCategory] = useState("All");
   const [showIntro, setShowIntro] = useState(true); 
   const [broadcast, setBroadcast] = useState(null);
-  const [maintenance, setMaintenance] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [userXP, setUserXP] = useState(0);
-  const [conqueredCities, setConqueredCities] = useState([]);
-  const [scenarios, setScenarios] = useState([]);
 
   // حالات المعركة
   const [battleResult, setBattleResult] = useState(null); 
   const [battleTrigger, setBattleTrigger] = useState(0);
 
-  // استخدام النظام الذكي الجديد
-  const { cards, currentCard, stats, handleSwipe, resetProgress, addCard, deleteCard, updateCard } = useStudySystem(user);
-  const { dueCards, updateCard: updateSRS, generateStudyPlan } = useSmartSRS(user?.uid, cards);
+  const { 
+    cards, currentCard, stats, handleSwipe, resetProgress, 
+    addCard, deleteCard, updateCard 
+  } = useStudySystem(user);
+
   const { speak, playSFX } = useAudio();
 
-  // --- 1. مراقبة المستخدم والبيانات ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
         if (u) {
             setUser(u);
             const userRef = doc(db, "users", u.uid);
             
-            // إصلاح صلاحيات السوبر أدمن
             if (u.email === MASTER_EMAIL) {
                 const snap = await getDoc(userRef);
                 if (!snap.exists()) {
-                    await setDoc(userRef, { 
-                        email: u.email, 
-                        role: 'admin', 
-                        xp: 0, 
-                        createdAt: new Date().toISOString(),
-                        conqueredCities: [],
-                        scenarios: [],
-                        rank: 'recruit'
-                    });
+                    await setDoc(userRef, { email: u.email, role: 'admin', xp: 0, createdAt: new Date().toISOString() });
                 } else if (snap.data().role !== 'admin') {
                     await updateDoc(userRef, { role: 'admin' });
                 }
             }
 
-            // مراقبة بيانات المستخدم
             onSnapshot(userRef, (docSnap) => {
                 if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    setUserData(data);
-                    setUserXP(data.xp || 0);
-                    setConqueredCities(data.conqueredCities || []);
-                    setScenarios(data.scenarios || []);
-                    
-                    if (data.forceLogout) {
+                    setUserData(docSnap.data());
+                    if (docSnap.data().forceLogout) {
                         auth.signOut();
                         window.location.reload();
                     }
@@ -509,72 +540,34 @@ export default function RussianApp() {
         } else {
             setUser(null);
             setUserData(null);
-            setUserXP(0);
         }
         setLoadingAuth(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // --- 2. مراقبة حالة النظام ---
   useEffect(() => {
-    const unsubBroad = onSnapshot(doc(db, "system", "broadcast"), (d) => 
-        setBroadcast(d.exists() && d.data().active ? d.data().message : null)
-    );
-    const unsubMaint = onSnapshot(doc(db, "system", "status"), (d) => 
-        setMaintenance(d.exists() ? d.data().maintenance : false)
-    );
-    return () => { unsubBroad(); unsubMaint(); };
+    const unsubBroad = onSnapshot(doc(db, "system", "broadcast"), (d) => setBroadcast(d.exists() && d.data().active ? d.data().message : null));
+    return () => unsubBroad();
   }, []);
 
   const handleLogout = () => auth.signOut().then(() => window.location.reload());
 
-  // معالجة فوز في لعبة الغزو
-  const handleCityConquered = async (cityReward) => {
-    if (!user) return;
-    
-    const userRef = doc(db, "users", user.uid);
-    await updateDoc(userRef, {
-        xp: userXP + cityReward.xp,
-        conqueredCities: [...conqueredCities, cityReward.id],
-        [`inventory.${cityReward.cards[0]}`]: true
-    });
-    
-    playSFX('victory');
-  };
-
-  // تصفية الفئات
   const categories = useMemo(() => {
       if (!cards) return [];
       return [...new Set(cards.map(c => c.category || "General"))];
   }, [cards]);
 
-  // --- تحديد الصلاحيات ---
   const isMaster = user?.email === MASTER_EMAIL;
   const isAdmin = userData?.role === 'admin' || isMaster;
   const isJunior = userData?.role === 'junior' || isAdmin;
   const isBanned = userData?.isBanned && !isMaster;
 
-  // --- الشاشات الافتتاحية والتحذيرية ---
-  
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
-
-  if (maintenance && !isAdmin) return (
-      <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-orange-500 relative overflow-hidden font-mono">
-          <DigitalRain />
-          <div className="z-10 text-center bg-black/90 p-12 border border-orange-500/50 rounded-3xl backdrop-blur-xl shadow-[0_0_50px_#ea580c]">
-             <IconServer size={100} className="mx-auto mb-6 animate-pulse text-orange-500" />
-             <h1 className="text-5xl font-black mb-4 text-white">SYSTEM UPDATING</h1>
-             <p className="text-orange-400/80 tracking-[0.2em] uppercase text-sm">Server connection severed by Admin.</p>
-          </div>
-      </div>
-  );
 
   if (isBanned) return (
     <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-red-500 space-y-6 font-mono relative overflow-hidden">
-        <IconLock size={80} className="animate-pulse" />
         <h1 className="text-6xl font-black tracking-widest text-center">ACCESS DENIED</h1>
-        <p className="text-red-500/50 uppercase tracking-widest">Neural Link Terminated.</p>
         <button onClick={handleLogout} className="px-8 py-3 border border-red-500 rounded hover:bg-red-900/20 transition-colors">LOGOUT</button>
     </div>
   );
@@ -583,89 +576,30 @@ export default function RussianApp() {
   
   if (!user) return <AuthScreen onLoginSuccess={setUser} />;
 
-  // --- إعداد القائمة السفلية الجديدة ---
   let navLinks = [
     { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
     { title: "AI Mentor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => setCurrentView('ai-tutor') },
     { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
-    { title: "Invasion", icon: <IconSword className="w-full text-red-500" />, onClick: () => setCurrentView('invasion') },
-    { title: "Live", icon: <IconVideo className="w-full text-purple-500" />, onClick: () => setCurrentView('live') },
     { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
-    { title: "Rank", icon: <IconMilitaryRank className="w-full text-yellow-500" />, onClick: () => setCurrentView('rank') },
     { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
     { title: "Archive", icon: <IconDatabase className="w-full text-emerald-400" />, onClick: () => setCurrentView('data') }, 
-    { title: "Editor", icon: <IconScript className="w-full text-orange-500" />, onClick: () => setCurrentView('scenario-editor') },
+    { title: "ID Card", icon: <IconTrophy className="w-full text-yellow-500" />, onClick: () => setCurrentView('leaderboard') },
     { title: "Config", icon: <IconSettings className="w-full text-neutral-400" />, onClick: () => setCurrentView('settings') },
   ];
   
-  // زر الأدمن
   if (isJunior) {
       navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
   }
 
-  // --- محول العرض الجديد ---
   const renderContent = () => {
-    if (currentView === 'admin' && !isJunior) {
-        return <HeroSection 
-            onStart={() => setCurrentView('category')} 
-            onOpenGame={() => setCurrentView('games')} 
-            user={user} 
-        />;
-    }
+    if (currentView === 'admin' && !isJunior) return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
 
     switch (currentView) {
-      case 'home': 
-        return <HeroSection 
-            onStart={() => setCurrentView('category')} 
-            onOpenGame={() => setCurrentView('games')} 
-            user={user} 
-        />;
-      
-      case 'ai-tutor':
-        return <AITutor user={user} />;
-      
-      case 'games':
-        return <GamesHub cards={cards} />;
-      
-      case 'invasion':
-        return <RussianInvasion 
-            cards={cards} 
-            user={user} 
-            onClose={() => setCurrentView('home')}
-            onVictory={handleCityConquered}
-        />;
-      
-      case 'live':
-        return <LiveStream 
-            user={user} 
-            onClose={() => setCurrentView('home')} 
-        />;
-      
-      case 'scenario-editor':
-        return <ScenarioEditor />;
-      
-      case 'rank':
-        return <RankSystem 
-            userXP={userXP}
-            userStats={userData || {}}
-            onRankUp={(rank, rewards) => {
-                playSFX('levelup');
-            }}
-        />;
-      
-      case 'chat':
-        return <CommunicationHub user={user} />;
-      
-      case 'category': 
-        return <CategorySelect 
-            categories={categories} 
-            activeCategory={activeCategory} 
-            onSelect={(cat) => { 
-                setActiveCategory(cat); 
-                setCurrentView('study'); 
-            }} 
-        />;
-      
+      case 'home': return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
+      case 'ai-tutor': return <AITutor user={user} />;
+      case 'games': return <GamesHub cards={cards} />;
+      case 'chat': return <CommunicationHub user={user} />;
+      case 'category': return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
       case 'study':
         return (
             <div className="flex flex-col items-center justify-center h-full w-full relative pb-32">
@@ -694,68 +628,27 @@ export default function RussianApp() {
                 )}
             </div>
         );
-      
-      case 'data': 
-        return <DataManager 
-            cards={cards} 
-            onAdd={addCard} 
-            onDelete={deleteCard} 
-            onUpdate={updateCard} 
-            isJunior={isJunior} 
-        />;
-      
-      case 'leaderboard': 
-        return <CyberDeck 
-            user={user} 
-            stats={stats || { xp: userXP, streak: 0, avatar: '👤' }} 
-            cards={cards || []} 
-        />;
-      
-      case 'settings': 
-        return <SettingsView 
-            user={user} 
-            resetProgress={resetProgress} 
-            onLogout={handleLogout} 
-        />;
-      
-      case 'admin':
-        return <AdminDashboard 
-            currentUser={user} 
-            userData={userData} 
-        />;
-      
-      default: 
-        return <HeroSection 
-            onStart={() => setCurrentView('category')} 
-            onOpenGame={() => setCurrentView('games')} 
-            user={user} 
-        />;
+      case 'data': return <DataManager cards={cards} onAdd={addCard} onDelete={deleteCard} onUpdate={updateCard} isJunior={isJunior} />;
+      case 'leaderboard': return <CyberDeck user={user} stats={stats || { xp: 0, streak: 0, avatar: '👤' }} cards={cards || []} />;
+      case 'settings': return <SettingsView user={user} resetProgress={resetProgress} onLogout={handleLogout} />;
+      case 'admin': return <AdminDashboard currentUser={user} userData={userData} />;
+      default: return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
     }
   };
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black selection:bg-cyan-500/30 selection:text-cyan-200">
-      
-      {/* 1. الخلفية الرقمية */}
       <DigitalRain />
-      
-      {/* 2. النوافذ العائمة */}
       {showDailyReward && <DailyReward user={user} onClose={() => setShowDailyReward(false)} />}
       
-      {/* 3. شريط البث المباشر */}
       <AnimatePresence>
         {broadcast && (
-            <motion.div 
-                initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} 
-                className="fixed top-0 w-full bg-red-900/90 border-b border-red-500 text-white text-center py-3 z-[100] font-bold shadow-[0_0_30px_rgba(220,38,38,0.5)] flex justify-center items-center gap-3 backdrop-blur-xl"
-            >
-                <IconAlertTriangle className="animate-pulse text-yellow-400" />
+            <motion.div initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} className="fixed top-0 w-full bg-red-900/90 border-b border-red-500 text-white text-center py-3 z-[100] font-bold shadow-[0_0_30px_rgba(220,38,38,0.5)] flex justify-center items-center gap-3 backdrop-blur-xl">
                 <span className="tracking-widest uppercase text-sm md:text-base">{broadcast}</span>
             </motion.div>
         )}
       </AnimatePresence>
 
-      {/* 4. الحاوية الرئيسية */}
       <main className="relative z-10 flex flex-col items-center justify-center min-h-screen w-full pt-10 md:pt-0">
            <AnimatePresence mode="wait">
              <motion.div 
@@ -771,7 +664,6 @@ export default function RussianApp() {
            </AnimatePresence>
       </main>
 
-      {/* 5. القائمة السفلية */}
       <div className="fixed bottom-8 left-0 w-full z-50 flex justify-center pointer-events-none">
           <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="pointer-events-auto">
               <FloatingDock items={navLinks} />
@@ -8868,6 +8760,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 FILE: tailwind.config.js
 ==================================================================
 
+// FILE: tailwind.config.js
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -8877,18 +8770,35 @@ module.exports = {
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      // يجب أن تكون الرسوم المتحركة هنا داخل extend
+      keyframes: {
+        shine: {
+          "100%": { transform: "translateX(100%)" },
+        },
+        shimmer: {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(100%)" },
+        },
+        blob: {
+          "0%": { transform: "translate(0px, 0px) scale(1)" },
+          "33%": { transform: "translate(30px, -50px) scale(1.1)" },
+          "66%": { transform: "translate(-20px, 20px) scale(0.9)" },
+          "100%": { transform: "translate(0px, 0px) scale(1)" },
+        },
+        "music-bar": {
+          "0%, 100%": { height: "20%" },
+          "50%": { height: "100%" },
+        }
+      },
+      animation: {
+        shine: "shine 1s",
+        blob: "blob 7s infinite",
+        "music-bar": "music-bar 0.5s ease-in-out infinite",
+        "spin-slow": "spin 8s linear infinite",
+      },
+    },
   },
   plugins: [],
-  // في extend:
-keyframes: {
-  shine: {
-    "100%": { transform: "translateX(100%)" },
-  },
-},
-animation: {
-  shine: "shine 1s",
-},
-}
-
+};
 
