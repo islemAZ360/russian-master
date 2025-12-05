@@ -326,6 +326,13 @@ import { JetBrains_Mono, Cairo } from "next/font/google";
 import "./globals.css";
 // استدعاء ملف الكونتكست الذي أنشأناه للتو
 import { SettingsProvider } from "../context/SettingsContext";
+// إضافة هذه السطر بعد الاستيرادات
+import { registerServiceWorker } from './service-worker-registration';
+
+// داخل مكون RootLayout، قبل return:
+useEffect(() => {
+  registerServiceWorker();
+}, []);
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin", "cyrillic"],
@@ -396,10 +403,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
   IconShield, IconLock, IconAlertTriangle, IconServer,
-  IconMessageCircle, IconRobot, IconDeviceGamepad 
+  IconMessageCircle, IconRobot, IconDeviceGamepad,
+  IconMap, IconVideo, IconScript, IconSword, IconMilitaryRank
 } from '@tabler/icons-react';
 
-// --- استيراد المكونات (Components) ---
+// --- استيراد المكونات الجديدة ---
 import { HeroSection } from '../components/HeroSection';
 import { CategorySelect } from '../components/CategorySelect';
 import { StudyCard } from '../components/StudyCard';
@@ -410,25 +418,31 @@ import CommunicationHub from '../components/CommunicationHub';
 import SettingsView from '../components/SettingsView'; 
 import AdminDashboard from '../components/AdminDashboard'; 
 import AITutor from '../components/AITutor';
-import GamesHub from '../components/GamesHub'; // <-- قسم الألعاب الجديد
+import GamesHub from '../components/GamesHub';
 import { FloatingDock } from '../components/ui/floating-dock';
 import DigitalRain from '../components/ui/DigitalRain'; 
 import IntroSequence from '../components/IntroSequence'; 
 import { BossBattleWrapper } from '../components/BossBattleWrapper'; 
 import DailyReward from '../components/DailyReward';
 
-// --- المكتبات والخطافات (Hooks) ---
+// --- المكونات الجديدة ---
+import RussianInvasion from '../components/games/RussianInvasion';
+import LiveStream from '../components/live/LiveStream';
+import ScenarioEditor from '../components/scenarios/ScenarioEditor';
+import RankSystem from '../components/ranks/RankSystem';
+
+// --- المكتبات والخطافات الجديدة ---
 import { useStudySystem } from '../hooks/useStudySystem';
+import { useSmartSRS } from '../hooks/useSmartSRS'; // الجديد
 import { useAudio } from '../hooks/useAudio';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot, updateDoc, setDoc, getDoc } from "firebase/firestore";
 
-// الإيميل الرئيسي (السوبر أدمن - لا يمكن حظره ويملك كل الصلاحيات)
 const MASTER_EMAIL = "islamaz@bomba.com";
 
 export default function RussianApp() {
-  // --- تعريف الحالات (States) ---
+  // --- تعريف الحالات الجديدة ---
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null); 
   const [currentView, setCurrentView] = useState('home');
@@ -438,42 +452,54 @@ export default function RussianApp() {
   const [maintenance, setMaintenance] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [userXP, setUserXP] = useState(0);
+  const [conqueredCities, setConqueredCities] = useState([]);
+  const [scenarios, setScenarios] = useState([]);
 
-  // حالات المعركة (لصفحة الدراسة)
+  // حالات المعركة
   const [battleResult, setBattleResult] = useState(null); 
   const [battleTrigger, setBattleTrigger] = useState(0);
 
-  // استدعاء منطق النظام
-  const { 
-    cards, currentCard, stats, handleSwipe, resetProgress, 
-    addCard, deleteCard, updateCard 
-  } = useStudySystem(user);
-
+  // استخدام النظام الذكي الجديد
+  const { cards, currentCard, stats, handleSwipe, resetProgress, addCard, deleteCard, updateCard } = useStudySystem(user);
+  const { dueCards, updateCard: updateSRS, generateStudyPlan } = useSmartSRS(user?.uid, cards);
   const { speak, playSFX } = useAudio();
 
-  // --- 1. مراقبة المستخدم والصلاحيات ---
+  // --- 1. مراقبة المستخدم والبيانات ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
         if (u) {
             setUser(u);
             const userRef = doc(db, "users", u.uid);
             
-            // إصلاح صلاحيات السوبر أدمن تلقائياً عند الدخول
+            // إصلاح صلاحيات السوبر أدمن
             if (u.email === MASTER_EMAIL) {
                 const snap = await getDoc(userRef);
                 if (!snap.exists()) {
-                    await setDoc(userRef, { email: u.email, role: 'admin', xp: 0, createdAt: new Date().toISOString() });
+                    await setDoc(userRef, { 
+                        email: u.email, 
+                        role: 'admin', 
+                        xp: 0, 
+                        createdAt: new Date().toISOString(),
+                        conqueredCities: [],
+                        scenarios: [],
+                        rank: 'recruit'
+                    });
                 } else if (snap.data().role !== 'admin') {
                     await updateDoc(userRef, { role: 'admin' });
                 }
             }
 
-            // مراقبة بيانات المستخدم الحية (للحظر الفوري أو تغيير الرتبة)
+            // مراقبة بيانات المستخدم
             onSnapshot(userRef, (docSnap) => {
                 if (docSnap.exists()) {
-                    setUserData(docSnap.data());
-                    // الطرد الأمني
-                    if (docSnap.data().forceLogout) {
+                    const data = docSnap.data();
+                    setUserData(data);
+                    setUserXP(data.xp || 0);
+                    setConqueredCities(data.conqueredCities || []);
+                    setScenarios(data.scenarios || []);
+                    
+                    if (data.forceLogout) {
                         auth.signOut();
                         window.location.reload();
                     }
@@ -483,22 +509,41 @@ export default function RussianApp() {
         } else {
             setUser(null);
             setUserData(null);
+            setUserXP(0);
         }
         setLoadingAuth(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // --- 2. مراقبة حالة النظام (رسائل الإدارة والصيانة) ---
+  // --- 2. مراقبة حالة النظام ---
   useEffect(() => {
-    const unsubBroad = onSnapshot(doc(db, "system", "broadcast"), (d) => setBroadcast(d.exists() && d.data().active ? d.data().message : null));
-    const unsubMaint = onSnapshot(doc(db, "system", "status"), (d) => setMaintenance(d.exists() ? d.data().maintenance : false));
+    const unsubBroad = onSnapshot(doc(db, "system", "broadcast"), (d) => 
+        setBroadcast(d.exists() && d.data().active ? d.data().message : null)
+    );
+    const unsubMaint = onSnapshot(doc(db, "system", "status"), (d) => 
+        setMaintenance(d.exists() ? d.data().maintenance : false)
+    );
     return () => { unsubBroad(); unsubMaint(); };
   }, []);
 
   const handleLogout = () => auth.signOut().then(() => window.location.reload());
 
-  // تصفية الفئات للدراسة
+  // معالجة فوز في لعبة الغزو
+  const handleCityConquered = async (cityReward) => {
+    if (!user) return;
+    
+    const userRef = doc(db, "users", user.uid);
+    await updateDoc(userRef, {
+        xp: userXP + cityReward.xp,
+        conqueredCities: [...conqueredCities, cityReward.id],
+        [`inventory.${cityReward.cards[0]}`]: true
+    });
+    
+    playSFX('victory');
+  };
+
+  // تصفية الفئات
   const categories = useMemo(() => {
       if (!cards) return [];
       return [...new Set(cards.map(c => c.category || "General"))];
@@ -512,10 +557,8 @@ export default function RussianApp() {
 
   // --- الشاشات الافتتاحية والتحذيرية ---
   
-  // 1. مقدمة سينمائية
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
 
-  // 2. وضع الصيانة (يستثنى منه الأدمن)
   if (maintenance && !isAdmin) return (
       <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-orange-500 relative overflow-hidden font-mono">
           <DigitalRain />
@@ -527,7 +570,6 @@ export default function RussianApp() {
       </div>
   );
 
-  // 3. شاشة الحظر
   if (isBanned) return (
     <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-red-500 space-y-6 font-mono relative overflow-hidden">
         <IconLock size={80} className="animate-pulse" />
@@ -537,51 +579,92 @@ export default function RussianApp() {
     </div>
   );
 
-  // 4. شاشة التحميل
   if (loadingAuth) return <div className="h-screen bg-black text-cyan-500 flex items-center justify-center font-mono animate-pulse">LOADING NEURAL LINK...</div>;
   
-  // 5. شاشة تسجيل الدخول
   if (!user) return <AuthScreen onLoginSuccess={setUser} />;
 
-  // --- إعداد القائمة السفلية (Navigation Dock) ---
+  // --- إعداد القائمة السفلية الجديدة ---
   let navLinks = [
     { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
     { title: "AI Mentor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => setCurrentView('ai-tutor') },
-    // الزر الجديد للألعاب
     { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
-    
+    { title: "Invasion", icon: <IconSword className="w-full text-red-500" />, onClick: () => setCurrentView('invasion') },
+    { title: "Live", icon: <IconVideo className="w-full text-purple-500" />, onClick: () => setCurrentView('live') },
     { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
+    { title: "Rank", icon: <IconMilitaryRank className="w-full text-yellow-500" />, onClick: () => setCurrentView('rank') },
     { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
     { title: "Archive", icon: <IconDatabase className="w-full text-emerald-400" />, onClick: () => setCurrentView('data') }, 
-    { title: "ID Card", icon: <IconTrophy className="w-full text-yellow-500" />, onClick: () => setCurrentView('leaderboard') },
+    { title: "Editor", icon: <IconScript className="w-full text-orange-500" />, onClick: () => setCurrentView('scenario-editor') },
     { title: "Config", icon: <IconSettings className="w-full text-neutral-400" />, onClick: () => setCurrentView('settings') },
   ];
   
-  // زر الأدمن يظهر فقط للمصرح لهم
+  // زر الأدمن
   if (isJunior) {
       navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
   }
 
-  // --- محول العرض (Routing Logic) ---
+  // --- محول العرض الجديد ---
   const renderContent = () => {
-    // حماية رابط الأدمن
-    if (currentView === 'admin' && !isJunior) return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
+    if (currentView === 'admin' && !isJunior) {
+        return <HeroSection 
+            onStart={() => setCurrentView('category')} 
+            onOpenGame={() => setCurrentView('games')} 
+            user={user} 
+        />;
+    }
 
     switch (currentView) {
       case 'home': 
-        return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
+        return <HeroSection 
+            onStart={() => setCurrentView('category')} 
+            onOpenGame={() => setCurrentView('games')} 
+            user={user} 
+        />;
       
       case 'ai-tutor':
         return <AITutor user={user} />;
       
       case 'games':
-        return <GamesHub cards={cards} />; // قسم الألعاب الجديد
+        return <GamesHub cards={cards} />;
+      
+      case 'invasion':
+        return <RussianInvasion 
+            cards={cards} 
+            user={user} 
+            onClose={() => setCurrentView('home')}
+            onVictory={handleCityConquered}
+        />;
+      
+      case 'live':
+        return <LiveStream 
+            user={user} 
+            onClose={() => setCurrentView('home')} 
+        />;
+      
+      case 'scenario-editor':
+        return <ScenarioEditor />;
+      
+      case 'rank':
+        return <RankSystem 
+            userXP={userXP}
+            userStats={userData || {}}
+            onRankUp={(rank, rewards) => {
+                playSFX('levelup');
+            }}
+        />;
       
       case 'chat':
         return <CommunicationHub user={user} />;
       
       case 'category': 
-        return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
+        return <CategorySelect 
+            categories={categories} 
+            activeCategory={activeCategory} 
+            onSelect={(cat) => { 
+                setActiveCategory(cat); 
+                setCurrentView('study'); 
+            }} 
+        />;
       
       case 'study':
         return (
@@ -613,19 +696,40 @@ export default function RussianApp() {
         );
       
       case 'data': 
-        return <DataManager cards={cards} onAdd={addCard} onDelete={deleteCard} onUpdate={updateCard} isJunior={isJunior} />;
+        return <DataManager 
+            cards={cards} 
+            onAdd={addCard} 
+            onDelete={deleteCard} 
+            onUpdate={updateCard} 
+            isJunior={isJunior} 
+        />;
       
       case 'leaderboard': 
-        return <CyberDeck user={user} stats={stats || { xp: 0, streak: 0, avatar: '👤' }} cards={cards || []} />;
+        return <CyberDeck 
+            user={user} 
+            stats={stats || { xp: userXP, streak: 0, avatar: '👤' }} 
+            cards={cards || []} 
+        />;
       
       case 'settings': 
-        return <SettingsView user={user} resetProgress={resetProgress} onLogout={handleLogout} />;
+        return <SettingsView 
+            user={user} 
+            resetProgress={resetProgress} 
+            onLogout={handleLogout} 
+        />;
       
       case 'admin':
-        return <AdminDashboard currentUser={user} userData={userData} />;
+        return <AdminDashboard 
+            currentUser={user} 
+            userData={userData} 
+        />;
       
       default: 
-        return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
+        return <HeroSection 
+            onStart={() => setCurrentView('category')} 
+            onOpenGame={() => setCurrentView('games')} 
+            user={user} 
+        />;
     }
   };
 
@@ -638,7 +742,7 @@ export default function RussianApp() {
       {/* 2. النوافذ العائمة */}
       {showDailyReward && <DailyReward user={user} onClose={() => setShowDailyReward(false)} />}
       
-      {/* 3. شريط البث المباشر (للأدمن) */}
+      {/* 3. شريط البث المباشر */}
       <AnimatePresence>
         {broadcast && (
             <motion.div 
@@ -651,7 +755,7 @@ export default function RussianApp() {
         )}
       </AnimatePresence>
 
-      {/* 4. الحاوية الرئيسية للعرض */}
+      {/* 4. الحاوية الرئيسية */}
       <main className="relative z-10 flex flex-col items-center justify-center min-h-screen w-full pt-10 md:pt-0">
            <AnimatePresence mode="wait">
              <motion.div 
@@ -667,7 +771,7 @@ export default function RussianApp() {
            </AnimatePresence>
       </main>
 
-      {/* 5. القائمة السفلية العائمة */}
+      {/* 5. القائمة السفلية */}
       <div className="fixed bottom-8 left-0 w-full z-50 flex justify-center pointer-events-none">
           <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="pointer-events-auto">
               <FloatingDock items={navLinks} />
@@ -676,6 +780,47 @@ export default function RussianApp() {
     </div>
   );
 }
+
+
+==================================================================
+FILE: app\service-worker-registration.js
+==================================================================
+
+"use client";
+
+export const registerServiceWorker = () => {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(registration => {
+          console.log('ServiceWorker registered: ', registration);
+        })
+        .catch(error => {
+          console.log('ServiceWorker registration failed: ', error);
+        });
+    });
+  }
+};
+
+export const checkNetworkStatus = () => {
+  return navigator.onLine;
+};
+
+export const syncOfflineData = async () => {
+  // مزامنة البيانات المحفوظة محلياً عند العودة للاتصال
+  const offlineActions = JSON.parse(localStorage.getItem('offlineActions') || '[]');
+  
+  for (const action of offlineActions) {
+    try {
+      // تنفيذ الإجراءات المؤجلة
+      await fetch(action.url, action.options);
+    } catch (error) {
+      console.error('Failed to sync action:', error);
+    }
+  }
+  
+  localStorage.removeItem('offlineActions');
+};
 
 
 ==================================================================
@@ -2679,6 +2824,528 @@ export default function ReactorCore({ cards, onClose }) {
 
 
 ==================================================================
+FILE: components\games\RussianInvasion.jsx
+==================================================================
+
+"use client";
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  IconMap, IconTarget, IconSword, IconShield, 
+  IconTrophy, IconX, IconUsers, IconClock,
+  IconCrown, IconBuildingCastle, IconTreasure
+} from '@tabler/icons-react';
+import confetti from 'canvas-confetti';
+
+// خريطة روسيا مع المدن
+const RUSSIAN_CITIES = [
+  {
+    id: 'moscow',
+    name: 'Москва',
+    nameAr: 'موسكو',
+    region: 'وسط روسيا',
+    points: 1000,
+    defense: 50,
+    culture: 'العاصمة التاريخية',
+    unlockAt: 0,
+    icon: '🏛️',
+    color: '#FF6B6B',
+    questions: 3,
+    reward: { xp: 1000, cards: ['موسكو الذهبية'] }
+  },
+  {
+    id: 'petersburg',
+    name: 'Санкт-Петербург',
+    nameAr: 'سانت بطرسبرغ',
+    region: 'شمال غرب',
+    points: 1500,
+    defense: 70,
+    culture: 'عاصمة القياصرة',
+    unlockAt: 2,
+    icon: '🎭',
+    color: '#4ECDC4',
+    questions: 4,
+    reward: { xp: 1500, cards: ['قصر الشتاء'] }
+  },
+  {
+    id: 'kazan',
+    name: 'Казань',
+    nameAr: 'قازان',
+    region: 'تتارستان',
+    points: 2000,
+    defense: 90,
+    culture: 'حضارة التتار',
+    unlockAt: 4,
+    icon: '🕌',
+    color: '#FFD166',
+    questions: 5,
+    reward: { xp: 2000, cards: ['قلعة قازان'] }
+  },
+  {
+    id: 'sochi',
+    name: 'Сочи',
+    nameAr: 'سوتشي',
+    region: 'كراسنودار',
+    points: 2500,
+    defense: 120,
+    culture: 'عروس البحر الأسود',
+    unlockAt: 6,
+    icon: '🏖️',
+    color: '#06D6A0',
+    questions: 6,
+    reward: { xp: 2500, cards: ['ساحل سوتشي'] }
+  },
+  {
+    id: 'vladivostok',
+    name: 'Владивосток',
+    nameAr: 'فلاديفوستوك',
+    region: 'الشرق الأقصى',
+    points: 3000,
+    defense: 150,
+    culture: 'بوابة روسيا إلى آسيا',
+    unlockAt: 8,
+    icon: '🌉',
+    color: '#118AB2',
+    questions: 7,
+    reward: { xp: 3000, cards: ['جسر روسكي'] }
+  }
+];
+
+// وحدات الجيش
+const ARMY_UNITS = [
+  { id: 'infantry', name: 'مشاة', cost: 100, attack: 10, defense: 20, icon: '🪖' },
+  { id: 'tanks', name: 'دبابات', cost: 300, attack: 30, defense: 15, icon: '🚜' },
+  { id: 'artillery', name: 'مدفعية', cost: 500, attack: 50, defense: 10, icon: '💥' },
+  { id: 'special', name: 'قوات خاصة', cost: 1000, attack: 100, defense: 50, icon: '🎯' }
+];
+
+export default function RussianInvasion({ cards, user, onClose, onVictory }) {
+  const [gameState, setGameState] = useState('map'); // map, battle, results
+  const [selectedCity, setSelectedCity] = useState(null);
+  const [conqueredCities, setConqueredCities] = useState([]);
+  const [army, setArmy] = useState({ infantry: 10, tanks: 3, artillery: 1, special: 0 });
+  const [resources, setResources] = useState(5000);
+  const [battleLog, setBattleLog] = useState([]);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [battleQuestions, setBattleQuestions] = useState([]);
+  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(180); // 3 دقائق للمعركة
+
+  // مؤقت المعركة
+  useEffect(() => {
+    let timer;
+    if (gameState === 'battle' && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            handleBattleLoss();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [gameState, timeLeft]);
+
+  // بدء معركة جديدة
+  const startBattle = useCallback((city) => {
+    if (conqueredCities.includes(city.id)) return;
+    
+    // توليد أسئلة عشوائية
+    const shuffledCards = [...cards].sort(() => Math.random() - 0.5);
+    const questions = shuffledCards.slice(0, city.questions).map((card, index) => ({
+      id: index,
+      type: Math.random() > 0.5 ? 'translation' : 'pronunciation',
+      card,
+      options: generateOptions(card, shuffledCards)
+    }));
+
+    setSelectedCity(city);
+    setBattleQuestions(questions);
+    setCurrentQuestion(0);
+    setTimeLeft(180);
+    setBattleLog([]);
+    setGameState('battle');
+    addToLog(`بدأت معركة ${city.nameAr} (${city.name})`);
+  }, [cards, conqueredCities]);
+
+  // توليد خيارات متعددة
+  const generateOptions = (correctCard, allCards) => {
+    const options = [correctCard.arabic];
+    while (options.length < 4) {
+      const randomCard = allCards[Math.floor(Math.random() * allCards.length)];
+      if (!options.includes(randomCard.arabic)) {
+        options.push(randomCard.arabic);
+      }
+    }
+    return options.sort(() => Math.random() - 0.5);
+  };
+
+  // معالجة الإجابة
+  const handleAnswer = useCallback((selectedAnswer) => {
+    const currentQ = battleQuestions[currentQuestion];
+    const isCorrect = selectedAnswer === currentQ.card.arabic;
+    
+    if (isCorrect) {
+      // هجوم ناجح
+      const damage = calculateDamage();
+      addToLog(`إجابة صحيحة! هجوم بقوة ${damage}`);
+      setScore(prev => prev + 100);
+      
+      // تشغيل مؤثرات
+      if (damage > 50) {
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.7 } });
+      }
+    } else {
+      // تلقي ضرر
+      const damageTaken = Math.floor(Math.random() * 30) + 10;
+      addToLog(`إجابة خاطئة! تلقيت ضرر ${damageTaken}`);
+      setResources(prev => Math.max(0, prev - damageTaken));
+    }
+
+    // الانتقال للسؤال التالي أو إنهاء المعركة
+    if (currentQuestion + 1 < battleQuestions.length) {
+      setCurrentQuestion(prev => prev + 1);
+    } else {
+      finishBattle(isCorrect);
+    }
+  }, [currentQuestion, battleQuestions]);
+
+  // حساب الضرر بناءً على الجيش
+  const calculateDamage = () => {
+    let damage = 10;
+    damage += army.infantry * 2;
+    damage += army.tanks * 10;
+    damage += army.artillery * 25;
+    damage += army.special * 50;
+    return damage;
+  };
+
+  // إنهاء المعركة
+  const finishBattle = (victory) => {
+    if (victory) {
+      addToLog(`انتصار! فتحت مدينة ${selectedCity.nameAr}`);
+      setConqueredCities(prev => [...prev, selectedCity.id]);
+      setResources(prev => prev + selectedCity.points);
+      
+      // مكافآت الفوز
+      confetti({ particleCount: 200, spread: 100 });
+      
+      if (onVictory) {
+        onVictory(selectedCity.reward);
+      }
+    } else {
+      addToLog(`هزيمة! لم تستطع فتح ${selectedCity.nameAr}`);
+    }
+    
+    setTimeout(() => {
+      setGameState('map');
+      setSelectedCity(null);
+    }, 3000);
+  };
+
+  // خسارة المعركة بالوقت
+  const handleBattleLoss = () => {
+    addToLog('انتهى الوقت! هزيمة');
+    finishBattle(false);
+  };
+
+  // إضافة رسالة للسجل
+  const addToLog = (message) => {
+    setBattleLog(prev => [
+      { id: Date.now(), message, time: new Date().toLocaleTimeString() },
+      ...prev.slice(0, 9) // الاحتفاظ بـ10 رسائل فقط
+    ]);
+  };
+
+  // شراء وحدات جيش
+  const buyUnit = (unitId) => {
+    const unit = ARMY_UNITS.find(u => u.id === unitId);
+    if (resources >= unit.cost) {
+      setResources(prev => prev - unit.cost);
+      setArmy(prev => ({
+        ...prev,
+        [unitId]: prev[unitId] + 1
+      }));
+      addToLog(`اشتريت وحدة ${unit.name}`);
+    }
+  };
+
+  // تقدير قوة الهجوم
+  const calculateAttackPower = () => {
+    return Object.entries(army).reduce((total, [unitId, count]) => {
+      const unit = ARMY_UNITS.find(u => u.id === unitId);
+      return total + (unit.attack * count);
+    }, 0);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#0a0a0a] flex items-center justify-center p-4">
+      <div className="w-full h-full max-w-6xl bg-gradient-to-br from-gray-900 to-black border-4 border-yellow-500 rounded-3xl overflow-hidden flex flex-col shadow-2xl">
+        
+        {/* Header */}
+        <div className="p-6 border-b border-yellow-500/30 bg-black/50 backdrop-blur-md">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-yellow-500/20 rounded-xl">
+                <IconMap size={32} className="text-yellow-500" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black text-white">الغزو الروسي</h1>
+                <p className="text-yellow-400/70 text-sm">اخترق المدن بالإجابات الصحيحة</p>
+              </div>
+            </div>
+            
+            <div className="flex gap-6">
+              <div className="text-center">
+                <div className="text-2xl font-black text-white">{resources}</div>
+                <div className="text-xs text-yellow-400">موارد</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-black text-white">{conqueredCities.length}/5</div>
+                <div className="text-xs text-green-400">مدن محررة</div>
+              </div>
+              <button
+                onClick={onClose}
+                className="p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-colors"
+              >
+                <IconX size={24} className="text-red-500" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-hidden flex">
+          {/* الخريطة */}
+          {gameState === 'map' && (
+            <>
+              <div className="flex-1 p-8 overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {RUSSIAN_CITIES.map((city) => {
+                    const isConquered = conqueredCities.includes(city.id);
+                    const isLocked = conqueredCities.length < city.unlockAt;
+                    
+                    return (
+                      <motion.div
+                        key={city.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        whileHover={{ scale: isLocked ? 1 : 1.05 }}
+                        className={`relative rounded-2xl p-6 border-2 backdrop-blur-sm transition-all ${
+                          isConquered
+                            ? 'border-green-500 bg-green-500/10'
+                            : isLocked
+                            ? 'border-gray-700 bg-gray-800/50 opacity-50'
+                            : 'border-yellow-500/50 bg-black/30 hover:border-yellow-500 hover:bg-black/50 cursor-pointer'
+                        }`}
+                        onClick={isLocked ? undefined : () => startBattle(city)}
+                      >
+                        {isLocked && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/70 rounded-2xl">
+                            <div className="text-center">
+                              <IconClock className="text-gray-400 mx-auto mb-2" />
+                              <div className="text-gray-400 text-sm">تحتاج {city.unlockAt - conqueredCities.length} مدن أخرى</div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {isConquered && (
+                          <div className="absolute top-4 right-4 bg-green-500 text-black px-3 py-1 rounded-full text-xs font-bold">
+                            محررة ✓
+                          </div>
+                        )}
+                        
+                        <div className="text-5xl mb-4">{city.icon}</div>
+                        <h3 className="text-2xl font-bold text-white mb-2">{city.nameAr}</h3>
+                        <div className="text-sm text-white/50 mb-1">🇷🇺 {city.name}</div>
+                        <div className="text-xs text-yellow-400 mb-3">{city.region}</div>
+                        
+                        <div className="space-y-2 mt-4">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-white/70">النقاط:</span>
+                            <span className="text-yellow-400 font-bold">{city.points}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-white/70">الدفاع:</span>
+                            <span className="text-red-400 font-bold">{city.defense}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-white/70">الأسئلة:</span>
+                            <span className="text-blue-400 font-bold">{city.questions}</span>
+                          </div>
+                        </div>
+                        
+                        {!isConquered && !isLocked && (
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="w-full mt-6 py-3 bg-gradient-to-r from-yellow-600 to-orange-600 text-white font-bold rounded-xl hover:shadow-[0_0_20px_rgba(255,193,7,0.3)] transition-all"
+                          >
+                            <IconSword className="inline mr-2" />
+                            ابدأ الغزو
+                          </motion.button>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+              
+              {/* لوحة الجيش */}
+              <div className="w-96 border-l border-white/10 p-6 bg-black/30 overflow-y-auto">
+                <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                  <IconShield className="text-blue-500" />
+                  جيشك
+                </h3>
+                
+                <div className="space-y-4 mb-8">
+                  {ARMY_UNITS.map(unit => (
+                    <div key={unit.id} className="bg-white/5 border border-white/10 rounded-xl p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{unit.icon}</span>
+                          <div>
+                            <div className="font-bold text-white">{unit.name}</div>
+                            <div className="text-xs text-white/50">قوة: {unit.attack} | دفاع: {unit.defense}</div>
+                          </div>
+                        </div>
+                        <div className="text-2xl font-black text-yellow-400">{army[unit.id]}</div>
+                      </div>
+                      <button
+                        onClick={() => buyUnit(unit.id)}
+                        disabled={resources < unit.cost}
+                        className={`w-full py-2 rounded-lg font-bold transition-all ${
+                          resources >= unit.cost
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                            : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                        }`}
+                      >
+                        شراء ({unit.cost} 💰)
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* إحصائيات */}
+                <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-xl p-4">
+                  <h4 className="font-bold text-white mb-3">إحصائيات المعركة</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-white/70">قوة الهجوم:</span>
+                      <span className="text-red-400 font-bold">{calculateAttackPower()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/70">نسبة النصر:</span>
+                      <span className="text-green-400 font-bold">
+                        {Math.min(95, conqueredCities.length * 15 + 30)}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/70">الخبرة:</span>
+                      <span className="text-yellow-400 font-bold">{score} XP</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* شاشة المعركة */}
+          {gameState === 'battle' && selectedCity && (
+            <div className="flex-1 flex flex-col p-8">
+              {/* معلومات المعركة */}
+              <div className="flex justify-between items-center mb-8 p-4 bg-black/50 rounded-2xl border border-yellow-500/30">
+                <div className="flex items-center gap-4">
+                  <div className="text-4xl">{selectedCity.icon}</div>
+                  <div>
+                    <h2 className="text-2xl font-black text-white">معركة {selectedCity.nameAr}</h2>
+                    <div className="text-yellow-400">سؤال {currentQuestion + 1} من {battleQuestions.length}</div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-6">
+                  <div className="text-center">
+                    <div className="text-3xl font-black text-white">{timeLeft}</div>
+                    <div className="text-xs text-cyan-400">ثانية</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-3xl font-black text-white">{score}</div>
+                    <div className="text-xs text-green-400">نقاط</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* السؤال */}
+              <div className="flex-1 flex flex-col items-center justify-center">
+                {battleQuestions[currentQuestion] && (
+                  <>
+                    <div className="text-center mb-8">
+                      <div className="text-sm text-white/50 mb-2">أجب بشكل صحيح لتسبب ضرراً!</div>
+                      <h3 className="text-4xl font-black text-white mb-6">
+                        {battleQuestions[currentQuestion].type === 'translation' 
+                          ? `ما معنى "${battleQuestions[currentQuestion].card.russian}"؟`
+                          : 'استمع واختر المعنى الصحيح:'}
+                      </h3>
+                      
+                      {battleQuestions[currentQuestion].type === 'pronunciation' && (
+                        <button
+                          onClick={() => {
+                            const utterance = new SpeechSynthesisUtterance(
+                              battleQuestions[currentQuestion].card.russian
+                            );
+                            utterance.lang = 'ru-RU';
+                            utterance.rate = 0.8;
+                            window.speechSynthesis.speak(utterance);
+                          }}
+                          className="px-6 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-full mb-8 transition-all"
+                        >
+                          🔊 استمع للنطق
+                        </button>
+                      )}
+                    </div>
+
+                    {/* الخيارات */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
+                      {battleQuestions[currentQuestion].options.map((option, index) => (
+                        <motion.button
+                          key={index}
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
+                          onClick={() => handleAnswer(option)}
+                          className="p-6 bg-white/5 border border-white/10 rounded-2xl text-white text-lg font-bold hover:bg-white/10 hover:border-blue-500/50 transition-all text-center"
+                        >
+                          {option}
+                        </motion.button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* سجل المعركة */}
+              <div className="mt-8 h-48 overflow-y-auto bg-black/30 rounded-xl p-4 border border-white/10">
+                <h4 className="font-bold text-white mb-3">سجل المعركة</h4>
+                <div className="space-y-2">
+                  {battleLog.map(log => (
+                    <div key={log.id} className="text-sm p-2 bg-white/5 rounded">
+                      <span className="text-cyan-400">[{log.time}]</span>
+                      <span className="text-white ml-2">{log.message}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+==================================================================
 FILE: components\games\SyntaxHack.jsx
 ==================================================================
 
@@ -3175,6 +3842,451 @@ export default function LeaderboardView({ currentUserEmail }) {
 
 
 ==================================================================
+FILE: components\live\LiveStream.jsx
+==================================================================
+
+"use client";
+
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  IconVideo, IconMessageCircle, IconUsers, IconSend, 
+  IconX, IconHeart, IconShare, IconGift, IconCrown,
+  IconMicrophone, IconScreenShare, IconSettings
+} from '@tabler/icons-react';
+import { db } from '../../lib/firebase';
+import { 
+  collection, addDoc, onSnapshot, query, 
+  orderBy, serverTimestamp, doc, updateDoc 
+} from 'firebase/firestore';
+
+// دروس مباشرة مجدولة
+const SCHEDULED_LESSONS = [
+  {
+    id: 1,
+    title: 'القواعد الأساسية للمبتدئين',
+    teacher: 'آنا إيفانوفا',
+    time: '18:00',
+    duration: '45 دقيقة',
+    level: 'مبتدئ',
+    description: 'تعلم الحروف والأفعال الأساسية',
+    attendees: 124
+  },
+  {
+    id: 2,
+    title: 'المحادثة اليومية',
+    teacher: 'دميتري بتروف',
+    time: '20:00',
+    duration: '60 دقيقة',
+    level: 'متوسط',
+    description: 'حوارات عملية في مواقف حقيقية',
+    attendees: 89
+  },
+  {
+    id: 3,
+    title: 'الأدب الروسي الكلاسيكي',
+    teacher: 'أولغا سيمونوفا',
+    time: '22:00',
+    duration: '90 دقيقة',
+    level: 'متقدم',
+    description: 'قراءة وتحليل نصوص أدبية',
+    attendees: 56
+  }
+];
+
+export default function LiveStream({ user, onClose }) {
+  const [activeLesson, setActiveLesson] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [viewers, setViewers] = useState(0);
+  const [isTeacher, setIsTeacher] = useState(false);
+  const [reactions, setReactions] = useState([]);
+  const [polls, setPolls] = useState([]);
+  const videoRef = useRef(null);
+  const messagesEndRef = useRef(null);
+
+  // محاكاة بث فيديو
+  useEffect(() => {
+    if (activeLesson && videoRef.current) {
+      // في الإصدار الحقيقي، هنا يكون اتصال WebRTC
+      const stream = new MediaStream();
+      videoRef.current.srcObject = stream;
+    }
+  }, [activeLesson]);
+
+  // جلب الرسائل من Firebase
+  useEffect(() => {
+    if (!activeLesson) return;
+
+    const q = query(
+      collection(db, 'live_streams', activeLesson.id.toString(), 'messages'),
+      orderBy('timestamp', 'asc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const msgs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setMessages(msgs);
+    });
+
+    return unsubscribe;
+  }, [activeLesson]);
+
+  // تحديث عدد المشاهدين
+  useEffect(() => {
+    if (activeLesson) {
+      const interval = setInterval(() => {
+        setViewers(prev => prev + Math.floor(Math.random() * 10) - 3);
+      }, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [activeLesson]);
+
+  // التمرير للرسائل الجديدة
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // بدء درس جديد
+  const startLesson = (lesson) => {
+    setActiveLesson(lesson);
+    setIsTeacher(user?.email === 'teacher@russian.com'); // محاكاة
+    setViewers(lesson.attendees);
+    setMessages([]);
+  };
+
+  // إرسال رسالة
+  const sendMessage = async () => {
+    if (!input.trim() || !activeLesson || !user) return;
+
+    const message = {
+      text: input,
+      user: user.email,
+      userName: user.displayName || user.email.split('@')[0],
+      timestamp: serverTimestamp(),
+      type: 'message',
+      isTeacher: isTeacher
+    };
+
+    try {
+      await addDoc(
+        collection(db, 'live_streams', activeLesson.id.toString(), 'messages'),
+        message
+      );
+      setInput('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  };
+
+  // إرسال تفاعل
+  const sendReaction = async (reaction) => {
+    if (!activeLesson || !user) return;
+
+    const reactionMsg = {
+      type: 'reaction',
+      reaction,
+      user: user.email,
+      timestamp: serverTimestamp()
+    };
+
+    await addDoc(
+      collection(db, 'live_streams', activeLesson.id.toString(), 'messages'),
+      reactionMsg
+    );
+
+    // عرض التفاعل مؤقتاً
+    setReactions(prev => [...prev, { id: Date.now(), reaction }]);
+    setTimeout(() => {
+      setReactions(prev => prev.filter(r => r.id > Date.now() - 3000));
+    }, 3000);
+  };
+
+  // إنشاء استطلاع
+  const createPoll = async () => {
+    if (!isTeacher || !activeLesson) return;
+
+    const poll = {
+      id: Date.now(),
+      question: 'ما الصعوبة التي تواجهها في النطق؟',
+      options: ['الحروف الصعبة', 'التركيب', 'السرعة', 'التشديد'],
+      votes: {},
+      active: true
+    };
+
+    setPolls([poll]);
+  };
+
+  // التصويت في استطلاع
+  const voteInPoll = async (pollId, optionIndex) => {
+    const pollRef = doc(db, 'live_streams', activeLesson.id.toString(), 'polls', pollId.toString());
+    await updateDoc(pollRef, {
+      [`votes.${user.uid}`]: optionIndex
+    });
+  };
+
+  // تبرع (هدية)
+  const sendGift = async (giftType) => {
+    const gift = {
+      type: giftType,
+      from: user.email,
+      timestamp: serverTimestamp(),
+      value: getGiftValue(giftType)
+    };
+
+    await addDoc(
+      collection(db, 'live_streams', activeLesson.id.toString(), 'gifts'),
+      gift
+    );
+  };
+
+  const getGiftValue = (type) => {
+    const values = {
+      'heart': 10,
+      'star': 50,
+      'crown': 100,
+      'rocket': 500
+    };
+    return values[type] || 0;
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      {/* Header */}
+      <div className="p-4 border-b border-purple-500/30 bg-gradient-to-r from-purple-900/50 to-black flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <div className="w-3 h-3 bg-red-500 rounded-full animate-ping absolute"></div>
+            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-white">القناة التعليمية الحية</h1>
+            <div className="flex items-center gap-4 text-sm text-purple-300">
+              <span className="flex items-center gap-1">
+                <IconUsers size={16} /> {viewers} مشاهد
+              </span>
+              {activeLesson && (
+                <>
+                  <span>المستوى: {activeLesson.level}</span>
+                  <span>المعلم: {activeLesson.teacher}</span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-colors"
+        >
+          <IconX size={24} className="text-red-500" />
+        </button>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden">
+        {/* الشاشة الرئيسية */}
+        <div className="flex-1 flex flex-col">
+          {/* الفيديو */}
+          <div className="relative flex-1 bg-black">
+            {activeLesson ? (
+              <>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  muted
+                  className="w-full h-full object-contain"
+                />
+                
+                {/* تفاعلات تطفو */}
+                <div className="absolute top-4 right-4 flex gap-2">
+                  {reactions.map(r => (
+                    <div
+                      key={r.id}
+                      className="text-3xl animate-bounce"
+                      style={{ animationDelay: `${Math.random()}s` }}
+                    >
+                      {r.reaction}
+                    </div>
+                  ))}
+                </div>
+
+                {/* معلومات الدرس */}
+                <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm p-4 rounded-xl max-w-md">
+                  <h2 className="text-2xl font-bold text-white mb-2">{activeLesson.title}</h2>
+                  <p className="text-white/70 mb-2">{activeLesson.description}</p>
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="text-green-400">● مباشر</span>
+                    <span className="text-white/50">{activeLesson.duration}</span>
+                    <span className="text-yellow-400">{activeLesson.level}</span>
+                  </div>
+                </div>
+
+                {/* أدوات المعلم */}
+                {isTeacher && (
+                  <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-sm p-4 rounded-xl">
+                    <h3 className="text-white font-bold mb-2">أدوات المعلم</h3>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={createPoll}
+                        className="p-2 bg-blue-600 rounded-lg text-white hover:bg-blue-500"
+                      >
+                        استطلاع
+                      </button>
+                      <button className="p-2 bg-green-600 rounded-lg text-white hover:bg-green-500">
+                        <IconScreenShare size={20} />
+                      </button>
+                      <button className="p-2 bg-purple-600 rounded-lg text-white hover:bg-purple-500">
+                        <IconSettings size={20} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full">
+                <IconVideo size={120} className="text-purple-500/30 mb-4" />
+                <h2 className="text-3xl font-bold text-white mb-2">لا يوجد بث نشط</h2>
+                <p className="text-white/50 mb-8">اختر درساً من الجدول</p>
+              </div>
+            )}
+          </div>
+
+          {/* الاستطلاعات */}
+          {polls.length > 0 && (
+            <div className="p-4 border-t border-white/10 bg-black/50">
+              {polls.map(poll => (
+                <div key={poll.id} className="max-w-md mx-auto">
+                  <h4 className="text-white font-bold mb-2">{poll.question}</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {poll.options.map((option, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => voteInPoll(poll.id, idx)}
+                        className="p-3 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors"
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* الشريط الجانبي */}
+        <div className="w-96 border-l border-white/10 flex flex-col bg-black/30">
+          {/* قائمة الدروس */}
+          {!activeLesson ? (
+            <div className="p-4 overflow-y-auto flex-1">
+              <h3 className="text-xl font-bold text-white mb-4">الدروس المجدولة</h3>
+              <div className="space-y-4">
+                {SCHEDULED_LESSONS.map(lesson => (
+                  <div
+                    key={lesson.id}
+                    onClick={() => startLesson(lesson)}
+                    className="bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 hover:border-purple-500/50 cursor-pointer transition-all"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-bold text-white">{lesson.title}</h4>
+                      <span className="text-sm text-green-400">{lesson.time}</span>
+                    </div>
+                    <p className="text-white/70 text-sm mb-3">{lesson.description}</p>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-yellow-400">{lesson.level}</span>
+                      <span className="text-white/50 flex items-center gap-1">
+                        <IconUsers size={12} /> {lesson.attendees}
+                      </span>
+                      <span className="text-cyan-400">{lesson.duration}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* الدردشة */}
+              <div className="flex-1 flex flex-col">
+                <div className="p-4 border-b border-white/10">
+                  <h3 className="font-bold text-white flex items-center gap-2">
+                    <IconMessageCircle size={20} /> دردشة البث
+                  </h3>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {messages.map(msg => (
+                    <div
+                      key={msg.id}
+                      className={`p-3 rounded-lg ${
+                        msg.isTeacher
+                          ? 'bg-purple-900/30 border-l-4 border-purple-500'
+                          : 'bg-white/5'
+                      }`}
+                    >
+                      <div className="flex justify-between mb-1">
+                        <span className={`font-bold ${
+                          msg.isTeacher ? 'text-purple-300' : 'text-cyan-300'
+                        }`}>
+                          {msg.isTeacher ? '👑 ' : ''}{msg.userName}
+                        </span>
+                        <span className="text-xs text-white/30">
+                          {msg.timestamp?.toDate?.().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-white">{msg.text}</p>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* أدوات التفاعل */}
+                <div className="p-4 border-t border-white/10">
+                  <div className="flex gap-2 mb-3">
+                    {['❤️', '👏', '🎉', '🔥', '🤯'].map(reaction => (
+                      <button
+                        key={reaction}
+                        onClick={() => sendReaction(reaction)}
+                        className="p-2 bg-white/10 hover:bg-white/20 rounded-lg text-xl transition-colors"
+                      >
+                        {reaction}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => sendGift('heart')}
+                      className="p-2 bg-pink-500/20 hover:bg-pink-500/30 rounded-lg text-pink-400"
+                    >
+                      <IconGift size={20} />
+                    </button>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                      placeholder="اكتب رسالتك..."
+                      className="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white outline-none focus:border-purple-500"
+                    />
+                    <button
+                      onClick={sendMessage}
+                      className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg font-bold transition-colors"
+                    >
+                      <IconSend size={20} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+==================================================================
 FILE: components\MusicPlayer.jsx
 ==================================================================
 
@@ -3262,6 +4374,1078 @@ export function MusicPlayer({ music }) {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+
+==================================================================
+FILE: components\ranks\RankSystem.jsx
+==================================================================
+
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  IconCrown, IconMedal, IconTrophy, IconStar,
+  IconSword, IconShield, IconFlag, IconUser,
+  IconArrowUp, IconAward, IconChevronRight,
+  IconChartBar, IconTrendingUp, IconSparkles
+} from '@tabler/icons-react';
+import { MILITARY_RANKS, getCurrentRank, getNextRank, getRankProgress, getRankUpRewards } from '../../data/militaryRanks';
+
+const RankSystem = ({ userXP, userStats, onRankUp }) => {
+  const [currentRank, setCurrentRank] = useState(null);
+  const [nextRank, setNextRank] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [showRankUp, setShowRankUp] = useState(false);
+  const [rewards, setRewards] = useState(null);
+
+  useEffect(() => {
+    const rank = getCurrentRank(userXP);
+    const next = getNextRank(userXP);
+    const prog = getRankProgress(userXP);
+    
+    setCurrentRank(rank);
+    setNextRank(next);
+    setProgress(prog);
+    
+    // التحقق من ترقية جديدة
+    const lastRank = localStorage.getItem('lastRank');
+    if (lastRank && rank.id !== lastRank) {
+      const reward = getRankUpRewards(lastRank, rank.id);
+      setRewards(reward);
+      setShowRankUp(true);
+      localStorage.setItem('lastRank', rank.id);
+      
+      if (onRankUp) {
+        onRankUp(rank, reward);
+      }
+    } else if (!lastRank) {
+      localStorage.setItem('lastRank', rank.id);
+    }
+  }, [userXP, onRankUp]);
+
+  const getRankIcon = (rankId) => {
+    const icons = {
+      recruit: '🪖',
+      private: '🎖️',
+      corporal: '⭐',
+      sergeant: '🎗️',
+      lieutenant: '⚔️',
+      captain: '🎖️',
+      major: '🏅',
+      colonel: '👑',
+      general: '🦅',
+      marshal: '🔥',
+      supreme_commander: '👁️'
+    };
+    return icons[rankId] || '⭐';
+  };
+
+  return (
+    <div className="w-full max-w-6xl mx-auto p-6">
+      {/* ترقية الرتبة */}
+      <AnimatePresence>
+        {showRankUp && rewards && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          >
+            <div className="bg-gradient-to-br from-yellow-900/30 to-orange-900/30 border-2 border-yellow-500 rounded-3xl p-8 max-w-md w-full shadow-[0_0_100px_rgba(255,193,7,0.5)]">
+              <div className="text-center mb-6">
+                <div className="text-6xl mb-4 animate-pulse">🎉</div>
+                <h2 className="text-3xl font-black text-white mb-2">ترقية!</h2>
+                <p className="text-yellow-300">أنت الآن {currentRank.title}</p>
+              </div>
+              
+              <div className="space-y-4 mb-8">
+                <div className="bg-black/30 p-4 rounded-xl">
+                  <div className="flex items-center justify-center gap-4 mb-3">
+                    <span className="text-4xl">{getRankIcon(currentRank.id)}</span>
+                    <IconArrowUp className="text-yellow-400" />
+                    <span className="text-4xl animate-bounce" style={{ color: currentRank.color }}>
+                      {getRankIcon(currentRank.id)}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-bold text-center text-white mb-2">{currentRank.name}</h3>
+                  <p className="text-white/70 text-center">{currentRank.description}</p>
+                </div>
+                
+                <div className="bg-black/30 p-4 rounded-xl">
+                  <h4 className="font-bold text-white mb-3">المكافآت</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-white/70">النقاط:</span>
+                      <span className="text-yellow-400 font-bold">+{rewards.xp}</span>
+                    </div>
+                    {rewards.cards.map((card, idx) => (
+                      <div key={idx} className="flex justify-between">
+                        <span className="text-white/70">بطاقة:</span>
+                        <span className="text-cyan-400">{card}</span>
+                      </div>
+                    ))}
+                    {rewards.special && (
+                      <div className="flex justify-between">
+                        <span className="text-white/70">مكافأة خاصة:</span>
+                        <span className="text-purple-400 font-bold">{rewards.special}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => setShowRankUp(false)}
+                className="w-full py-3 bg-yellow-600 hover:bg-yellow-500 text-white font-bold rounded-xl transition-colors"
+              >
+                استمر
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* بطاقة الرتبة الحالية */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-8"
+      >
+        <div className="bg-gradient-to-r from-gray-900 to-black border-2 border-cyan-500/30 rounded-3xl p-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <IconCrown size={120} />
+          </div>
+          
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            {/* شارة الرتبة */}
+            <div className="relative">
+              <div
+                className="w-40 h-40 rounded-full flex items-center justify-center text-6xl shadow-2xl"
+                style={{
+                  background: `radial-gradient(circle, ${currentRank?.color}20, transparent 70%)`,
+                  border: `4px solid ${currentRank?.color}`
+                }}
+              >
+                <span className="text-5xl">{getRankIcon(currentRank?.id)}</span>
+              </div>
+              <div className="absolute -bottom-2 -right-2 bg-cyan-600 text-black px-3 py-1 rounded-full text-xs font-bold">
+                LVL {currentRank ? MILITARY_RANKS.findIndex(r => r.id === currentRank.id) + 1 : 1}
+              </div>
+            </div>
+            
+            {/* معلومات الرتبة */}
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-sm text-cyan-400 font-bold tracking-widest">الرتبة الحالية</span>
+                <div className="flex-1 h-px bg-cyan-500/30"></div>
+              </div>
+              
+              <h2 className="text-4xl font-black text-white mb-2" style={{ color: currentRank?.color }}>
+                {currentRank?.title}
+              </h2>
+              <div className="text-white/50 text-lg mb-4">{currentRank?.name}</div>
+              <p className="text-white/70 mb-6">{currentRank?.description}</p>
+              
+              {/* المزايا */}
+              <div className="flex flex-wrap gap-2">
+                {currentRank?.perks.map((perk, idx) => (
+                  <span
+                    key={idx}
+                    className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-sm text-white/80"
+                  >
+                    {perk}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* تقدم الرتبة */}
+        <div className="lg:col-span-2">
+          <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <IconTrendingUp className="text-green-500" />
+                التقدم للرتبة التالية
+              </h3>
+              <div className="text-cyan-400 font-bold">
+                {progress}%
+              </div>
+            </div>
+            
+            {nextRank ? (
+              <>
+                {/* شريط التقدم */}
+                <div className="relative mb-4">
+                  <div className="h-3 bg-white/5 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress}%` }}
+                      transition={{ duration: 1 }}
+                      className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 relative"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+                    </motion.div>
+                  </div>
+                  <div className="flex justify-between text-xs text-white/50 mt-2">
+                    <span>{currentRank?.xp} XP</span>
+                    <span>{nextRank.xp} XP</span>
+                  </div>
+                </div>
+                
+                {/* الرتبة التالية */}
+                <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                  <div className="flex items-center gap-4">
+                    <div
+                      className="w-16 h-16 rounded-full flex items-center justify-center text-3xl"
+                      style={{
+                        background: `radial-gradient(circle, ${nextRank.color}20, transparent 70%)`,
+                        border: `2px solid ${nextRank.color}`
+                      }}
+                    >
+                      {getRankIcon(nextRank.id)}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-bold text-white mb-1">{nextRank.title}</h4>
+                      <p className="text-white/50 text-sm">{nextRank.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm text-white/70">تحتاج</div>
+                      <div className="text-xl font-black text-yellow-400">
+                        {nextRank.xp - userXP} XP
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* مزايا الرتبة التالية */}
+                  <div className="mt-4 pt-4 border-t border-white/10">
+                    <div className="text-sm text-white/70 mb-2">مزايا جديدة:</div>
+                    <div className="space-y-2">
+                      {nextRank.perks.map((perk, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm">
+                          <IconStar size={14} className="text-yellow-500" />
+                          <span className="text-white">{perk}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <IconCrown size={48} className="text-yellow-500 mx-auto mb-4" />
+                <h4 className="text-2xl font-bold text-white mb-2">أنت في القمة!</h4>
+                <p className="text-white/50">وصلت لأعلى رتبة ممكنة</p>
+              </div>
+            )}
+          </div>
+          
+          {/* إحصائيات الرتبة */}
+          <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard
+              icon={<IconTrophy className="text-yellow-500" />}
+              title="مركزك"
+              value={`#${Math.ceil((MILITARY_RANKS.findIndex(r => r.id === currentRank?.id) + 1) * 2.5)}`}
+              subtitle="عالمياً"
+            />
+            <StatCard
+              icon={<IconSparkles className="text-cyan-500" />}
+              title="النقاط"
+              value={userXP.toLocaleString()}
+              subtitle="XP"
+            />
+            <StatCard
+              icon={<IconChartBar className="text-green-500" />}
+              title="التقدم اليومي"
+              value={`+${userStats?.dailyXP || 0}`}
+              subtitle="نقاط"
+            />
+            <StatCard
+              icon={<IconAward className="text-purple-500" />}
+              title="الأوسمة"
+              value={userStats?.achievements || 0}
+              subtitle="إنجاز"
+            />
+          </div>
+        </div>
+        
+        {/* قائمة الرتب */}
+        <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6 overflow-hidden">
+          <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+            <IconMedal className="text-yellow-500" />
+            سلم الرتب العسكرية
+          </h3>
+          
+          <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+            {MILITARY_RANKS.map((rank, index) => {
+              const isCurrent = currentRank?.id === rank.id;
+              const isUnlocked = userXP >= rank.xp;
+              
+              return (
+                <div
+                  key={rank.id}
+                  className={`p-4 rounded-xl border transition-all ${
+                    isCurrent
+                      ? 'border-cyan-500 bg-cyan-500/10'
+                      : isUnlocked
+                      ? 'border-white/10 bg-white/5'
+                      : 'border-white/5 bg-black/30 opacity-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div
+                      className="w-12 h-12 rounded-full flex items-center justify-center text-xl"
+                      style={{
+                        background: isCurrent 
+                          ? `radial-gradient(circle, ${rank.color}30, transparent 70%)`
+                          : 'transparent',
+                        border: `2px solid ${rank.color}`
+                      }}
+                    >
+                      {getRankIcon(rank.id)}
+                    </div>
+                    
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className={`font-bold ${isCurrent ? 'text-cyan-400' : 'text-white'}`}>
+                          {rank.title}
+                        </h4>
+                        {isCurrent && (
+                          <span className="text-xs bg-cyan-600 text-white px-2 py-0.5 rounded-full">
+                            أنت هنا
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-white/50">{rank.name}</div>
+                    </div>
+                    
+                    <div className="text-right">
+                      <div className="text-sm font-bold text-white">{rank.xp.toLocaleString()} XP</div>
+                      <div className="text-xs text-white/30">المستوى {index + 1}</div>
+                    </div>
+                  </div>
+                  
+                  {isUnlocked && rank.perks.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-white/10">
+                      <div className="flex flex-wrap gap-1">
+                        {rank.perks.slice(0, 2).map((perk, idx) => (
+                          <span
+                            key={idx}
+                            className="text-xs px-2 py-1 bg-white/5 rounded"
+                          >
+                            {perk}
+                          </span>
+                        ))}
+                        {rank.perks.length > 2 && (
+                          <span className="text-xs px-2 py-1 bg-white/5 rounded">
+                            +{rank.perks.length - 2}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const StatCard = ({ icon, title, value, subtitle }) => (
+  <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+    <div className="flex items-center gap-3 mb-2">
+      {icon}
+      <div className="text-sm text-white/70">{title}</div>
+    </div>
+    <div className="text-2xl font-black text-white">{value}</div>
+    <div className="text-xs text-white/30">{subtitle}</div>
+  </div>
+);
+
+export default RankSystem;
+
+
+==================================================================
+FILE: components\scenarios\ScenarioEditor.jsx
+==================================================================
+
+"use client";
+
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  IconScript, IconPlus, IconTrash, IconPlayerPlay, 
+  IconDownload, IconUpload, IconEye, IconCode,
+  IconMovie, IconMusic, IconPhoto, IconDeviceGamepad,
+  IconChevronRight, IconCopy, IconCheck
+} from '@tabler/icons-react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// عناصر السيناريو
+const SCENARIO_ELEMENTS = [
+  { type: 'dialogue', icon: '💬', label: 'حوار', color: '#3B82F6' },
+  { type: 'choice', icon: '🔀', label: 'اختيار', color: '#10B981' },
+  { type: 'quiz', icon: '❓', label: 'سؤال', color: '#F59E0B' },
+  { type: 'audio', icon: '🎵', label: 'صوت', color: '#8B5CF6' },
+  { type: 'image', icon: '🖼️', label: 'صورة', color: '#EC4899' },
+  { type: 'video', icon: '🎥', label: 'فيديو', color: '#EF4444' },
+  { type: 'wait', icon: '⏱️', label: 'انتظار', color: '#6B7280' },
+  { type: 'branch', icon: '🌳', label: 'فرع', color: '#059669' }
+];
+
+// خلفيات جاهزة
+const BACKGROUNDS = [
+  { id: 'classroom', name: 'فصل دراسي', url: '/backgrounds/classroom.jpg', category: 'education' },
+  { id: 'moscow', name: 'موسكو', url: '/backgrounds/moscow.jpg', category: 'city' },
+  { id: 'forest', name: 'غابة روسية', url: '/backgrounds/forest.jpg', category: 'nature' },
+  { id: 'station', name: 'محطة قطار', url: '/backgrounds/station.jpg', category: 'transport' },
+  { id: 'market', name: 'سوق', url: '/backgrounds/market.jpg', category: 'city' },
+  { id: 'home', name: 'منزل', url: '/backgrounds/home.jpg', category: 'interior' }
+];
+
+// شخصيات جاهزة
+const CHARACTERS = [
+  { id: 'teacher', name: 'المعلم', image: '/characters/teacher.png', expressions: ['normal', 'happy', 'angry'] },
+  { id: 'student', name: 'الطالب', image: '/characters/student.png', expressions: ['normal', 'confused', 'excited'] },
+  { id: 'tourist', name: 'سائح', image: '/characters/tourist.png', expressions: ['normal', 'lost', 'happy'] },
+  { id: 'shopkeeper', name: 'بائع', image: '/characters/shopkeeper.png', expressions: ['normal', 'smiling', 'angry'] }
+];
+
+export default function ScenarioEditor() {
+  const [scenes, setScenes] = useState([]);
+  const [selectedScene, setSelectedScene] = useState(null);
+  const [background, setBackground] = useState(BACKGROUNDS[0]);
+  const [characters, setCharacters] = useState([]);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [title, setTitle] = useState('سيناريو جديد');
+  const [description, setDescription] = useState('');
+  const [language, setLanguage] = useState('ar');
+  const [variables, setVariables] = useState({});
+  const [copied, setCopied] = useState(false);
+
+  // إضافة مشهد جديد
+  const addScene = (type) => {
+    const newScene = {
+      id: Date.now(),
+      type,
+      title: `مشهد ${scenes.length + 1}`,
+      content: getDefaultContent(type),
+      position: { x: scenes.length * 200, y: 100 },
+      connections: []
+    };
+    
+    setScenes([...scenes, newScene]);
+    setSelectedScene(newScene.id);
+  };
+
+  // محتوى افتراضي حسب النوع
+  const getDefaultContent = (type) => {
+    switch (type) {
+      case 'dialogue':
+        return {
+          character: CHARACTERS[0].id,
+          expression: 'normal',
+          text: '',
+          audio: null,
+          duration: 3
+        };
+      case 'choice':
+        return {
+          question: '',
+          options: [
+            { text: '', nextScene: null },
+            { text: '', nextScene: null }
+          ]
+        };
+      case 'quiz':
+        return {
+          question: '',
+          correctAnswer: '',
+          wrongAnswers: ['', '', ''],
+          explanation: '',
+          points: 10
+        };
+      case 'audio':
+        return {
+          file: null,
+          text: '',
+          autoplay: true,
+          loop: false
+        };
+      default:
+        return {};
+    }
+  };
+
+  // تحديث مشهد
+  const updateScene = (sceneId, updates) => {
+    setScenes(scenes.map(scene =>
+      scene.id === sceneId ? { ...scene, ...updates } : scene
+    ));
+  };
+
+  // حذف مشهد
+  const deleteScene = (sceneId) => {
+    setScenes(scenes.filter(scene => scene.id !== sceneId));
+    if (selectedScene === sceneId) {
+      setSelectedScene(scenes.length > 1 ? scenes[0].id : null);
+    }
+  };
+
+  // إضافة شخصية
+  const addCharacter = (characterId) => {
+    if (!characters.some(c => c.id === characterId)) {
+      const character = CHARACTERS.find(c => c.id === characterId);
+      setCharacters([...characters, {
+        ...character,
+        position: { x: 100, y: 300 },
+        size: 1
+      }]);
+    }
+  };
+
+  // معاينة السيناريو
+  const previewScenario = () => {
+    setPreviewMode(true);
+  };
+
+  // تصدير السيناريو
+  const exportScenario = () => {
+    const scenarioData = {
+      title,
+      description,
+      language,
+      background,
+      characters,
+      scenes,
+      variables,
+      createdAt: new Date().toISOString(),
+      version: '1.0'
+    };
+
+    const dataStr = JSON.stringify(scenarioData, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `${title.replace(/\s+/g, '_')}.json`;
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
+
+  // نسخ الكود البرمجي
+  const copyCode = () => {
+    const code = generateReactCode();
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // توليد كود React للسيناريو
+  const generateReactCode = () => {
+    return `import React, { useState } from 'react';
+
+const ${title.replace(/\s+/g, '')}Scenario = () => {
+  const [currentScene, setCurrentScene] = useState(0);
+  const [score, setScore] = useState(0);
+  
+  const scenes = ${JSON.stringify(scenes, null, 2)};
+  
+  const renderScene = (scene) => {
+    switch (scene.type) {
+      case 'dialogue':
+        return (
+          <div className="dialogue-scene">
+            <h3>{scene.content.character}</h3>
+            <p>{scene.content.text}</p>
+          </div>
+        );
+      case 'choice':
+        return (
+          <div className="choice-scene">
+            <h3>{scene.content.question}</h3>
+            {scene.content.options.map((option, idx) => (
+              <button key={idx} onClick={() => handleChoice(option.nextScene)}>
+                {option.text}
+              </button>
+            ))}
+          </div>
+        );
+      default:
+        return <div>مشهد غير معروف</div>;
+    }
+  };
+  
+  return (
+    <div className="scenario-player">
+      {renderScene(scenes[currentScene])}
+    </div>
+  );
+};
+
+export default ${title.replace(/\s+/g, '')}Scenario;`;
+  };
+
+  return (
+    <div className="w-full h-full flex bg-[#0a0a0a] text-white">
+      {/* شريط الأدوات */}
+      <div className="w-16 border-r border-white/10 flex flex-col items-center py-4 space-y-4">
+        {SCENARIO_ELEMENTS.map(element => (
+          <button
+            key={element.type}
+            onClick={() => addScene(element.type)}
+            className="p-3 rounded-lg hover:bg-white/10 transition-colors group relative"
+            style={{ color: element.color }}
+          >
+            <span className="text-2xl">{element.icon}</span>
+            <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-black px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              {element.label}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* محرر السيناريو */}
+      <div className="flex-1 flex flex-col">
+        {/* شريط التحكم العلوي */}
+        <div className="p-4 border-b border-white/10 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <IconScript size={32} className="text-purple-500" />
+            <div>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="text-2xl font-bold bg-transparent border-none outline-none text-white"
+                placeholder="اسم السيناريو"
+              />
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="text-sm text-white/50 bg-transparent border-none outline-none w-96"
+                placeholder="وصف السيناريو"
+              />
+            </div>
+          </div>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={previewMode ? () => setPreviewMode(false) : previewScenario}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg flex items-center gap-2"
+            >
+              {previewMode ? <IconEye size={20} /> : <IconPlayerPlay size={20} />}
+              {previewMode ? 'تعديل' : 'معاينة'}
+            </button>
+            <button
+              onClick={exportScenario}
+              className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg flex items-center gap-2"
+            >
+              <IconDownload size={20} />
+              تصدير
+            </button>
+            <button
+              onClick={copyCode}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg flex items-center gap-2"
+            >
+              {copied ? <IconCheck size={20} /> : <IconCode size={20} />}
+              {copied ? 'تم النسخ!' : 'كود'}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 flex overflow-hidden">
+          {/* لوحة المشاهد */}
+          <div className="w-64 border-r border-white/10 p-4 overflow-y-auto">
+            <h3 className="font-bold text-white mb-4">المشاهد ({scenes.length})</h3>
+            <div className="space-y-2">
+              {scenes.map(scene => (
+                <div
+                  key={scene.id}
+                  onClick={() => setSelectedScene(scene.id)}
+                  className={`p-3 rounded-lg cursor-pointer transition-all ${
+                    selectedScene === scene.id
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white/5 hover:bg-white/10'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <span>{SCENARIO_ELEMENTS.find(e => e.type === scene.type)?.icon}</span>
+                      <span className="font-bold">{scene.title}</span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteScene(scene.id);
+                      }}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <IconTrash size={16} />
+                    </button>
+                  </div>
+                  <div className="text-xs text-white/50 truncate">
+                    {scene.type} • {scene.id}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* المكتبة */}
+            <div className="mt-8">
+              <h4 className="font-bold text-white mb-3">المكتبة</h4>
+              
+              <div className="mb-4">
+                <h5 className="text-sm text-white/70 mb-2">الخلفيات</h5>
+                <div className="grid grid-cols-2 gap-2">
+                  {BACKGROUNDS.map(bg => (
+                    <div
+                      key={bg.id}
+                      onClick={() => setBackground(bg)}
+                      className={`aspect-video rounded overflow-hidden cursor-pointer border-2 ${
+                        background.id === bg.id ? 'border-purple-500' : 'border-transparent'
+                      }`}
+                    >
+                      <div className="w-full h-full bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center text-xs">
+                        {bg.name}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h5 className="text-sm text-white/70 mb-2">الشخصيات</h5>
+                <div className="space-y-2">
+                  {CHARACTERS.map(char => (
+                    <div
+                      key={char.id}
+                      onClick={() => addCharacter(char.id)}
+                      className="p-2 bg-white/5 rounded hover:bg-white/10 cursor-pointer flex items-center gap-3"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500"></div>
+                      <span className="text-sm">{char.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* منطقة العمل */}
+          <div className="flex-1 p-4 overflow-auto">
+            {previewMode ? (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-black rounded-xl border border-white/10">
+                <div className="text-center">
+                  <IconMovie size={64} className="text-purple-500/50 mx-auto mb-4" />
+                  <h3 className="text-2xl font-bold text-white mb-2">وضع المعاينة</h3>
+                  <p className="text-white/50 mb-6">هنا سيظهر تشغيل السيناريو</p>
+                  <button
+                    onClick={() => setPreviewMode(false)}
+                    className="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg"
+                  >
+                    العودة للتعديل
+                  </button>
+                </div>
+              </div>
+            ) : selectedScene ? (
+              <div className="max-w-4xl mx-auto">
+                {(() => {
+                  const scene = scenes.find(s => s.id === selectedScene);
+                  if (!scene) return null;
+
+                  switch (scene.type) {
+                    case 'dialogue':
+                      return (
+                        <div className="bg-black/50 border border-white/10 rounded-2xl p-6">
+                          <h3 className="text-xl font-bold text-white mb-6">✏️ حوار</h3>
+                          
+                          <div className="grid grid-cols-2 gap-6">
+                            <div>
+                              <label className="block text-white/70 mb-2">الشخصية</label>
+                              <select
+                                value={scene.content.character}
+                                onChange={(e) => updateScene(scene.id, {
+                                  content: { ...scene.content, character: e.target.value }
+                                })}
+                                className="w-full bg-black border border-white/20 rounded-lg p-3 text-white"
+                              >
+                                {CHARACTERS.map(char => (
+                                  <option key={char.id} value={char.id}>{char.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            
+                            <div>
+                              <label className="block text-white/70 mb-2">التعبير</label>
+                              <select
+                                value={scene.content.expression}
+                                onChange={(e) => updateScene(scene.id, {
+                                  content: { ...scene.content, expression: e.target.value }
+                                })}
+                                className="w-full bg-black border border-white/20 rounded-lg p-3 text-white"
+                              >
+                                <option value="normal">عادي</option>
+                                <option value="happy">سعيد</option>
+                                <option value="angry">غاضب</option>
+                                <option value="confused">مرتبك</option>
+                              </select>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-6">
+                            <label className="block text-white/70 mb-2">النص</label>
+                            <textarea
+                              value={scene.content.text}
+                              onChange={(e) => updateScene(scene.id, {
+                                content: { ...scene.content, text: e.target.value }
+                              })}
+                              className="w-full h-48 bg-black border border-white/20 rounded-lg p-3 text-white resize-none"
+                              placeholder="اكتب النص هنا..."
+                            />
+                          </div>
+                          
+                          <div className="mt-6">
+                            <label className="block text-white/70 mb-2">المدة (ثواني)</label>
+                            <input
+                              type="range"
+                              min="1"
+                              max="10"
+                              value={scene.content.duration}
+                              onChange={(e) => updateScene(scene.id, {
+                                content: { ...scene.content, duration: parseInt(e.target.value) }
+                              })}
+                              className="w-full"
+                            />
+                            <div className="text-center text-white/50">{scene.content.duration} ثانية</div>
+                          </div>
+                        </div>
+                      );
+
+                    case 'choice':
+                      return (
+                        <div className="bg-black/50 border border-white/10 rounded-2xl p-6">
+                          <h3 className="text-xl font-bold text-white mb-6">🔀 اختيار متعدد</h3>
+                          
+                          <div className="mb-6">
+                            <label className="block text-white/70 mb-2">السؤال</label>
+                            <input
+                              type="text"
+                              value={scene.content.question}
+                              onChange={(e) => updateScene(scene.id, {
+                                content: { ...scene.content, question: e.target.value }
+                              })}
+                              className="w-full bg-black border border-white/20 rounded-lg p-3 text-white"
+                              placeholder="اسأل سؤالاً..."
+                            />
+                          </div>
+                          
+                          <div className="space-y-4">
+                            {scene.content.options.map((option, idx) => (
+                              <div key={idx} className="p-4 bg-white/5 rounded-lg">
+                                <div className="flex items-center gap-4">
+                                  <div className="text-2xl">{idx === 0 ? 'A' : idx === 1 ? 'B' : idx === 2 ? 'C' : 'D'}</div>
+                                  <div className="flex-1">
+                                    <input
+                                      type="text"
+                                      value={option.text}
+                                      onChange={(e) => {
+                                        const newOptions = [...scene.content.options];
+                                        newOptions[idx].text = e.target.value;
+                                        updateScene(scene.id, {
+                                          content: { ...scene.content, options: newOptions }
+                                        });
+                                      }}
+                                      className="w-full bg-transparent border-none outline-none text-white"
+                                      placeholder={`الخيار ${idx + 1}`}
+                                    />
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      const newOptions = scene.content.options.filter((_, i) => i !== idx);
+                                      updateScene(scene.id, {
+                                        content: { ...scene.content, options: newOptions }
+                                      });
+                                    }}
+                                    className="text-red-400 hover:text-red-300"
+                                  >
+                                    <IconTrash size={20} />
+                                  </button>
+                                </div>
+                                
+                                <div className="mt-3">
+                                  <label className="text-sm text-white/50">المشهد التالي:</label>
+                                  <select
+                                    value={option.nextScene || ''}
+                                    onChange={(e) => {
+                                      const newOptions = [...scene.content.options];
+                                      newOptions[idx].nextScene = e.target.value || null;
+                                      updateScene(scene.id, {
+                                        content: { ...scene.content, options: newOptions }
+                                      });
+                                    }}
+                                    className="w-full mt-1 bg-black/50 border border-white/20 rounded p-2 text-sm text-white"
+                                  >
+                                    <option value="">نهاية السيناريو</option>
+                                    {scenes
+                                      .filter(s => s.id !== scene.id)
+                                      .map(s => (
+                                        <option key={s.id} value={s.id}>{s.title}</option>
+                                      ))}
+                                  </select>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          
+                          <button
+                            onClick={() => {
+                              const newOptions = [...scene.content.options, { text: '', nextScene: null }];
+                              updateScene(scene.id, {
+                                content: { ...scene.content, options: newOptions }
+                              });
+                            }}
+                            className="w-full mt-6 py-3 bg-white/10 hover:bg-white/20 rounded-lg text-white flex items-center justify-center gap-2"
+                          >
+                            <IconPlus size={20} />
+                            إضافة خيار جديد
+                          </button>
+                        </div>
+                      );
+
+                    default:
+                      return (
+                        <div className="text-center py-12">
+                          <div className="text-4xl mb-4">
+                            {SCENARIO_ELEMENTS.find(e => e.type === scene.type)?.icon}
+                          </div>
+                          <h3 className="text-2xl font-bold text-white mb-2">{scene.type}</h3>
+                          <p className="text-white/50">محرر هذا النوع قيد التطوير</p>
+                        </div>
+                      );
+                  }
+                })()}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full">
+                <IconScript size={120} className="text-purple-500/30 mb-4" />
+                <h3 className="text-3xl font-bold text-white mb-2">محرر السيناريوهات</h3>
+                <p className="text-white/50 mb-6">ابدأ بإنشاء مشهد جديد من شريط الأدوات</p>
+                <div className="grid grid-cols-4 gap-4 max-w-2xl">
+                  {SCENARIO_ELEMENTS.map(element => (
+                    <button
+                      key={element.type}
+                      onClick={() => addScene(element.type)}
+                      className="p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-all"
+                      style={{ borderLeft: `4px solid ${element.color}` }}
+                    >
+                      <div className="text-2xl mb-2">{element.icon}</div>
+                      <div className="font-bold text-white">{element.label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* خصائص المشهد */}
+          {selectedScene && !previewMode && (
+            <div className="w-80 border-l border-white/10 p-4 overflow-y-auto">
+              <h3 className="font-bold text-white mb-4">خصائص المشهد</h3>
+              
+              {(() => {
+                const scene = scenes.find(s => s.id === selectedScene);
+                if (!scene) return null;
+
+                return (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-white/70 mb-2">اسم المشهد</label>
+                      <input
+                        type="text"
+                        value={scene.title}
+                        onChange={(e) => updateScene(scene.id, { title: e.target.value })}
+                        className="w-full bg-black border border-white/20 rounded-lg p-2 text-white"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-white/70 mb-2">نوع المشهد</label>
+                      <div className="p-3 bg-white/5 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">
+                            {SCENARIO_ELEMENTS.find(e => e.type === scene.type)?.icon}
+                          </span>
+                          <span className="font-bold">{SCENARIO_ELEMENTS.find(e => e.type === scene.type)?.label}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-white/70 mb-2">المتغيرات</label>
+                      <div className="space-y-2">
+                        {Object.entries(variables).map(([key, value]) => (
+                          <div key={key} className="flex items-center justify-between p-2 bg-white/5 rounded">
+                            <span className="text-sm text-cyan-400">{key}</span>
+                            <span className="text-sm text-white">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => {
+                          const varName = prompt('اسم المتغير:');
+                          if (varName) {
+                            setVariables({ ...variables, [varName]: '' });
+                          }
+                        }}
+                        className="w-full mt-2 py-2 bg-white/10 hover:bg-white/20 rounded text-sm"
+                      >
+                        + إضافة متغير
+                      </button>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-white/70 mb-2">الإجراءات</label>
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => {
+                            const newScene = {
+                              id: Date.now(),
+                              type: 'dialogue',
+                              title: `مشهد ${scenes.length + 1}`,
+                              content: getDefaultContent('dialogue'),
+                              position: { x: 0, y: 0 }
+                            };
+                            setScenes([...scenes, newScene]);
+                          }}
+                          className="w-full py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded text-sm"
+                        >
+                          + إضافة مشهد بعده
+                        </button>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(JSON.stringify(scene))}
+                          className="w-full py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 rounded text-sm"
+                        >
+                          نسخ المشهد
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -4259,6 +6443,200 @@ export const useSettings = () => {
 
 
 ==================================================================
+FILE: data\achievements.js
+==================================================================
+
+export const LEGENDARY_ACHIEVEMENTS = {
+  // إنجازات سرية (تظهر عند الفتح فقط)
+  secret: [
+    {
+      id: 'secret_1',
+      name: 'الهاكر الروسي',
+      description: 'تحدث مع الذكاء الاصطناعي 100 مرة',
+      icon: '👨‍💻',
+      color: '#00FF00',
+      xp: 1000,
+      secret: true,
+      condition: (user) => user.aiChats >= 100
+    },
+    {
+      id: 'secret_2',
+      name: 'بطل منتصف الليل',
+      description: 'ادرس بعد منتصف الليل 7 أيام متتالية',
+      icon: '🌙',
+      color: '#000080',
+      xp: 1500,
+      secret: true,
+      condition: (user) => user.lateNightSessions >= 7
+    },
+    {
+      id: 'secret_3',
+      name: 'مجنون السوفيت',
+      description: 'أكمل كل ألعاب الشيفرة السوفيتية',
+      icon: '☭',
+      color: '#FF0000',
+      xp: 2000,
+      secret: true,
+      condition: (user) => user.sovietGamesCompleted === 10
+    }
+  ],
+
+  // إنجازات تاريخية
+  historical: [
+    {
+      id: 'hist_1',
+      name: 'ثورة أكتوبر',
+      description: 'ادرس في 7 أكتوبر',
+      icon: '🚩',
+      color: '#CC0000',
+      xp: 1917,
+      date: '10-07'
+    },
+    {
+      id: 'hist_2',
+      name: 'يوم النصر',
+      description: 'ادرس في 9 مايو',
+      icon: '🎖️',
+      color: '#FFD700',
+      xp: 1945,
+      date: '05-09'
+    },
+    {
+      id: 'hist_3',
+      name: 'رحلة غاغارين',
+      description: 'ادرس لمدة 108 دقائق متواصلة',
+      icon: '🚀',
+      color: '#0000FF',
+      xp: 1961,
+      condition: (user) => user.maxStudyStreak >= 108
+    }
+  ],
+
+  // إنجازات ساخرة
+  funny: [
+    {
+      id: 'funny_1',
+      name: 'محشش الكلمات',
+      description: 'أخطأ في 420 بطاقة',
+      icon: '🍁',
+      color: '#00AA00',
+      xp: 420,
+      condition: (user) => user.wrongAnswers >= 420
+    },
+    {
+      id: 'funny_2',
+      name: 'فاشل بامتياز',
+      description: 'احصل على 0% في لعبة',
+      icon: '🎯',
+      color: '#FF0000',
+      xp: 666,
+      condition: (user) => user.minGameScore === 0
+    },
+    {
+      id: 'funny_3',
+      name: 'الثرثار',
+      description: 'أرسل 1000 رسالة في الدردشة',
+      icon: '💬',
+      color: '#FFFF00',
+      xp: 1000,
+      condition: (user) => user.messagesSent >= 1000
+    }
+  ],
+
+  // إنجازات البطاقات الجامعة
+  collectible: [
+    {
+      id: 'card_1',
+      name: 'فلاديمير لينين',
+      description: 'بطاقة نادرة للقائد الثوري',
+      icon: '🇷🇺',
+      color: '#CC0000',
+      xp: 1870,
+      rarity: 'legendary',
+      story: 'زعيم الثورة البلشفية ومؤسس الاتحاد السوفيتي'
+    },
+    {
+      id: 'card_2',
+      name: 'يوري غاغارين',
+      description: 'بطاقة أول رائد فضاء',
+      icon: '👨‍🚀',
+      color: '#0000FF',
+      xp: 1934,
+      rarity: 'epic',
+      story: 'أول إنسان يسافر إلى الفضاء الخارجي'
+    },
+    {
+      id: 'card_3',
+      name: 'فيدور دوستويفسكي',
+      description: 'بطاقة الكاتب العظيم',
+      icon: '📚',
+      color: '#8B4513',
+      xp: 1821,
+      rarity: 'rare',
+      story: 'أحد أعظم الكتاب في العالم، مؤلف "الجريمة والعقاب"'
+    },
+    {
+      id: 'card_4',
+      name: 'بيوتر تشايكوفسكي',
+      description: 'بطاقة الموسيقار الأسطوري',
+      icon: '🎵',
+      color: '#800080',
+      xp: 1840,
+      rarity: 'epic',
+      story: 'مؤلف باليه بحيرة البجع وكسارة البندق'
+    },
+    {
+      id: 'card_5',
+      name: 'كاتيوشا',
+      description: 'بطاقة السلاح الأسطوري',
+      icon: '🚚',
+      color: '#808080',
+      xp: 1941,
+      rarity: 'rare',
+      story: 'صاروخ سوفيتي أسطوري من الحرب العالمية الثانية'
+    }
+  ]
+};
+
+// نظام التبادل والجمع
+export const CARD_TRADING_SYSTEM = {
+  // قواعد التبادل
+  exchangeRates: {
+    common: 5,     // 5 عادية = 1 نادرة
+    rare: 3,       // 3 نادرة = 1 ملحمية
+    epic: 2,       // 2 ملحمية = 1 أسطورية
+    legendary: 1   // لا يمكن تبادل الأسطورية
+  },
+
+  // مجموعات الكوليكشن
+  collections: [
+    {
+      name: 'القادة السوفييت',
+      cards: ['card_1', 'card_5'],
+      reward: { xp: 5000, title: 'المناضل الشيوعي' }
+    },
+    {
+      name: 'أبطال روسيا',
+      cards: ['card_2', 'card_3', 'card_4'],
+      reward: { xp: 10000, title: 'البطل الوطني' }
+    },
+    {
+      name: 'المجموعة الكاملة',
+      cards: ['card_1', 'card_2', 'card_3', 'card_4', 'card_5'],
+      reward: { xp: 25000, title: 'أسطورة روسيا' }
+    }
+  ],
+
+  // سوق المزاد
+  auctionHouse: {
+    listingFee: 100, // رسوم إدراج البطاقة
+    tax: 0.1,        // ضريبة 10% على البيع
+    duration: 7      // المدة بالأيام
+  }
+};
+
+
+==================================================================
 FILE: data\fullDatabase.js
 ==================================================================
 
@@ -4700,6 +7078,223 @@ export const fullDatabase = rawData.flatMap(group =>
 
 
 ==================================================================
+FILE: data\militaryRanks.js
+==================================================================
+
+export const MILITARY_RANKS = [
+  {
+    id: 'recruit',
+    name: 'RECRUIT',
+    title: 'متدرب',
+    titleRu: 'Новобранец',
+    xp: 0,
+    icon: '🪖',
+    color: '#808080',
+    perks: [],
+    abilities: [],
+    description: 'المبتدئ في عالم اللغة الروسية',
+    unlockMessage: 'مرحباً بك في الجيش الروسي!'
+  },
+  {
+    id: 'private',
+    name: 'PRIVATE',
+    title: 'جندي',
+    titleRu: 'Рядовой',
+    xp: 500,
+    icon: '🎖️',
+    color: '#00FF00',
+    perks: ['إضافة 10 بطاقات يومياً', 'بطاقات أساسية'],
+    abilities: ['سرعة تعلم +10%'],
+    description: 'لقد أتقنت الأساسيات',
+    unlockMessage: 'تهانينا! أنت الآن جندي في الجيش الروسي'
+  },
+  {
+    id: 'corporal',
+    name: 'CORPORAL',
+    title: 'عريف',
+    titleRu: 'Ефрейтор',
+    xp: 1500,
+    icon: '⭐',
+    color: '#4CAF50',
+    perks: ['ألعاب حصرية', 'دردشات خاصة'],
+    abilities: ['سرعة تعلم +15%', 'مكافآت يومية مضاعفة'],
+    description: 'قائد فريق صغير',
+    unlockMessage: 'ترقية إلى عريف! قيادة الفريق تبدأ الآن'
+  },
+  {
+    id: 'sergeant',
+    name: 'SERGEANT',
+    title: 'رقيب',
+    titleRu: 'Сержант',
+    xp: 3500,
+    icon: '🎗️',
+    color: '#2196F3',
+    perks: ['بطاقات ذهبية', 'إمكانية إنشاء مجموعات'],
+    abilities: ['سرعة تعلم +20%', 'تجربة جماعية +25%'],
+    description: 'مدرب ومشرف على المتدربين',
+    unlockMessage: 'أنت الآن رقيب! دورك تدريب الجدد'
+  },
+  {
+    id: 'lieutenant',
+    name: 'LIEUTENANT',
+    title: 'ملازم',
+    titleRu: 'Лейтенант',
+    xp: 7500,
+    icon: '⚔️',
+    color: '#9C27B0',
+    perks: ['صلاحيات مراقبة', 'تصميم رتبة مخصصة'],
+    abilities: ['سرعة تعلم +30%', 'مكافآت المجموعة +50%'],
+    description: 'ضابط صف مع صلاحيات تخطيط',
+    unlockMessage: 'ترقية إلى ملازم! ابدأ في التخطيط للعمليات'
+  },
+  {
+    id: 'captain',
+    name: 'CAPTAIN',
+    title: 'نقيب',
+    titleRu: 'Капитан',
+    xp: 15000,
+    icon: '🎖️',
+    color: '#FF9800',
+    perks: ['غرف قيادة', 'إطلاق بث عالمي'],
+    abilities: ['سرعة تعلم +40%', 'جميع المكافآت مضاعفة'],
+    description: 'قائد وحدة مستقلة',
+    unlockMessage: 'نقيب الجيش! قيادة الوحدة بين يديك'
+  },
+  {
+    id: 'major',
+    name: 'MAJOR',
+    title: 'رائد',
+    titleRu: 'Майор',
+    xp: 30000,
+    icon: '🏅',
+    color: '#FF5722',
+    perks: ['صلاحيات شبه إدارية', 'تحليل إحصائي متقدم'],
+    abilities: ['سرعة تعلم +50%', 'تأثير المجموعة +75%'],
+    description: 'ضابط كبير في الاستخبارات',
+    unlockMessage: 'رائد المخابرات! المعلومات سر قوتك'
+  },
+  {
+    id: 'colonel',
+    name: 'COLONEL',
+    title: 'عقيد',
+    titleRu: 'Полковник',
+    xp: 60000,
+    icon: '👑',
+    color: '#F44336',
+    perks: ['كل الصلاحيات', 'تمثال في الصالة'],
+    abilities: ['سرعة تعلم +60%', 'جميع المكافآت ×3'],
+    description: 'قادة الألوية والفرق',
+    unlockMessage: 'عقيد الجيش! القيادة العليا تنتظرك'
+  },
+  {
+    id: 'general',
+    name: 'GENERAL',
+    title: 'لواء',
+    titleRu: 'Генерал',
+    xp: 120000,
+    icon: '🦅',
+    color: '#E91E63',
+    perks: ['نظام رتبة مخصصة', 'إدارة المحتوى'],
+    abilities: ['سرعة تعلم +75%', 'تأثير عالمي'],
+    description: 'قائد الجيش بأكمله',
+    unlockMessage: 'اللواء الأعلى! الجيش تحت قيادتك'
+  },
+  {
+    id: 'marshal',
+    name: 'MARSHAL',
+    title: 'مشير',
+    titleRu: 'Маршал',
+    xp: 250000,
+    icon: '🔥',
+    color: '#FFEB3B',
+    perks: ['أسطوري', 'نصب تذكاري'],
+    abilities: ['سرعة تعلم +100%', 'أسطورة حية'],
+    description: 'أسطورة الجيش الروسي',
+    unlockMessage: 'المشير الأسطوري! اسمك في تاريخ الجيش'
+  },
+  {
+    id: 'supreme_commander',
+    name: 'SUPREME COMMANDER',
+    title: 'القائد الأعلى',
+    titleRu: 'Верховный Главнокомандующий',
+    xp: 500000,
+    icon: '👁️',
+    color: '#FFFFFF',
+    perks: ['إلهي', 'تخليد الاسم'],
+    abilities: ['قوة لا متناهية', 'سيطرة مطلقة'],
+    description: 'إمبراطور اللغة الروسية',
+    unlockMessage: 'القائد الأعلى! أنت الآن أسطورة خالدة'
+  }
+];
+
+// دالة الحصول على الرتبة الحالية
+export const getCurrentRank = (xp) => {
+  return MILITARY_RANKS.reduce((current, rank) => 
+    xp >= rank.xp ? rank : current
+  , MILITARY_RANKS[0]);
+};
+
+// دالة الحصول على الرتبة التالية
+export const getNextRank = (xp) => {
+  const currentRank = getCurrentRank(xp);
+  const currentIndex = MILITARY_RANKS.indexOf(currentRank);
+  return MILITARY_RANKS[currentIndex + 1] || null;
+};
+
+// دالة حساب التقدم للرتبة التالية
+export const getRankProgress = (xp) => {
+  const currentRank = getCurrentRank(xp);
+  const nextRank = getNextRank(xp);
+  
+  if (!nextRank) return 100;
+  
+  const currentXP = xp - currentRank.xp;
+  const neededXP = nextRank.xp - currentRank.xp;
+  
+  return Math.min(100, Math.round((currentXP / neededXP) * 100));
+};
+
+// نظام المكافآت عند الترقية
+export const getRankUpRewards = (oldRankId, newRankId) => {
+  const rewards = {
+    xp: 0,
+    cards: [],
+    perks: [],
+    special: null
+  };
+
+  const rankIndex = MILITARY_RANKS.findIndex(r => r.id === newRankId);
+  
+  // مكافآت XP
+  rewards.xp = rankIndex * 500;
+  
+  // بطاقات حصرية حسب الرتبة
+  if (rankIndex >= 2) { // عريف فما فوق
+    rewards.cards.push('بطاقة القائد الذهبية');
+  }
+  if (rankIndex >= 4) { // ملازم فما فوق
+    rewards.cards.push('بطاقة الاستراتيجي البلاتينية');
+  }
+  if (rankIndex >= 6) { // عقيد فما فوق
+    rewards.cards.push('بطاقة الأسطورة الماسية');
+  }
+  
+  // مكافآت خاصة
+  if (newRankId === 'captain') {
+    rewards.special = 'قبعة القيادة الذهبية';
+  }
+  if (newRankId === 'general') {
+    rewards.special = 'سيف القيادة الأسطوري';
+  }
+  if (newRankId === 'supreme_commander') {
+    rewards.special = 'تاج الإمبراطور الروسي';
+  }
+
+  return rewards;
+};
+
+
+==================================================================
 FILE: hooks\useAudio.js
 ==================================================================
 
@@ -4891,6 +7486,505 @@ export const useSettings = () => {
   };
 
   return { settings, toggleSound, toggleParticles, setTheme, speak };
+};
+
+
+==================================================================
+FILE: hooks\useSmartSRS.js
+==================================================================
+
+"use client";
+
+import { useState, useEffect, useCallback } from 'react';
+import { doc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+
+// خوارزمية SM2 معدلة مع عوامل تخصيص
+export const useSmartSRS = (userId, initialCards = []) => {
+  const [cards, setCards] = useState([]);
+  const [userStats, setUserStats] = useState({
+    totalReviews: 0,
+    averageResponseTime: 0,
+    weakPoints: [],
+    optimalStudyTime: 'morning'
+  });
+
+  // تحميل الإحصائيات عند التهيئة
+  useEffect(() => {
+    if (userId) {
+      loadUserStats();
+    }
+  }, [userId]);
+
+  const loadUserStats = async () => {
+    // جلب إحصائيات المستخدم من Firebase
+    // ...
+  };
+
+  // حساب الصعوبة الديناميكية للبطاقة
+  const calculateDifficulty = (card, response) => {
+    const { 
+      difficulty = 2.5, 
+      reviewCount = 0, 
+      correctStreak = 0,
+      lastResponseTime = 0 
+    } = card;
+
+    let newDifficulty = difficulty;
+    
+    // عوامل التعديل
+    if (response.correct) {
+      // تخفيض الصعوبة مع زيادة السلسلة الصحيحة
+      newDifficulty -= (0.1 + (correctStreak * 0.05));
+      newDifficulty = Math.max(1.3, newDifficulty);
+    } else {
+      // زيادة الصعوبة عند الخطأ
+      newDifficulty += 0.2;
+      
+      // إذا كان وقت الاستجابة سريعاً جداً (ربما تخمين)
+      if (response.time < 2000) {
+        newDifficulty += 0.1;
+      }
+    }
+
+    // تعديل بناءً على وقت اليوم
+    const hour = new Date().getHours();
+    const isOptimalTime = (hour >= 9 && hour <= 11) || (hour >= 16 && hour <= 18);
+    if (!isOptimalTime) {
+      newDifficulty += 0.1;
+    }
+
+    return Math.min(5, Math.max(1, newDifficulty));
+  };
+
+  // حساب الفاصل الزمني للمراجعة التالية
+  const calculateNextInterval = (card, difficulty, performance) => {
+    let interval;
+    const { reviewCount = 0, intervals = [] } = card;
+
+    if (performance === 5) { // ممتاز
+      if (reviewCount === 0) interval = 1;
+      else if (reviewCount === 1) interval = 3;
+      else if (reviewCount === 2) interval = 7;
+      else {
+        const lastInterval = intervals[intervals.length - 1] || 1;
+        interval = Math.round(lastInterval * difficulty * 2.5);
+      }
+    } else if (performance >= 3) { // جيد
+      if (reviewCount === 0) interval = 1;
+      else {
+        const lastInterval = intervals[intervals.length - 1] || 1;
+        interval = Math.round(lastInterval * difficulty * 1.7);
+      }
+    } else { // ضعيف
+      interval = 1;
+    }
+
+    // لا تتجاوز 90 يوماً
+    return Math.min(90, interval);
+  };
+
+  // تحديث البطاقة بعد المراجعة
+  const updateCard = useCallback(async (cardId, response) => {
+    const card = cards.find(c => c.id === cardId);
+    if (!card) return;
+
+    const difficulty = calculateDifficulty(card, response);
+    const nextInterval = calculateNextInterval(card, difficulty, response.performance);
+    const nextReview = new Date();
+    nextReview.setDate(nextReview.getDate() + nextInterval);
+
+    const updatedCard = {
+      ...card,
+      difficulty,
+      reviewCount: (card.reviewCount || 0) + 1,
+      lastReviewed: new Date().toISOString(),
+      nextReview: nextReview.toISOString(),
+      intervals: [...(card.intervals || []), nextInterval],
+      correctStreak: response.correct ? (card.correctStreak || 0) + 1 : 0,
+      lastResponseTime: response.time
+    };
+
+    // تحديث حالة المستخدم
+    setUserStats(prev => ({
+      ...prev,
+      totalReviews: prev.totalReviews + 1,
+      averageResponseTime: 
+        (prev.averageResponseTime * prev.totalReviews + response.time) / 
+        (prev.totalReviews + 1)
+    }));
+
+    // إذا كانت الإجابة خاطئة، أضف إلى نقاط الضعف
+    if (!response.correct) {
+      setUserStats(prev => ({
+        ...prev,
+        weakPoints: [...new Set([...prev.weakPoints, card.category])]
+      }));
+    }
+
+    // تحديث في Firebase
+    if (userId) {
+      const userRef = doc(db, "users", userId);
+      await updateDoc(userRef, {
+        studyStats: {
+          totalReviews: userStats.totalReviews + 1,
+          weakPoints: userStats.weakPoints,
+          lastStudySession: new Date().toISOString()
+        },
+        [`cards.${cardId}`]: updatedCard
+      });
+    }
+
+    // تحديث الحالة المحلية
+    setCards(prev => prev.map(c => 
+      c.id === cardId ? updatedCard : c
+    ));
+
+    return updatedCard;
+  }, [cards, userId, userStats]);
+
+  // الحصول على البطاقات الجاهزة للمراجعة
+  const getDueCards = useCallback(() => {
+    const now = new Date();
+    return cards.filter(card => {
+      if (!card.nextReview) return true;
+      const reviewDate = new Date(card.nextReview);
+      return reviewDate <= now;
+    }).sort((a, b) => {
+      // ترتيب حسب الأولوية
+      const priorityA = (a.difficulty || 2.5) * (a.reviewCount || 0);
+      const priorityB = (b.difficulty || 2.5) * (b.reviewCount || 0);
+      return priorityB - priorityA;
+    });
+  }, [cards]);
+
+  // توليد خطة دراسة أسبوعية
+  const generateStudyPlan = useCallback(() => {
+    const dueCards = getDueCards();
+    const plan = {
+      monday: [],
+      tuesday: [],
+      wednesday: [],
+      thursday: [],
+      friday: [],
+      saturday: [],
+      sunday: []
+    };
+
+    // توزيع البطاقات على أيام الأسبوع
+    dueCards.forEach((card, index) => {
+      const day = Object.keys(plan)[index % 7];
+      plan[day].push(card);
+    });
+
+    // إضافة بطاقات مراجعة للمواضيع الضعيفة
+    userStats.weakPoints.forEach(weakPoint => {
+      const weakCards = cards.filter(c => 
+        c.category === weakPoint && 
+        (c.reviewCount || 0) < 3
+      ).slice(0, 2);
+
+      weakCards.forEach(card => {
+        plan.saturday.push(card);
+        plan.sunday.push(card);
+      });
+    });
+
+    return plan;
+  }, [getDueCards, cards, userStats]);
+
+  return {
+    cards,
+    dueCards: getDueCards(),
+    userStats,
+    updateCard,
+    generateStudyPlan,
+    getDueCards
+  };
+};
+
+
+==================================================================
+FILE: hooks\useSpeechAnalysis.js
+==================================================================
+
+"use client";
+
+import { useState, useRef, useCallback } from 'react';
+
+export const useSpeechAnalysis = () => {
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [pitch, setPitch] = useState(0);
+  const [pronunciationScore, setPronunciationScore] = useState(0);
+  const [feedback, setFeedback] = useState('');
+  const [waveform, setWaveform] = useState([]);
+  const [comparison, setComparison] = useState(null);
+  
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+  const recordingRef = useRef([]);
+  const animationRef = useRef(null);
+
+  // تهيئة تحليل الصوت
+  const initAudioAnalysis = useCallback(async () => {
+    try {
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 2048;
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
+      mediaStreamRef.current = stream;
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      source.connect(analyserRef.current);
+      
+      return true;
+    } catch (error) {
+      console.error('Error initializing audio:', error);
+      setFeedback('لا يمكن الوصول إلى الميكروفون');
+      return false;
+    }
+  }, []);
+
+  // بدء التسجيل والتحليل
+  const startAnalysis = useCallback(async (referenceAudio = null) => {
+    if (!await initAudioAnalysis()) return;
+    
+    setIsRecording(true);
+    recordingRef.current = [];
+    
+    const analyzeFrame = () => {
+      if (!isRecording || !analyserRef.current) return;
+      
+      // تحليل الموجة
+      const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+      analyserRef.current.getByteTimeDomainData(dataArray);
+      
+      // حساب مستوى الصوت
+      const rms = Math.sqrt(
+        dataArray.reduce((sum, val) => sum + Math.pow((val - 128) / 128, 2), 0) / dataArray.length
+      );
+      setAudioLevel(Math.min(100, rms * 1000));
+      
+      // تحديث الموجة المرئية
+      setWaveform(prev => [...prev.slice(-50), rms].filter(Boolean));
+      
+      // تسجيل البيانات للتحليل لاحقاً
+      recordingRef.current.push([...dataArray]);
+      
+      animationRef.current = requestAnimationFrame(analyzeFrame);
+    };
+    
+    animationRef.current = requestAnimationFrame(analyzeFrame);
+  }, [isRecording, initAudioAnalysis]);
+
+  // إيقاف التحليل
+  const stopAnalysis = useCallback(() => {
+    setIsRecording(false);
+    
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+    }
+    
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+    }
+    
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+    }
+    
+    // تحليل التسجيل
+    analyzeRecording();
+  }, []);
+
+  // تحليل التسجيل المحفوظ
+  const analyzeRecording = useCallback(() => {
+    if (recordingRef.current.length === 0) return;
+    
+    // حساب متوسط الصوت
+    const avgVolume = recordingRef.current.reduce((sum, frame) => {
+      const frameVolume = frame.reduce((s, v) => s + Math.abs(v - 128), 0) / frame.length;
+      return sum + frameVolume;
+    }, 0) / recordingRef.current.length;
+    
+    // حساب التغير في النبرة
+    const pitchVariance = calculatePitchVariance(recordingRef.current);
+    
+    // حساب النتيجة
+    let score = 70; // درجة أساسية
+    
+    // تحسين بناءً على مستوى الصوت
+    if (avgVolume > 20 && avgVolume < 80) {
+      score += 10;
+    }
+    
+    // تحسين بناءً على ثبات النبرة
+    if (pitchVariance < 30) {
+      score += 10;
+    }
+    
+    // تحسين بناءً على طول التسجيل
+    if (recordingRef.current.length > 100) {
+      score += 10;
+    }
+    
+    score = Math.min(100, score);
+    setPronunciationScore(score);
+    
+    // تقديم تغذية راجعة
+    provideFeedback(score, avgVolume, pitchVariance);
+  }, []);
+
+  // حساب تغير النبرة
+  const calculatePitchVariance = (frames) => {
+    const pitches = frames.map(frame => {
+      // خوارزمية بسيطة للكشف عن النبرة
+      let maxVal = 0;
+      let maxIndex = 0;
+      
+      for (let i = 0; i < frame.length; i++) {
+        if (frame[i] > maxVal) {
+          maxVal = frame[i];
+          maxIndex = i;
+        }
+      }
+      
+      return maxIndex;
+    });
+    
+    // حساب التباين
+    const mean = pitches.reduce((a, b) => a + b, 0) / pitches.length;
+    const variance = pitches.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / pitches.length;
+    
+    return Math.sqrt(variance);
+  };
+
+  // تقديم تغذية راجعة
+  const provideFeedback = (score, volume, variance) => {
+    let feedbackText = '';
+    
+    if (score >= 90) {
+      feedbackText = 'ممتاز! نطقك صحيح تماماً 👏';
+    } else if (score >= 80) {
+      feedbackText = 'جيد جداً! مع بعض التمارين ستصل للكمال';
+    } else if (score >= 70) {
+      feedbackText = 'ليس سيئاً، لكن تحتاج لممارسة أكثر';
+    } else {
+      feedbackText = 'تحتاج لتحسين النطق. استمع للنموذج وجرب مجدداً';
+    }
+    
+    // نصائح محددة
+    const tips = [];
+    if (volume < 20) {
+      tips.push('ارفع صوتك قليلاً');
+    }
+    if (volume > 80) {
+      tips.push('خفض صوتك قليلاً');
+    }
+    if (variance > 40) {
+      tips.push('حاول تثبيت نبرة صوتك');
+    }
+    
+    if (tips.length > 0) {
+      feedbackText += `\n\nنصائح:\n${tips.map(tip => `• ${tip}`).join('\n')}`;
+    }
+    
+    setFeedback(feedbackText);
+  };
+
+  // مقارنة مع نطق مرجعي
+  const compareWithReference = useCallback(async (referenceText) => {
+    // في الإصدار الحقيقي، هنا نستخدم نموذج ML لمقارنة النطق
+    // هذا مثال محاكاة
+    
+    const similarity = Math.random() * 30 + 70; // محاكاة
+    const differences = [
+      { sound: 'р', accuracy: 85, tip: 'الراء الروسية تحتاج لاهتزاز اللسان' },
+      { sound: 'ы', accuracy: 60, tip: 'هذا الصوت غير موجود في العربية، يحتاج تمرين' },
+      { sound: 'щ', accuracy: 75, tip: 'شديد التشديد' }
+    ];
+    
+    setComparison({
+      similarity,
+      differences,
+      referenceText
+    });
+    
+    return similarity;
+  }, []);
+
+  // توليد تمارين بناءً على النتائج
+  const generateExercises = useCallback(() => {
+    const exercises = [];
+    
+    if (pronunciationScore < 80) {
+      exercises.push({
+        type: 'minimal_pairs',
+        title: 'أزواج صوتية متشابهة',
+        description: 'تمييز الأصوات المتقاربة في الروسية',
+        duration: '5 دقائق'
+      });
+    }
+    
+    if (comparison?.differences?.some(d => d.accuracy < 70)) {
+      exercises.push({
+        type: 'problem_sounds',
+        title: 'الأصوات الصعبة',
+        description: 'تركيز على الأصوات التي تحتاج تحسين',
+        duration: '10 دقائق'
+      });
+    }
+    
+    exercises.push({
+      type: 'intonation',
+      title: 'النبرة والإيقاع',
+      description: 'تحسين الموسيقى الكلامية للغة',
+      duration: '7 دقائق'
+    });
+    
+    return exercises;
+  }, [pronunciationScore, comparison]);
+
+  return {
+    // الحالة
+    isRecording,
+    audioLevel,
+    pitch,
+    pronunciationScore,
+    feedback,
+    waveform,
+    comparison,
+    
+    // الدوال
+    startAnalysis,
+    stopAnalysis,
+    compareWithReference,
+    generateExercises,
+    
+    // مساعدات
+    getScoreColor: () => {
+      if (pronunciationScore >= 90) return '#10B981';
+      if (pronunciationScore >= 80) return '#3B82F6';
+      if (pronunciationScore >= 70) return '#F59E0B';
+      return '#EF4444';
+    },
+    
+    getWaveformData: () => {
+      return waveform.map((value, index) => ({
+        x: index,
+        y: value * 100
+      }));
+    }
+  };
 };
 
 
