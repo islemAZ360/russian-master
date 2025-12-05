@@ -1,242 +1,56 @@
+/* FILE: app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* --- 1. استيراد الخطوط (عربي + تقني) --- */
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@200;400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
 
 :root {
-  --neon-cyan: #06b6d4;
-  --neon-purple: #a855f7;
-  --neon-red: #ef4444;
-  --bg-dark: #050505;
+  --bg-dark: #030014;
 }
 
-/* --- 2. إعدادات الصفحة الأساسية --- */
 body {
+  background-color: var(--bg-dark);
   color: white;
-  background: var(--bg-dark);
-  font-family: 'JetBrains Mono', monospace; /* الأرقام والإنجليزية التقنية */
+  font-family: 'Cairo', sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-/* دعم الخط العربي في النصوص العامة */
-h1, h2, h3, h4, p, span, div, button, input, textarea {
-  font-family: 'Cairo', sans-serif;
+/* Scrollbar Modernization */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #7000ff, #00f0ff);
+  border-radius: 4px;
 }
 
-/* الأكواد والأرقام تبقى بالخط التقني */
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  transition: all 0.3s ease;
+}
+
+/* Text Glows */
+.text-glow {
+  text-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
+}
+
+/* Utility for code/numbers */
 .font-mono {
   font-family: 'JetBrains Mono', monospace !important;
 }
-
-/* --- 3. تخصيص شريط التمرير (Scrollbar) --- */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: #050505;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 3px;
-  transition: background 0.3s;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--neon-cyan);
-  box-shadow: 0 0 10px var(--neon-cyan);
-}
-
-/* --- 4. الطبقات السينمائية (Cinematic Overlays) --- */
-
-/* خطوط الشاشة (Scanlines) */
-.scanlines {
-  background: linear-gradient(
-    to bottom,
-    rgba(255,255,255,0),
-    rgba(255,255,255,0) 50%,
-    rgba(0,0,0,0.2) 50%,
-    rgba(0,0,0,0.2)
-  );
-  background-size: 100% 4px;
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9998;
-  opacity: 0.4;
-}
-
-/* تعتيم الحواف (Vignette) */
-.vignette {
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.9) 100%);
-  pointer-events: none;
-  z-index: 9997;
-}
-
-/* الضجيج (Noise) */
-.noise-overlay {
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 9996;
-  opacity: 0.3;
-}
-
-/* --- 5. زوايا الـ HUD (واجهة النظام) --- */
-.hud-corner {
-  position: fixed;
-  width: 30px; height: 30px;
-  border: 2px solid rgba(6, 182, 212, 0.2);
-  z-index: 50;
-  pointer-events: none;
-}
-.hud-corner.tl { top: 20px; left: 20px; border-right: 0; border-bottom: 0; }
-.hud-corner.tr { top: 20px; right: 20px; border-left: 0; border-bottom: 0; }
-.hud-corner.bl { bottom: 20px; left: 20px; border-right: 0; border-top: 0; }
-.hud-corner.br { bottom: 20px; right: 20px; border-left: 0; border-top: 0; }
-
-/* --- 6. تنسيق ردود الذكاء الاصطناعي (Markdown Styles) --- */
-/* هذا الجزء مهم جداً لتظهر الجداول والنصوص بشكل جميل في الشات */
-
-/* الجداول */
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 1rem 0;
-  font-size: 0.9em;
-  background-color: rgba(255, 255, 255, 0.02);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-th, td {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 10px 12px;
-  text-align: left;
-}
-
-/* رؤوس الجداول */
-th {
-  background-color: rgba(6, 182, 212, 0.1); /* لون سماوي خفيف */
-  color: var(--neon-cyan);
-  font-weight: bold;
-  text-transform: uppercase;
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
-}
-
-/* الخط العريض */
-strong {
-  color: var(--neon-purple); /* لون بنفسجي للكلمات المهمة */
-  font-weight: 900;
-}
-
-/* القوائم */
-ul, ol {
-  padding-left: 1.5rem;
-  margin: 0.5rem 0;
-}
-
-li {
-  margin-bottom: 0.5rem;
-  position: relative;
-}
-
-/* الروابط (إذا وجدت) */
-a {
-  color: var(--neon-cyan);
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
-
-/* --- 7. المؤثرات الخاصة (Animations) --- */
-
-/* النص المتقطع (Glitch Text) - يستخدم في الألعاب */
-.glitch-text {
-  position: relative;
-}
-.glitch-text::before,
-.glitch-text::after {
-  content: attr(data-text);
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: black;
-}
-.glitch-text::before {
-  left: 2px;
-  text-shadow: -1px 0 red;
-  clip: rect(24px, 550px, 90px, 0);
-  animation: glitch-anim-2 3s infinite linear alternate-reverse;
-}
-.glitch-text::after {
-  left: -2px;
-  text-shadow: -1px 0 #00ff00;
-  clip: rect(85px, 550px, 140px, 0);
-  animation: glitch-anim 2.5s infinite linear alternate-reverse;
-}
-
-@keyframes glitch-anim {
-  0% { clip: rect(14px, 9999px, 129px, 0); }
-  20% { clip: rect(40px, 9999px, 69px, 0); }
-  40% { clip: rect(96px, 9999px, 12px, 0); }
-  60% { clip: rect(6px, 9999px, 147px, 0); }
-  80% { clip: rect(69px, 9999px, 19px, 0); }
-  100% { clip: rect(122px, 9999px, 20px, 0); }
-}
-@keyframes glitch-anim-2 {
-  0% { clip: rect(126px, 9999px, 142px, 0); }
-  20% { clip: rect(3px, 9999px, 25px, 0); }
-  40% { clip: rect(63px, 9999px, 164px, 0); }
-  60% { clip: rect(124px, 9999px, 14px, 0); }
-  80% { clip: rect(138px, 9999px, 73px, 0); }
-  100% { clip: rect(39px, 9999px, 107px, 0); }
-}
-
-/* اهتزاز الشاشة (Shake Effect) - يستخدم عند الخطأ */
-.animate-shake {
-  animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
-}
-
-@keyframes shake {
-  10%, 90% { transform: translate3d(-1px, 0, 0); }
-  20%, 80% { transform: translate3d(2px, 0, 0); }
-  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-  40%, 60% { transform: translate3d(4px, 0, 0); }
-}
-
-/* دوران بطيء (للأيقونات) */
-.animate-spin-slow {
-  animation: spin 8s linear infinite;
-}
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* تحسين تحديد النصوص */
-::selection {
-  background: rgba(6, 182, 212, 0.3);
-  color: white;
-  text-shadow: 0 0 5px var(--neon-cyan);
-}
-
-/* فئات مساعدة للتوافق */
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: #333 #000;
-}
-.perspective-1000 { perspective: 1000px; }
-.backface-hidden { backface-visibility: hidden; }
-.preserve-3d { transform-style: preserve-3d; }
-.dir-rtl { direction: rtl; }

@@ -1,28 +1,36 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, setDoc, addDoc, query, orderBy, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, query, orderBy, where, getDocs } from "firebase/firestore";
 import { 
-  IconShield, IconBan, IconUser, IconMessage, IconCheck, IconX, IconCrown, IconStar 
+  IconShield, IconBan, IconUser, IconMessage, IconCheck, IconX, IconCrown, 
+  IconStar, IconChartBar, IconSearch, IconAlertTriangle, IconActivity 
 } from '@tabler/icons-react';
+import { motion } from 'framer-motion';
 
 export default function AdminDashboard({ currentUser, userData }) {
   const [users, setUsers] = useState([]);
-  const [activeTab, setActiveTab] = useState('users'); 
+  const [activeTab, setActiveTab] = useState('overview'); 
   const [supportTickets, setSupportTickets] = useState([]);
-  const [replyText, setReplyText] = useState("");
-  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [broadcastMsg, setBroadcastMsg] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [stats, setStats] = useState({ totalUsers: 0, activeToday: 0, banned: 0 });
 
-  // تحقق أن المستخدم الحالي أدمن حقيقي (وليس جونيور فقط) لبعض الخصائص
   const isSuperAdmin = userData?.role === 'admin';
 
   useEffect(() => {
-    // جلب المستخدمين
+    // مراقبة المستخدمين
     const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
-        setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const usersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setUsers(usersList);
+        setStats({
+            totalUsers: usersList.length,
+            activeToday: usersList.filter(u => u.lastLogin && new Date(u.lastLogin).getDate() === new Date().getDate()).length,
+            banned: usersList.filter(u => u.isBanned).length
+        });
     });
 
-    // جلب تذاكر الدعم
+    // مراقبة التذاكر
     const unsubSupport = onSnapshot(query(collection(db, "support_tickets"), orderBy("lastUpdate", "desc")), (snap) => {
         setSupportTickets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -30,151 +38,129 @@ export default function AdminDashboard({ currentUser, userData }) {
     return () => { unsubUsers(); unsubSupport(); };
   }, []);
 
-  // --- التحكم بالرتب ---
-  const changeRole = async (userId, newRole) => {
-      if (!isSuperAdmin) return alert("Access Denied: Only Super Admin can promote users.");
-      if (confirm(`Change user role to ${newRole}?`)) {
-          await updateDoc(doc(db, "users", userId), { role: newRole });
-      }
+  const handleBroadcast = async () => {
+      await updateDoc(doc(db, "system", "broadcast"), { message: broadcastMsg, active: !!broadcastMsg });
+      alert("System Broadcast Updated");
   };
 
-  const banUser = async (id, status) => {
-      if (!isSuperAdmin) return alert("Access Denied: Only Super Admin can ban users.");
-      await updateDoc(doc(db, "users", id), { isBanned: !status });
-  };
-
-  // --- الدعم الفني ---
-  const sendSupportReply = async () => {
-      if (!selectedTicket || !replyText) return;
-      
-      const ticketRef = doc(db, "support_tickets", selectedTicket.id);
-      const newMessage = {
-          text: replyText,
-          sender: "admin",
-          createdAt: new Date().toISOString()
-      };
-
-      // تحديث مصفوفة الرسائل
-      const updatedMessages = [...(selectedTicket.messages || []), newMessage];
-      
-      await updateDoc(ticketRef, {
-          messages: updatedMessages,
-          lastUpdate: new Date().toISOString(),
-          status: 'answered'
-      });
-
-      setReplyText("");
-  };
+  const filteredUsers = users.filter(u => u.email?.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
-    <div className="w-full h-full flex flex-col p-6 font-sans text-white overflow-hidden relative pb-32">
-      
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-        <div>
-            <h1 className="text-3xl font-black text-white tracking-widest flex items-center gap-2">
-                <IconShield className="text-red-500"/> COMMAND CENTER
-            </h1>
-            <p className="text-xs text-white/40 font-mono">
-                LOGGED AS: <span className="text-cyan-400 uppercase">{userData?.role || "UNKNOWN"}</span>
-            </p>
+    <div className="w-full h-full flex flex-col bg-[#050505] text-white overflow-hidden relative">
+      {/* Top Bar */}
+      <div className="h-20 border-b border-white/10 flex items-center justify-between px-8 bg-black/50 backdrop-blur-md z-10">
+        <div className="flex items-center gap-3">
+            <div className="p-2 bg-red-500/20 rounded-lg text-red-500"><IconShield size={24}/></div>
+            <h1 className="text-xl font-black tracking-[0.2em]">GOD MODE</h1>
         </div>
-        <div className="flex gap-2">
-            <button onClick={()=>setActiveTab('users')} className={`px-4 py-2 rounded font-bold ${activeTab==='users' ? 'bg-cyan-600' : 'bg-white/10'}`}>USERS</button>
-            <button onClick={()=>setActiveTab('support')} className={`px-4 py-2 rounded font-bold ${activeTab==='support' ? 'bg-purple-600' : 'bg-white/10'}`}>SUPPORT</button>
+        <div className="flex gap-1 bg-white/5 p-1 rounded-lg">
+            {['overview', 'users', 'support', 'system'].map(tab => (
+                <button 
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-4 py-2 rounded-md text-xs font-bold uppercase transition-all ${activeTab === tab ? 'bg-red-600 text-white shadow-lg' : 'text-white/50 hover:text-white'}`}
+                >
+                    {tab}
+                </button>
+            ))}
         </div>
       </div>
 
-      {/* Users Tab */}
-      {activeTab === 'users' && (
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-            <table className="w-full text-left text-sm">
-                <thead className="bg-white/5 text-white/40 uppercase sticky top-0 backdrop-blur-md">
-                    <tr><th className="p-4">User</th><th className="p-4">Role</th><th className="p-4">Actions</th></tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                    {users.map(u => (
-                        <tr key={u.id} className="hover:bg-white/5 transition-colors">
-                            <td className="p-4">
-                                <div className="font-bold text-white">{u.email}</div>
-                                <div className="text-xs text-white/30">{u.id}</div>
-                            </td>
-                            <td className="p-4">
-                                <span className={`px-2 py-1 rounded text-xs font-black uppercase ${
-                                    u.role === 'admin' ? 'bg-red-500/20 text-red-500' : 
-                                    u.role === 'junior' ? 'bg-yellow-500/20 text-yellow-500' : 
-                                    'bg-gray-500/20 text-gray-400'
-                                }`}>
-                                    {u.role || 'USER'}
-                                </span>
-                            </td>
-                            <td className="p-4 flex gap-2">
-                                {isSuperAdmin && (
-                                    <>
-                                        <button onClick={()=>changeRole(u.id, 'junior')} title="Promote to Junior" className="p-2 bg-yellow-900/30 text-yellow-500 rounded hover:bg-yellow-500 hover:text-black"><IconStar size={16}/></button>
-                                        <button onClick={()=>changeRole(u.id, 'admin')} title="Promote to Admin" className="p-2 bg-red-900/30 text-red-500 rounded hover:bg-red-500 hover:text-white"><IconCrown size={16}/></button>
-                                        <button onClick={()=>changeRole(u.id, 'user')} title="Demote to User" className="p-2 bg-gray-800 text-gray-400 rounded hover:bg-gray-600"><IconUser size={16}/></button>
-                                        <div className="w-[1px] bg-white/10 mx-2"></div>
-                                        <button onClick={()=>banUser(u.id, u.isBanned)} className={`p-2 rounded ${u.isBanned ? 'bg-green-900/30 text-green-500' : 'bg-red-900/30 text-red-500'}`}>
-                                            {u.isBanned ? <IconCheck size={16}/> : <IconBan size={16}/>}
-                                        </button>
-                                    </>
-                                )}
-                            </td>
-                        </tr>
+      <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+        {activeTab === 'overview' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <StatCard title="Total Operatives" value={stats.totalUsers} icon={IconUser} color="text-cyan-400" />
+                <StatCard title="Active Today" value={stats.activeToday} icon={IconActivity} color="text-green-400" />
+                <StatCard title="Banned Units" value={stats.banned} icon={IconBan} color="text-red-400" />
+                
+                {/* Mock Chart Area */}
+                <div className="md:col-span-3 h-64 glass-panel rounded-2xl p-6 flex items-end justify-between gap-2 mt-4 relative overflow-hidden">
+                    <div className="absolute top-4 left-4 font-bold text-white/50 text-xs uppercase">Network Traffic (7 Days)</div>
+                    {[40, 65, 30, 80, 55, 90, 70].map((h, i) => (
+                        <div key={i} className="w-full bg-gradient-to-t from-red-900/50 to-red-500/50 rounded-t-lg transition-all hover:opacity-100 opacity-70" style={{ height: `${h}%` }}></div>
                     ))}
-                </tbody>
-            </table>
-        </div>
-      )}
+                </div>
+            </div>
+        )}
 
-      {/* Support Tab */}
-      {activeTab === 'support' && (
-          <div className="flex h-full gap-4">
-              {/* Ticket List */}
-              <div className="w-1/3 border-r border-white/10 overflow-y-auto custom-scrollbar">
-                  {supportTickets.map(ticket => (
-                      <div 
-                        key={ticket.id} 
-                        onClick={() => setSelectedTicket(ticket)}
-                        className={`p-4 border-b border-white/5 cursor-pointer hover:bg-white/5 ${selectedTicket?.id === ticket.id ? 'bg-purple-900/20 border-l-4 border-l-purple-500' : ''}`}
-                      >
-                          <div className="font-bold text-white truncate">{ticket.userEmail}</div>
-                          <div className="text-xs text-white/40 truncate">{ticket.messages[ticket.messages.length - 1]?.text}</div>
-                          <div className="text-[10px] text-right mt-1 opacity-50">{ticket.status}</div>
-                      </div>
-                  ))}
-              </div>
-
-              {/* Chat Area */}
-              <div className="flex-1 flex flex-col bg-[#050505] rounded-xl overflow-hidden border border-white/10">
-                  {selectedTicket ? (
-                      <>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                            {selectedTicket.messages?.map((msg, i) => (
-                                <div key={i} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[70%] p-3 rounded-xl text-sm ${msg.sender === 'admin' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-200'}`}>
-                                        {msg.text}
-                                    </div>
-                                </div>
+        {activeTab === 'users' && (
+            <div className="glass-panel rounded-2xl overflow-hidden flex flex-col h-full">
+                <div className="p-4 border-b border-white/10 flex gap-4">
+                    <div className="relative flex-1">
+                        <IconSearch className="absolute left-3 top-3 text-white/30" size={18} />
+                        <input 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Search by email..."
+                            className="w-full bg-black/50 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-white focus:border-red-500 outline-none"
+                        />
+                    </div>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-white/5 text-white/40 uppercase sticky top-0 backdrop-blur-md">
+                            <tr><th className="p-4">User</th><th className="p-4">Role</th><th className="p-4">XP</th><th className="p-4">Actions</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                            {filteredUsers.map(u => (
+                                <tr key={u.id} className="hover:bg-white/5 transition-colors">
+                                    <td className="p-4 font-mono">{u.email}</td>
+                                    <td className="p-4"><Badge role={u.role} /></td>
+                                    <td className="p-4 text-cyan-400 font-bold">{u.xp || 0}</td>
+                                    <td className="p-4 flex gap-2">
+                                        {isSuperAdmin && (
+                                            <>
+                                                <ActionBtn icon={IconCrown} onClick={() => confirm(`Promote ${u.email}?`) && updateDoc(doc(db,"users",u.id),{role:'admin'})} color="text-yellow-500" />
+                                                <ActionBtn icon={IconBan} onClick={() => updateDoc(doc(db,"users",u.id),{isBanned:!u.isBanned})} color={u.isBanned ? "text-green-500" : "text-red-500"} />
+                                            </>
+                                        )}
+                                    </td>
+                                </tr>
                             ))}
-                        </div>
-                        <div className="p-3 bg-[#111] border-t border-white/10 flex gap-2">
-                            <input 
-                                value={replyText} 
-                                onChange={e => setReplyText(e.target.value)} 
-                                className="flex-1 bg-black border border-white/20 rounded p-2 text-white outline-none"
-                                placeholder="Type admin reply..."
-                            />
-                            <button onClick={sendSupportReply} className="bg-purple-600 px-4 py-2 rounded text-white font-bold">SEND</button>
-                        </div>
-                      </>
-                  ) : (
-                      <div className="flex items-center justify-center h-full text-white/20">SELECT A TICKET</div>
-                  )}
-              </div>
-          </div>
-      )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        )}
+
+        {activeTab === 'system' && (
+            <div className="max-w-2xl mx-auto space-y-6">
+                <div className="glass-panel p-6 rounded-2xl">
+                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><IconAlertTriangle className="text-yellow-500"/> Emergency Broadcast</h3>
+                    <textarea 
+                        value={broadcastMsg}
+                        onChange={(e) => setBroadcastMsg(e.target.value)}
+                        className="w-full bg-black/50 border border-white/20 rounded-xl p-4 text-white h-32 mb-4 focus:border-red-500 outline-none"
+                        placeholder="Type system-wide alert message..."
+                    />
+                    <button onClick={handleBroadcast} className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow-[0_0_20px_#dc2626]">
+                        DEPLOY MESSAGE
+                    </button>
+                </div>
+            </div>
+        )}
+      </div>
     </div>
   );
 }
+
+const StatCard = ({ title, value, icon: Icon, color }) => (
+    <div className="glass-panel p-6 rounded-2xl flex items-center justify-between group hover:border-white/20 transition-all">
+        <div>
+            <div className="text-white/40 text-xs font-bold uppercase tracking-widest mb-1">{title}</div>
+            <div className="text-4xl font-black text-white">{value}</div>
+        </div>
+        <div className={`p-4 rounded-xl bg-white/5 ${color} group-hover:scale-110 transition-transform`}>
+            <Icon size={32} />
+        </div>
+    </div>
+);
+
+const Badge = ({ role }) => {
+    const colors = { admin: "bg-red-500/20 text-red-400", junior: "bg-yellow-500/20 text-yellow-400", user: "bg-gray-500/20 text-gray-400" };
+    return <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${colors[role] || colors.user}`}>{role || 'USER'}</span>
+};
+
+const ActionBtn = ({ icon: Icon, onClick, color }) => (
+    <button onClick={onClick} className={`p-2 bg-white/5 rounded-lg hover:bg-white/10 transition-colors ${color}`}><Icon size={16}/></button>
+);

@@ -7,7 +7,7 @@ import {
   IconShield, IconMessageCircle, IconRobot, IconDeviceGamepad 
 } from '@tabler/icons-react';
 
-// --- استيراد المكونات (Components) ---
+// Components
 import { HeroSection } from '../components/HeroSection';
 import { CategorySelect } from '../components/CategorySelect';
 import { StudyCard } from '../components/StudyCard';
@@ -25,14 +25,14 @@ import IntroSequence from '../components/IntroSequence';
 import { BossBattleWrapper } from '../components/BossBattleWrapper'; 
 import DailyReward from '../components/DailyReward';
 
-// --- المكتبات والخطافات (Hooks) ---
+// Hooks
 import { useStudySystem } from '../hooks/useStudySystem';
 import { useAudio } from '../hooks/useAudio';
+import { useSettings } from '../context/SettingsContext'; // استيراد إعدادات الثيم
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot, updateDoc, setDoc, getDoc } from "firebase/firestore";
 
-// الإيميل الرئيسي
 const MASTER_EMAIL = "islamaz@bomba.com";
 
 export default function RussianApp() {
@@ -44,10 +44,10 @@ export default function RussianApp() {
   const [broadcast, setBroadcast] = useState(null);
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
-
-  // حالات المعركة
   const [battleResult, setBattleResult] = useState(null); 
   const [battleTrigger, setBattleTrigger] = useState(0);
+
+  const { settings } = useSettings(); // استخدام الإعدادات العالمية
 
   const { 
     cards, currentCard, stats, handleSwipe, resetProgress, 
@@ -107,35 +107,39 @@ export default function RussianApp() {
   const isJunior = userData?.role === 'junior' || isAdmin;
   const isBanned = userData?.isBanned && !isMaster;
 
+  // --- Render Logic ---
+  
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
 
   if (isBanned) return (
     <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-red-500 space-y-6 font-mono relative overflow-hidden">
-        <h1 className="text-6xl font-black tracking-widest text-center">ACCESS DENIED</h1>
-        <button onClick={handleLogout} className="px-8 py-3 border border-red-500 rounded hover:bg-red-900/20 transition-colors">LOGOUT</button>
+        <h1 className="text-6xl font-black tracking-widest text-center animate-pulse">ACCESS DENIED</h1>
+        <p className="text-red-500/50 uppercase tracking-widest">Neural Link Terminated by Administrator.</p>
+        <button onClick={handleLogout} className="px-8 py-3 border border-red-500 rounded hover:bg-red-900/20 transition-colors">FORCE LOGOUT</button>
     </div>
   );
 
-  if (loadingAuth) return <div className="h-screen bg-black text-cyan-500 flex items-center justify-center font-mono animate-pulse">LOADING NEURAL LINK...</div>;
+  if (loadingAuth) return <div className="h-screen bg-black text-cyan-500 flex flex-col items-center justify-center font-mono gap-4"><div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div><div className="animate-pulse tracking-widest">ESTABLISHING LINK...</div></div>;
   
   if (!user) return <AuthScreen onLoginSuccess={setUser} />;
 
   let navLinks = [
     { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
-    { title: "AI Mentor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => setCurrentView('ai-tutor') },
+    { title: "AI Tutor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => setCurrentView('ai-tutor') },
     { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
     { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
-    { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
+    { title: "Study", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
     { title: "Archive", icon: <IconDatabase className="w-full text-emerald-400" />, onClick: () => setCurrentView('data') }, 
-    { title: "ID Card", icon: <IconTrophy className="w-full text-yellow-500" />, onClick: () => setCurrentView('leaderboard') },
-    { title: "Config", icon: <IconSettings className="w-full text-neutral-400" />, onClick: () => setCurrentView('settings') },
+    { title: "Profile", icon: <IconTrophy className="w-full text-yellow-500" />, onClick: () => setCurrentView('leaderboard') },
+    { title: "Settings", icon: <IconSettings className="w-full text-neutral-400" />, onClick: () => setCurrentView('settings') },
   ];
   
   if (isJunior) {
-      navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
+      navLinks.push({ title: "GOD MODE", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
   }
 
   const renderContent = () => {
+    // Protection against URL manipulation if we had routing
     if (currentView === 'admin' && !isJunior) return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
 
     switch (currentView) {
@@ -164,10 +168,11 @@ export default function RussianApp() {
                         />
                     </BossBattleWrapper>
                 ) : (
-                    <div className="text-center p-10 bg-black/60 border border-cyan-500/50 rounded-2xl backdrop-blur-md">
-                        <IconCpu size={64} className="text-cyan-500 mx-auto mb-4 animate-pulse" />
-                        <h2 className="text-3xl font-black text-cyan-400 mb-2">MISSION ACCOMPLISHED</h2>
-                        <button onClick={() => setCurrentView('home')} className="px-8 py-3 bg-cyan-600 text-white font-bold rounded-full hover:bg-cyan-500 shadow-[0_0_20px_#06b6d4]">BASE</button>
+                    <div className="text-center p-10 glass-panel rounded-3xl animate-in zoom-in">
+                        <IconCpu size={80} className="text-cyan-500 mx-auto mb-6 animate-pulse" />
+                        <h2 className="text-4xl font-black text-white mb-2">ALL SYSTEMS NOMINAL</h2>
+                        <p className="text-cyan-400/60 mb-8 uppercase tracking-widest">No pending data packets for review.</p>
+                        <button onClick={() => setCurrentView('home')} className="px-10 py-4 bg-cyan-600 text-white font-bold rounded-full hover:bg-cyan-500 shadow-[0_0_30px_#06b6d4] transition-all hover:scale-105">RETURN TO BASE</button>
                     </div>
                 )}
             </div>
@@ -181,26 +186,36 @@ export default function RussianApp() {
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black selection:bg-cyan-500/30 selection:text-cyan-200">
-      <DigitalRain />
+    <div className="relative min-h-screen w-full overflow-hidden font-sans text-neutral-200 bg-[#030014] selection:bg-cyan-500/30 selection:text-cyan-200">
+      
+      {/* Dynamic Backgrounds based on settings */}
+      {settings?.particles !== false && <DigitalRain />}
+      
+      {/* Daily Reward Modal */}
       {showDailyReward && <DailyReward user={user} onClose={() => setShowDailyReward(false)} />}
       
+      {/* Admin Broadcast Banner */}
       <AnimatePresence>
         {broadcast && (
-            <motion.div initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} className="fixed top-0 w-full bg-red-900/90 border-b border-red-500 text-white text-center py-3 z-[100] font-bold shadow-[0_0_30px_rgba(220,38,38,0.5)] flex justify-center items-center gap-3 backdrop-blur-xl">
+            <motion.div 
+                initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} 
+                className="fixed top-0 w-full bg-red-900/90 border-b border-red-500 text-white text-center py-3 z-[100] font-bold shadow-[0_0_30px_rgba(220,38,38,0.5)] flex justify-center items-center gap-3 backdrop-blur-xl"
+            >
+                <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
                 <span className="tracking-widest uppercase text-sm md:text-base">{broadcast}</span>
             </motion.div>
         )}
       </AnimatePresence>
 
+      {/* Main Content Area */}
       <main className="relative z-10 flex flex-col items-center justify-center min-h-screen w-full pt-10 md:pt-0">
            <AnimatePresence mode="wait">
              <motion.div 
                 key={currentView} 
-                initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }} 
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }} 
-                exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }} 
-                transition={{ duration: 0.3 }} 
+                initial={{ opacity: 0, filter: "blur(10px)", scale: 0.95 }} 
+                animate={{ opacity: 1, filter: "blur(0px)", scale: 1 }} 
+                exit={{ opacity: 0, filter: "blur(10px)", scale: 1.05 }} 
+                transition={{ duration: 0.4, ease: "easeOut" }} 
                 className="w-full h-full flex justify-center"
              >
                 {renderContent()}
@@ -208,8 +223,9 @@ export default function RussianApp() {
            </AnimatePresence>
       </main>
 
+      {/* Futuristic Dock Navigation */}
       <div className="fixed bottom-8 left-0 w-full z-50 flex justify-center pointer-events-none">
-          <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="pointer-events-auto">
+          <motion.div initial={{ y: 100 }} animate={{ y: 0 }} transition={{delay: 0.5}} className="pointer-events-auto">
               <FloatingDock items={navLinks} />
           </motion.div>
       </div>
