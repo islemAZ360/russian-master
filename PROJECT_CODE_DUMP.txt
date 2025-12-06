@@ -74,248 +74,81 @@ export async function POST(req) {
 FILE: app\globals.css
 ==================================================================
 
+/* FILE: app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* --- 1. استيراد الخطوط (عربي + تقني) --- */
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@200;400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
 
 :root {
-  --neon-cyan: #06b6d4;
-  --neon-purple: #a855f7;
-  --neon-red: #ef4444;
-  --bg-dark: #050505;
+  --bg-deep: #050505;
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-surface: rgba(20, 20, 20, 0.6);
+  --neon-primary: #00f2ff;
+  --neon-secondary: #ff0055;
+  --neon-accent: #7000ff;
 }
 
-/* --- 2. إعدادات الصفحة الأساسية --- */
 body {
+  background-color: var(--bg-deep);
   color: white;
-  background: var(--bg-dark);
-  font-family: 'JetBrains Mono', monospace; /* الأرقام والإنجليزية التقنية */
+  font-family: 'Cairo', sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-/* دعم الخط العربي في النصوص العامة */
-h1, h2, h3, h4, p, span, div, button, input, textarea {
-  font-family: 'Cairo', sans-serif;
-}
-
-/* الأكواد والأرقام تبقى بالخط التقني */
-.font-mono {
-  font-family: 'JetBrains Mono', monospace !important;
-}
-
-/* --- 3. تخصيص شريط التمرير (Scrollbar) --- */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: #050505;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 3px;
-  transition: background 0.3s;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--neon-cyan);
-  box-shadow: 0 0 10px var(--neon-cyan);
-}
-
-/* --- 4. الطبقات السينمائية (Cinematic Overlays) --- */
-
-/* خطوط الشاشة (Scanlines) */
-.scanlines {
-  background: linear-gradient(
-    to bottom,
-    rgba(255,255,255,0),
-    rgba(255,255,255,0) 50%,
-    rgba(0,0,0,0.2) 50%,
-    rgba(0,0,0,0.2)
-  );
-  background-size: 100% 4px;
+/* --- الخلفية الكونية المتحركة --- */
+.nebula-bg {
   position: fixed;
   inset: 0;
-  pointer-events: none;
-  z-index: 9998;
-  opacity: 0.4;
+  background: 
+    radial-gradient(circle at 15% 50%, rgba(112, 0, 255, 0.08), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(0, 242, 255, 0.08), transparent 25%);
+  z-index: -1;
+  animation: breathe 10s ease-in-out infinite;
 }
 
-/* تعتيم الحواف (Vignette) */
-.vignette {
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.9) 100%);
-  pointer-events: none;
-  z-index: 9997;
+@keyframes breathe {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
 }
 
-/* الضجيج (Noise) */
-.noise-overlay {
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 9996;
-  opacity: 0.3;
+/* --- زجاج عالي الجودة --- */
+.glass-card {
+  background: var(--glass-surface);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
-/* --- 5. زوايا الـ HUD (واجهة النظام) --- */
-.hud-corner {
-  position: fixed;
-  width: 30px; height: 30px;
-  border: 2px solid rgba(6, 182, 212, 0.2);
-  z-index: 50;
-  pointer-events: none;
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(30, 30, 30, 0.7);
 }
-.hud-corner.tl { top: 20px; left: 20px; border-right: 0; border-bottom: 0; }
-.hud-corner.tr { top: 20px; right: 20px; border-left: 0; border-bottom: 0; }
-.hud-corner.bl { bottom: 20px; left: 20px; border-right: 0; border-top: 0; }
-.hud-corner.br { bottom: 20px; right: 20px; border-left: 0; border-top: 0; }
 
-/* --- 6. تنسيق ردود الذكاء الاصطناعي (Markdown Styles) --- */
-/* هذا الجزء مهم جداً لتظهر الجداول والنصوص بشكل جميل في الشات */
-
-/* الجداول */
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 1rem 0;
-  font-size: 0.9em;
-  background-color: rgba(255, 255, 255, 0.02);
-  border-radius: 8px;
+/* --- أزرار النيون --- */
+.btn-neon {
+  position: relative;
   overflow: hidden;
+  transition: all 0.3s ease;
 }
-
-th, td {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 10px 12px;
-  text-align: left;
-}
-
-/* رؤوس الجداول */
-th {
-  background-color: rgba(6, 182, 212, 0.1); /* لون سماوي خفيف */
-  color: var(--neon-cyan);
-  font-weight: bold;
-  text-transform: uppercase;
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
-}
-
-/* الخط العريض */
-strong {
-  color: var(--neon-purple); /* لون بنفسجي للكلمات المهمة */
-  font-weight: 900;
-}
-
-/* القوائم */
-ul, ol {
-  padding-left: 1.5rem;
-  margin: 0.5rem 0;
-}
-
-li {
-  margin-bottom: 0.5rem;
-  position: relative;
-}
-
-/* الروابط (إذا وجدت) */
-a {
-  color: var(--neon-cyan);
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
-
-/* --- 7. المؤثرات الخاصة (Animations) --- */
-
-/* النص المتقطع (Glitch Text) - يستخدم في الألعاب */
-.glitch-text {
-  position: relative;
-}
-.glitch-text::before,
-.glitch-text::after {
-  content: attr(data-text);
+.btn-neon::after {
+  content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: black;
+  top: 0; left: -100%; width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: 0.5s;
 }
-.glitch-text::before {
-  left: 2px;
-  text-shadow: -1px 0 red;
-  clip: rect(24px, 550px, 90px, 0);
-  animation: glitch-anim-2 3s infinite linear alternate-reverse;
-}
-.glitch-text::after {
-  left: -2px;
-  text-shadow: -1px 0 #00ff00;
-  clip: rect(85px, 550px, 140px, 0);
-  animation: glitch-anim 2.5s infinite linear alternate-reverse;
-}
+.btn-neon:hover::after { left: 100%; }
 
-@keyframes glitch-anim {
-  0% { clip: rect(14px, 9999px, 129px, 0); }
-  20% { clip: rect(40px, 9999px, 69px, 0); }
-  40% { clip: rect(96px, 9999px, 12px, 0); }
-  60% { clip: rect(6px, 9999px, 147px, 0); }
-  80% { clip: rect(69px, 9999px, 19px, 0); }
-  100% { clip: rect(122px, 9999px, 20px, 0); }
-}
-@keyframes glitch-anim-2 {
-  0% { clip: rect(126px, 9999px, 142px, 0); }
-  20% { clip: rect(3px, 9999px, 25px, 0); }
-  40% { clip: rect(63px, 9999px, 164px, 0); }
-  60% { clip: rect(124px, 9999px, 14px, 0); }
-  80% { clip: rect(138px, 9999px, 73px, 0); }
-  100% { clip: rect(39px, 9999px, 107px, 0); }
-}
-
-/* اهتزاز الشاشة (Shake Effect) - يستخدم عند الخطأ */
-.animate-shake {
-  animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
-}
-
-@keyframes shake {
-  10%, 90% { transform: translate3d(-1px, 0, 0); }
-  20%, 80% { transform: translate3d(2px, 0, 0); }
-  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-  40%, 60% { transform: translate3d(4px, 0, 0); }
-}
-
-/* دوران بطيء (للأيقونات) */
-.animate-spin-slow {
-  animation: spin 8s linear infinite;
-}
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* تحسين تحديد النصوص */
-::selection {
-  background: rgba(6, 182, 212, 0.3);
-  color: white;
-  text-shadow: 0 0 5px var(--neon-cyan);
-}
-
-/* فئات مساعدة للتوافق */
-.custom-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: #333 #000;
-}
-.perspective-1000 { perspective: 1000px; }
-.backface-hidden { backface-visibility: hidden; }
-.preserve-3d { transform-style: preserve-3d; }
-.dir-rtl { direction: rtl; }
+/* --- تخصيصات إضافية --- */
+.font-mono { font-family: 'JetBrains Mono', monospace !important; }
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--neon-primary); }
 
 
 ==================================================================
@@ -443,16 +276,15 @@ export default function NotFound() {
 FILE: app\page.js
 ==================================================================
 
-// FILE: app/page.js
 "use client";
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
-  IconShield, IconMessageCircle, IconRobot, IconDeviceGamepad 
+  IconShield, IconMessageCircle, IconRobot, IconDeviceGamepad, IconBroadcast 
 } from '@tabler/icons-react';
 
-// --- استيراد المكونات (Components) ---
+// --- استيراد المكونات ---
 import { HeroSection } from '../components/HeroSection';
 import { CategorySelect } from '../components/CategorySelect';
 import { StudyCard } from '../components/StudyCard';
@@ -470,14 +302,15 @@ import IntroSequence from '../components/IntroSequence';
 import { BossBattleWrapper } from '../components/BossBattleWrapper'; 
 import DailyReward from '../components/DailyReward';
 
-// --- المكتبات والخطافات (Hooks) ---
+// 👇 استيراد البث المباشر الجديد 👇
+import RealLiveStream from '../components/live/RealLiveStream';
+
 import { useStudySystem } from '../hooks/useStudySystem';
 import { useAudio } from '../hooks/useAudio';
 import { auth, db } from '../lib/firebase';
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot, updateDoc, setDoc, getDoc } from "firebase/firestore";
 
-// الإيميل الرئيسي
 const MASTER_EMAIL = "islamaz@bomba.com";
 
 export default function RussianApp() {
@@ -569,6 +402,10 @@ export default function RussianApp() {
     { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
     { title: "AI Mentor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => setCurrentView('ai-tutor') },
     { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
+    
+    // 👇 زر البث المباشر الجديد 👇
+    { title: "Live Ops", icon: <IconBroadcast className="w-full text-red-500 animate-pulse" />, onClick: () => setCurrentView('live') },
+
     { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
     { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
     { title: "Archive", icon: <IconDatabase className="w-full text-emerald-400" />, onClick: () => setCurrentView('data') }, 
@@ -587,6 +424,10 @@ export default function RussianApp() {
       case 'home': return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
       case 'ai-tutor': return <AITutor user={user} />;
       case 'games': return <GamesHub cards={cards} />;
+      
+      // 👇 عرض شاشة البث المباشر 👇
+      case 'live': return <RealLiveStream user={user} onClose={() => setCurrentView('home')} />;
+      
       case 'chat': return <CommunicationHub user={user} />;
       case 'category': return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
       case 'study':
@@ -708,183 +549,259 @@ export const syncOfflineData = async () => {
 FILE: components\AdminDashboard.jsx
 ==================================================================
 
+// FILE: components/AdminDashboard.jsx
 "use client";
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, setDoc, addDoc, query, orderBy, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, query, orderBy, limit, addDoc } from "firebase/firestore";
 import { 
-  IconShield, IconBan, IconUser, IconMessage, IconCheck, IconX, IconCrown, IconStar 
+  IconShield, IconBan, IconUser, IconCrown, IconStar, IconSearch, 
+  IconLayoutDashboard, IconMessage2, IconSettings, IconActivity, IconCheck
 } from '@tabler/icons-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function AdminDashboard({ currentUser, userData }) {
+  const [activeView, setActiveView] = useState('users');
   const [users, setUsers] = useState([]);
-  const [activeTab, setActiveTab] = useState('users'); 
-  const [supportTickets, setSupportTickets] = useState([]);
-  const [replyText, setReplyText] = useState("");
-  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [broadcast, setBroadcast] = useState("");
 
-  // تحقق أن المستخدم الحالي أدمن حقيقي (وليس جونيور فقط) لبعض الخصائص
   const isSuperAdmin = userData?.role === 'admin';
 
+  // --- جلب البيانات الحية ---
   useEffect(() => {
-    // جلب المستخدمين
-    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
-        setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-
-    // جلب تذاكر الدعم
-    const unsubSupport = onSnapshot(query(collection(db, "support_tickets"), orderBy("lastUpdate", "desc")), (snap) => {
-        setSupportTickets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-
-    return () => { unsubUsers(); unsubSupport(); };
+    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => 
+      setUsers(snap.docs.map(d => ({id: d.id, ...d.data()})))
+    );
+    const unsubLogs = onSnapshot(query(collection(db, "system_logs"), orderBy("timestamp", "desc"), limit(20)), (snap) => 
+      setLogs(snap.docs.map(d => d.data()))
+    );
+    return () => { unsubUsers(); unsubLogs(); };
   }, []);
 
-  // --- التحكم بالرتب ---
-  const changeRole = async (userId, newRole) => {
-      if (!isSuperAdmin) return alert("Access Denied: Only Super Admin can promote users.");
-      if (confirm(`Change user role to ${newRole}?`)) {
-          await updateDoc(doc(db, "users", userId), { role: newRole });
-      }
+  // --- دوال التحكم (Core Actions) ---
+  const handleRoleChange = async (userId, newRole, userEmail) => {
+    if (!isSuperAdmin) return alert("Security Alert: Unauthorized Action.");
+    if (!confirm(`Confirm promotion of [${userEmail}] to [${newRole.toUpperCase()}]?`)) return;
+    
+    try {
+      await updateDoc(doc(db, "users", userId), { role: newRole });
+      await addLog(`Changed role of ${userEmail} to ${newRole}`, "SUCCESS");
+    } catch (e) {
+      alert("Error: " + e.message);
+    }
   };
 
-  const banUser = async (id, status) => {
-      if (!isSuperAdmin) return alert("Access Denied: Only Super Admin can ban users.");
-      await updateDoc(doc(db, "users", id), { isBanned: !status });
+  const toggleBan = async (userId, currentStatus, userEmail) => {
+    if (!isSuperAdmin) return;
+    await updateDoc(doc(db, "users", userId), { isBanned: !currentStatus });
+    await addLog(`${!currentStatus ? 'BANNED' : 'UNBANNED'} user ${userEmail}`, "WARN");
   };
 
-  // --- الدعم الفني ---
-  const sendSupportReply = async () => {
-      if (!selectedTicket || !replyText) return;
-      
-      const ticketRef = doc(db, "support_tickets", selectedTicket.id);
-      const newMessage = {
-          text: replyText,
-          sender: "admin",
-          createdAt: new Date().toISOString()
-      };
-
-      // تحديث مصفوفة الرسائل
-      const updatedMessages = [...(selectedTicket.messages || []), newMessage];
-      
-      await updateDoc(ticketRef, {
-          messages: updatedMessages,
-          lastUpdate: new Date().toISOString(),
-          status: 'answered'
-      });
-
-      setReplyText("");
+  const addLog = async (action, status) => {
+    await addDoc(collection(db, "system_logs"), {
+      action, status, admin: currentUser.email, timestamp: Date.now()
+    });
   };
+
+  const updateBroadcast = async () => {
+    await updateDoc(doc(db, "system", "broadcast"), { message: broadcast, active: !!broadcast });
+    await addLog("Updated system broadcast", "INFO");
+    alert("Broadcast Deployed.");
+  };
+
+  const filteredUsers = users.filter(u => u.email?.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  // --- القائمة الجانبية ---
+  const SidebarItem = ({ id, icon: Icon, label }) => (
+    <button 
+      onClick={() => setActiveView(id)}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
+        activeView === id 
+        ? 'bg-gradient-to-r from-red-900/40 to-transparent border-l-4 border-red-500 text-white' 
+        : 'text-white/40 hover:text-white hover:bg-white/5'
+      }`}
+    >
+      <Icon size={20} />
+      <span className="font-bold text-sm tracking-wider">{label}</span>
+    </button>
+  );
 
   return (
-    <div className="w-full h-full flex flex-col p-6 font-sans text-white overflow-hidden relative pb-32">
+    <div className="w-full h-full flex bg-[#020202] text-white overflow-hidden font-sans">
       
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-        <div>
-            <h1 className="text-3xl font-black text-white tracking-widest flex items-center gap-2">
-                <IconShield className="text-red-500"/> COMMAND CENTER
-            </h1>
-            <p className="text-xs text-white/40 font-mono">
-                LOGGED AS: <span className="text-cyan-400 uppercase">{userData?.role || "UNKNOWN"}</span>
-            </p>
+      {/* Sidebar */}
+      <div className="w-20 md:w-72 border-r border-white/10 bg-black/60 backdrop-blur-xl flex flex-col">
+        <div className="p-6 border-b border-white/10 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-red-600 flex items-center justify-center shadow-[0_0_20px_#dc2626]">
+            <IconShield size={24} className="text-white" />
+          </div>
+          <div className="hidden md:block">
+            <h1 className="font-black text-lg tracking-widest leading-none">OVERWATCH</h1>
+            <span className="text-[10px] text-red-400 font-mono">ADMIN SYSTEM v4.0</span>
+          </div>
         </div>
-        <div className="flex gap-2">
-            <button onClick={()=>setActiveTab('users')} className={`px-4 py-2 rounded font-bold ${activeTab==='users' ? 'bg-cyan-600' : 'bg-white/10'}`}>USERS</button>
-            <button onClick={()=>setActiveTab('support')} className={`px-4 py-2 rounded font-bold ${activeTab==='support' ? 'bg-purple-600' : 'bg-white/10'}`}>SUPPORT</button>
+        
+        <div className="flex-1 p-4 space-y-2">
+          <SidebarItem id="users" icon={IconUser} label="User Management" />
+          <SidebarItem id="system" icon={IconActivity} label="System Health" />
+          <SidebarItem id="logs" icon={IconLayoutDashboard} label="Audit Logs" />
         </div>
       </div>
 
-      {/* Users Tab */}
-      {activeTab === 'users' && (
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-            <table className="w-full text-left text-sm">
-                <thead className="bg-white/5 text-white/40 uppercase sticky top-0 backdrop-blur-md">
-                    <tr><th className="p-4">User</th><th className="p-4">Role</th><th className="p-4">Actions</th></tr>
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-8 relative">
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none"></div>
+
+        {activeView === 'users' && (
+          <div className="space-y-6 relative z-10">
+            {/* Header & Search */}
+            <div className="flex flex-col md:flex-row justify-between items-end gap-4 mb-8">
+              <div>
+                <h2 className="text-3xl font-black text-white mb-1">OPERATIVES</h2>
+                <p className="text-white/40 text-sm">Manage access levels and security clearance.</p>
+              </div>
+              <div className="relative w-full md:w-96">
+                <IconSearch className="absolute left-4 top-3.5 text-white/30" size={18} />
+                <input 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search database..."
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:border-red-500 focus:bg-black transition-all outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Users Table */}
+            <div className="glass-card rounded-2xl overflow-hidden">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-white/5 text-white/40 uppercase font-mono text-xs border-b border-white/10">
+                  <tr>
+                    <th className="p-5">User Identity</th>
+                    <th className="p-5">Current Rank</th>
+                    <th className="p-5">Security Actions</th>
+                    <th className="p-5 text-right">Status</th>
+                  </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                    {users.map(u => (
-                        <tr key={u.id} className="hover:bg-white/5 transition-colors">
-                            <td className="p-4">
-                                <div className="font-bold text-white">{u.email}</div>
-                                <div className="text-xs text-white/30">{u.id}</div>
-                            </td>
-                            <td className="p-4">
-                                <span className={`px-2 py-1 rounded text-xs font-black uppercase ${
-                                    u.role === 'admin' ? 'bg-red-500/20 text-red-500' : 
-                                    u.role === 'junior' ? 'bg-yellow-500/20 text-yellow-500' : 
-                                    'bg-gray-500/20 text-gray-400'
-                                }`}>
-                                    {u.role || 'USER'}
-                                </span>
-                            </td>
-                            <td className="p-4 flex gap-2">
-                                {isSuperAdmin && (
-                                    <>
-                                        <button onClick={()=>changeRole(u.id, 'junior')} title="Promote to Junior" className="p-2 bg-yellow-900/30 text-yellow-500 rounded hover:bg-yellow-500 hover:text-black"><IconStar size={16}/></button>
-                                        <button onClick={()=>changeRole(u.id, 'admin')} title="Promote to Admin" className="p-2 bg-red-900/30 text-red-500 rounded hover:bg-red-500 hover:text-white"><IconCrown size={16}/></button>
-                                        <button onClick={()=>changeRole(u.id, 'user')} title="Demote to User" className="p-2 bg-gray-800 text-gray-400 rounded hover:bg-gray-600"><IconUser size={16}/></button>
-                                        <div className="w-[1px] bg-white/10 mx-2"></div>
-                                        <button onClick={()=>banUser(u.id, u.isBanned)} className={`p-2 rounded ${u.isBanned ? 'bg-green-900/30 text-green-500' : 'bg-red-900/30 text-red-500'}`}>
-                                            {u.isBanned ? <IconCheck size={16}/> : <IconBan size={16}/>}
-                                        </button>
-                                    </>
-                                )}
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-      )}
+                  {filteredUsers.map(u => (
+                    <tr key={u.id} className="hover:bg-white/5 transition-colors group">
+                      <td className="p-5">
+                        <div className="font-bold text-white text-base">{u.email}</div>
+                        <div className="text-xs text-white/30 font-mono mt-1">ID: {u.id}</div>
+                      </td>
+                      
+                      <td className="p-5">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                            u.role === 'admin' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 
+                            u.role === 'junior' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 
+                            'bg-gray-500/20 text-gray-400 border border-gray-500/30'
+                          }`}>
+                            {u.role || 'USER'}
+                          </span>
+                        </div>
+                      </td>
 
-      {/* Support Tab */}
-      {activeTab === 'support' && (
-          <div className="flex h-full gap-4">
-              {/* Ticket List */}
-              <div className="w-1/3 border-r border-white/10 overflow-y-auto custom-scrollbar">
-                  {supportTickets.map(ticket => (
-                      <div 
-                        key={ticket.id} 
-                        onClick={() => setSelectedTicket(ticket)}
-                        className={`p-4 border-b border-white/5 cursor-pointer hover:bg-white/5 ${selectedTicket?.id === ticket.id ? 'bg-purple-900/20 border-l-4 border-l-purple-500' : ''}`}
-                      >
-                          <div className="font-bold text-white truncate">{ticket.userEmail}</div>
-                          <div className="text-xs text-white/40 truncate">{ticket.messages[ticket.messages.length - 1]?.text}</div>
-                          <div className="text-[10px] text-right mt-1 opacity-50">{ticket.status}</div>
-                      </div>
+                      <td className="p-5">
+                        {isSuperAdmin && (
+                          <div className="flex items-center gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                            {/* أزرار الترقية الصريحة */}
+                            <button 
+                              onClick={() => handleRoleChange(u.id, 'user', u.email)}
+                              title="Demote to User"
+                              className={`p-2 rounded-lg border transition-all ${u.role !== 'admin' && u.role !== 'junior' ? 'bg-white/10 border-white/30 text-white' : 'border-transparent text-white/30 hover:bg-white/10'}`}
+                            >
+                              <IconUser size={18} />
+                            </button>
+                            
+                            <button 
+                              onClick={() => handleRoleChange(u.id, 'junior', u.email)}
+                              title="Promote to Junior Admin"
+                              className={`p-2 rounded-lg border transition-all ${u.role === 'junior' ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400' : 'border-transparent text-yellow-500/50 hover:bg-yellow-500/20'}`}
+                            >
+                              <IconStar size={18} />
+                            </button>
+
+                            <button 
+                              onClick={() => handleRoleChange(u.id, 'admin', u.email)}
+                              title="Promote to Super Admin"
+                              className={`p-2 rounded-lg border transition-all ${u.role === 'admin' ? 'bg-red-500/20 border-red-500 text-red-400' : 'border-transparent text-red-500/50 hover:bg-red-500/20'}`}
+                            >
+                              <IconCrown size={18} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="p-5 text-right">
+                        <button 
+                          onClick={() => toggleBan(u.id, u.isBanned, u.email)}
+                          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                            u.isBanned 
+                            ? 'bg-red-500 text-black hover:bg-red-400' 
+                            : 'bg-green-900/30 text-green-400 border border-green-500/30 hover:bg-red-900/50 hover:text-red-400 hover:border-red-500/50'
+                          }`}
+                        >
+                          {u.isBanned ? 'UNBAN' : 'ACTIVE'}
+                        </button>
+                      </td>
+                    </tr>
                   ))}
-              </div>
-
-              {/* Chat Area */}
-              <div className="flex-1 flex flex-col bg-[#050505] rounded-xl overflow-hidden border border-white/10">
-                  {selectedTicket ? (
-                      <>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                            {selectedTicket.messages?.map((msg, i) => (
-                                <div key={i} className={`flex ${msg.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[70%] p-3 rounded-xl text-sm ${msg.sender === 'admin' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-200'}`}>
-                                        {msg.text}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="p-3 bg-[#111] border-t border-white/10 flex gap-2">
-                            <input 
-                                value={replyText} 
-                                onChange={e => setReplyText(e.target.value)} 
-                                className="flex-1 bg-black border border-white/20 rounded p-2 text-white outline-none"
-                                placeholder="Type admin reply..."
-                            />
-                            <button onClick={sendSupportReply} className="bg-purple-600 px-4 py-2 rounded text-white font-bold">SEND</button>
-                        </div>
-                      </>
-                  ) : (
-                      <div className="flex items-center justify-center h-full text-white/20">SELECT A TICKET</div>
-                  )}
-              </div>
+                </tbody>
+              </table>
+            </div>
           </div>
-      )}
+        )}
+
+        {activeView === 'system' && (
+          <div className="max-w-3xl space-y-8 relative z-10">
+            <h2 className="text-3xl font-black text-white">SYSTEM CONTROL</h2>
+            
+            <div className="glass-card p-8 rounded-2xl">
+              <h3 className="text-xl font-bold mb-4 text-cyan-400">Global Broadcast</h3>
+              <p className="text-white/50 text-sm mb-4">Send a message to all connected neural links instantly.</p>
+              <textarea 
+                value={broadcast} 
+                onChange={e => setBroadcast(e.target.value)}
+                className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white h-32 mb-6 focus:border-cyan-500 outline-none resize-none font-mono"
+                placeholder="> Enter system message protocol..."
+              />
+              <div className="flex justify-end">
+                <button 
+                  onClick={updateBroadcast}
+                  className="px-8 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all"
+                >
+                  TRANSMIT SIGNAL
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeView === 'logs' && (
+          <div className="relative z-10">
+            <h2 className="text-3xl font-black text-white mb-6">SYSTEM AUDIT</h2>
+            <div className="space-y-2 font-mono text-xs">
+              {logs.map((log, i) => (
+                <div key={i} className="glass-card p-4 rounded-lg flex items-center gap-6 border-l-4 border-l-white/20">
+                  <span className="text-white/30 w-32">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                  <span className={`px-2 py-1 rounded text-[10px] font-bold ${
+                    log.status === 'SUCCESS' ? 'bg-green-500/20 text-green-400' : 
+                    log.status === 'WARN' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'
+                  }`}>
+                    {log.status}
+                  </span>
+                  <span className="flex-1 text-white/80">{log.action}</span>
+                  <span className="text-white/30">{log.admin}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }
@@ -1457,6 +1374,118 @@ export function CategorySelect({ categories, activeCategory, onSelect }) {
           <div className="h-20 w-full"></div>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+==================================================================
+FILE: components\CommandMenu.jsx
+==================================================================
+
+// FILE: components/CommandMenu.jsx
+"use client";
+import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  IconSearch, IconHome, IconSettings, IconUser, IconCpu, 
+  IconMessage, IconDeviceGamepad, IconLogout, IconTerminal 
+} from '@tabler/icons-react';
+
+export default function CommandMenu({ isOpen, onClose, onNavigate, onAction }) {
+  const [query, setQuery] = useState("");
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const actions = [
+    { id: 'home', label: 'Go to Base', icon: IconHome, group: 'Navigation' },
+    { id: 'study', label: 'Start Training', icon: IconCpu, group: 'Navigation' },
+    { id: 'games', label: 'Cyber Arcade', icon: IconDeviceGamepad, group: 'Navigation' },
+    { id: 'profile', label: 'User ID', icon: IconUser, group: 'Navigation' },
+    { id: 'settings', label: 'System Config', icon: IconSettings, group: 'System' },
+    { id: 'logout', label: 'Terminate Session', icon: IconLogout, group: 'System', color: 'text-red-500' },
+  ];
+
+  const filtered = actions.filter(a => a.label.toLowerCase().includes(query.toLowerCase()));
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        isOpen ? onClose() : onAction('open_cmd');
+      }
+      if (!isOpen) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(prev => (prev + 1) % filtered.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(prev => (prev - 1 + filtered.length) % filtered.length);
+      } else if (e.key === 'Enter') {
+        const item = filtered[selectedIndex];
+        if (item) {
+          onNavigate(item.id === 'logout' || item.id === 'settings' ? item.id : item.id); // معالجة خاصة
+          onClose();
+        }
+      } else if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, selectedIndex, filtered, onClose, onAction]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-start justify-center pt-[20vh]" onClick={onClose}>
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: -20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        onClick={e => e.stopPropagation()}
+        className="w-full max-w-xl bg-[#09090b] border border-white/10 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden"
+      >
+        <div className="flex items-center px-4 py-4 border-b border-white/10">
+          <IconSearch className="text-white/40 mr-3" size={20} />
+          <input 
+            autoFocus
+            value={query}
+            onChange={e => { setQuery(e.target.value); setSelectedIndex(0); }}
+            placeholder="Type a command..."
+            className="flex-1 bg-transparent border-none outline-none text-white placeholder-white/30 font-mono"
+          />
+          <div className="text-xs text-white/20 bg-white/5 px-2 py-1 rounded">ESC</div>
+        </div>
+        
+        <div className="py-2 max-h-[300px] overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="px-4 py-8 text-center text-white/30 text-sm">No commands found.</div>
+          ) : (
+            filtered.map((action, i) => (
+              <div
+                key={action.id}
+                onClick={() => { onNavigate(action.id); onClose(); }}
+                className={`px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors ${
+                  i === selectedIndex ? 'bg-white/10 border-l-2 border-cyan-500' : 'text-white/60 hover:bg-white/5'
+                }`}
+              >
+                <action.icon size={18} className={action.color || "text-white"} />
+                <span className={`text-sm ${i === selectedIndex ? 'text-white font-bold' : ''}`}>{action.label}</span>
+                {i === selectedIndex && <IconTerminal size={14} className="ml-auto text-cyan-500 animate-pulse" />}
+              </div>
+            ))
+          )}
+        </div>
+        
+        <div className="px-4 py-2 bg-black/50 border-t border-white/5 flex justify-between text-[10px] text-white/30 uppercase tracking-wider">
+            <span>Nexus OS v3.0</span>
+            <span className="flex items-center gap-2">
+                Use <kbd className="bg-white/10 px-1 rounded">↑</kbd> <kbd className="bg-white/10 px-1 rounded">↓</kbd> to navigate
+            </span>
+        </div>
+      </motion.div>
     </div>
   );
 }
@@ -3723,444 +3752,144 @@ export default function LeaderboardView({ currentUserEmail }) {
 
 
 ==================================================================
-FILE: components\live\LiveStream.jsx
+FILE: components\live\RealLiveStream.jsx
 ==================================================================
 
 "use client";
+import React, { useState, useEffect } from "react";
+// استخدام التحميل الديناميكي لتجنب مشاكل المتصفح والسيرفر
+import dynamic from 'next/dynamic';
+import { IconBroadcast, IconX, IconLoader, IconVideo } from "@tabler/icons-react";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  IconVideo, IconMessageCircle, IconUsers, IconSend, 
-  IconX, IconHeart, IconShare, IconGift, IconCrown,
-  IconMicrophone, IconScreenShare, IconSettings
-} from '@tabler/icons-react';
-import { db } from '../../lib/firebase';
-import { 
-  collection, addDoc, onSnapshot, query, 
-  orderBy, serverTimestamp, doc, updateDoc 
-} from 'firebase/firestore';
-
-// دروس مباشرة مجدولة
-const SCHEDULED_LESSONS = [
-  {
-    id: 1,
-    title: 'القواعد الأساسية للمبتدئين',
-    teacher: 'آنا إيفانوفا',
-    time: '18:00',
-    duration: '45 دقيقة',
-    level: 'مبتدئ',
-    description: 'تعلم الحروف والأفعال الأساسية',
-    attendees: 124
-  },
-  {
-    id: 2,
-    title: 'المحادثة اليومية',
-    teacher: 'دميتري بتروف',
-    time: '20:00',
-    duration: '60 دقيقة',
-    level: 'متوسط',
-    description: 'حوارات عملية في مواقف حقيقية',
-    attendees: 89
-  },
-  {
-    id: 3,
-    title: 'الأدب الروسي الكلاسيكي',
-    teacher: 'أولغا سيمونوفا',
-    time: '22:00',
-    duration: '90 دقيقة',
-    level: 'متقدم',
-    description: 'قراءة وتحليل نصوص أدبية',
-    attendees: 56
+// استيراد Jitsi بشكل ديناميكي (الحل السحري للمشكلة)
+const JitsiMeeting = dynamic(
+  () => import('@jitsi/react-sdk').then((mod) => mod.JitsiMeeting),
+  { 
+    ssr: false,
+    loading: () => <div className="flex items-center justify-center h-full text-white">جاري تحميل نظام البث...</div>
   }
-];
+);
 
-export default function LiveStream({ user, onClose }) {
-  const [activeLesson, setActiveLesson] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [viewers, setViewers] = useState(0);
-  const [isTeacher, setIsTeacher] = useState(false);
-  const [reactions, setReactions] = useState([]);
-  const [polls, setPolls] = useState([]);
-  const videoRef = useRef(null);
-  const messagesEndRef = useRef(null);
+export default function RealLiveStream({ user, onClose }) {
+  const [roomName, setRoomName] = useState("");
+  const [isJoined, setIsJoined] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  // محاكاة بث فيديو
+  // التأكد من أن المكون يعمل فقط في المتصفح
   useEffect(() => {
-    if (activeLesson && videoRef.current) {
-      // في الإصدار الحقيقي، هنا يكون اتصال WebRTC
-      const stream = new MediaStream();
-      videoRef.current.srcObject = stream;
-    }
-  }, [activeLesson]);
+    setMounted(true);
+  }, []);
 
-  // جلب الرسائل من Firebase
-  useEffect(() => {
-    if (!activeLesson) return;
-
-    const q = query(
-      collection(db, 'live_streams', activeLesson.id.toString(), 'messages'),
-      orderBy('timestamp', 'asc')
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setMessages(msgs);
-    });
-
-    return unsubscribe;
-  }, [activeLesson]);
-
-  // تحديث عدد المشاهدين
-  useEffect(() => {
-    if (activeLesson) {
-      const interval = setInterval(() => {
-        setViewers(prev => prev + Math.floor(Math.random() * 10) - 3);
-      }, 10000);
-      return () => clearInterval(interval);
-    }
-  }, [activeLesson]);
-
-  // التمرير للرسائل الجديدة
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // بدء درس جديد
-  const startLesson = (lesson) => {
-    setActiveLesson(lesson);
-    setIsTeacher(user?.email === 'teacher@russian.com'); // محاكاة
-    setViewers(lesson.attendees);
-    setMessages([]);
-  };
-
-  // إرسال رسالة
-  const sendMessage = async () => {
-    if (!input.trim() || !activeLesson || !user) return;
-
-    const message = {
-      text: input,
-      user: user.email,
-      userName: user.displayName || user.email.split('@')[0],
-      timestamp: serverTimestamp(),
-      type: 'message',
-      isTeacher: isTeacher
-    };
-
-    try {
-      await addDoc(
-        collection(db, 'live_streams', activeLesson.id.toString(), 'messages'),
-        message
-      );
-      setInput('');
-    } catch (error) {
-      console.error('Error sending message:', error);
-    }
-  };
-
-  // إرسال تفاعل
-  const sendReaction = async (reaction) => {
-    if (!activeLesson || !user) return;
-
-    const reactionMsg = {
-      type: 'reaction',
-      reaction,
-      user: user.email,
-      timestamp: serverTimestamp()
-    };
-
-    await addDoc(
-      collection(db, 'live_streams', activeLesson.id.toString(), 'messages'),
-      reactionMsg
-    );
-
-    // عرض التفاعل مؤقتاً
-    setReactions(prev => [...prev, { id: Date.now(), reaction }]);
+  const handleJoin = () => {
+    if (!roomName.trim()) return;
+    setLoading(true);
     setTimeout(() => {
-      setReactions(prev => prev.filter(r => r.id > Date.now() - 3000));
-    }, 3000);
+        setLoading(false);
+        setIsJoined(true);
+    }, 1000);
   };
 
-  // إنشاء استطلاع
-  const createPoll = async () => {
-    if (!isTeacher || !activeLesson) return;
-
-    const poll = {
-      id: Date.now(),
-      question: 'ما الصعوبة التي تواجهها في النطق؟',
-      options: ['الحروف الصعبة', 'التركيب', 'السرعة', 'التشديد'],
-      votes: {},
-      active: true
-    };
-
-    setPolls([poll]);
-  };
-
-  // التصويت في استطلاع
-  const voteInPoll = async (pollId, optionIndex) => {
-    const pollRef = doc(db, 'live_streams', activeLesson.id.toString(), 'polls', pollId.toString());
-    await updateDoc(pollRef, {
-      [`votes.${user.uid}`]: optionIndex
-    });
-  };
-
-  // تبرع (هدية)
-  const sendGift = async (giftType) => {
-    const gift = {
-      type: giftType,
-      from: user.email,
-      timestamp: serverTimestamp(),
-      value: getGiftValue(giftType)
-    };
-
-    await addDoc(
-      collection(db, 'live_streams', activeLesson.id.toString(), 'gifts'),
-      gift
-    );
-  };
-
-  const getGiftValue = (type) => {
-    const values = {
-      'heart': 10,
-      'star': 50,
-      'crown': 100,
-      'rocket': 500
-    };
-    return values[type] || 0;
-  };
+  // إذا لم يتم تحميل الصفحة في المتصفح بعد، لا تعرض شيئاً
+  if (!mounted) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      {/* Header */}
-      <div className="p-4 border-b border-purple-500/30 bg-gradient-to-r from-purple-900/50 to-black flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <div className="w-3 h-3 bg-red-500 rounded-full animate-ping absolute"></div>
-            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-          </div>
-          <div>
-            <h1 className="text-2xl font-black text-white">القناة التعليمية الحية</h1>
-            <div className="flex items-center gap-4 text-sm text-purple-300">
-              <span className="flex items-center gap-1">
-                <IconUsers size={16} /> {viewers} مشاهد
-              </span>
-              {activeLesson && (
-                <>
-                  <span>المستوى: {activeLesson.level}</span>
-                  <span>المعلم: {activeLesson.teacher}</span>
-                </>
-              )}
-            </div>
-          </div>
+    // رفعنا الـ z-index إلى 9999 لضمان ظهوره فوق كل شيء بما في ذلك الشريط السفلي
+    <div className="fixed inset-0 z-[9999] bg-[#050505] flex flex-col font-sans">
+      
+      {/* رأس الصفحة */}
+      <div className="h-16 border-b border-white/10 bg-black/80 backdrop-blur-md flex justify-between items-center px-6 z-50 shrink-0">
+        <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full ${isJoined ? 'bg-red-500 animate-pulse' : 'bg-gray-500'}`}></div>
+            <h2 className="font-black tracking-widest text-white uppercase text-sm md:text-base">
+                {isJoined ? `ON AIR: ${roomName}` : "LIVE OPERATIONS CENTER"}
+            </h2>
         </div>
-        <button
-          onClick={onClose}
-          className="p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg transition-colors"
-        >
-          <IconX size={24} className="text-red-500" />
+        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-white/50 hover:text-red-500 transition-colors">
+            <IconX size={24}/>
         </button>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* الشاشة الرئيسية */}
-        <div className="flex-1 flex flex-col">
-          {/* الفيديو */}
-          <div className="relative flex-1 bg-black">
-            {activeLesson ? (
-              <>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  muted
-                  className="w-full h-full object-contain"
+      <div className="flex-1 relative overflow-hidden bg-black w-full h-full">
+        {/* خلفية جمالية */}
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none"></div>
+
+        {!isJoined ? (
+            // --- شاشة اللوبي (دخول الغرفة) ---
+            <div className="h-full w-full flex flex-col items-center justify-center p-6">
+                <div className="max-w-md w-full bg-[#111] border border-cyan-500/30 p-8 rounded-3xl relative shadow-[0_0_60px_rgba(6,182,212,0.15)]">
+                    
+                    {/* تأثير ضوئي خلفي */}
+                    <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-40 h-40 bg-cyan-500/20 blur-[100px] pointer-events-none"></div>
+
+                    <div className="flex justify-center mb-6 relative z-10">
+                        <div className="w-24 h-24 bg-cyan-900/20 rounded-full flex items-center justify-center border-2 border-cyan-500/50 shadow-lg shadow-cyan-500/20">
+                            <IconVideo size={48} className="text-cyan-400" />
+                        </div>
+                    </div>
+
+                    <h1 className="text-3xl font-black text-center text-white mb-2 relative z-10">SECURE UPLINK</h1>
+                    <p className="text-center text-white/40 text-sm mb-8 font-mono relative z-10">Enter Frequency ID to Connect</p>
+
+                    <div className="space-y-4 relative z-10">
+                        <div>
+                            <label className="text-[10px] uppercase font-bold text-cyan-500 tracking-widest ml-2 mb-1 block">Room Name</label>
+                            <input 
+                                value={roomName}
+                                onChange={(e) => setRoomName(e.target.value)}
+                                placeholder="ex: MOSCOW-BASE"
+                                className="w-full bg-black border border-white/20 rounded-xl p-4 text-white outline-none focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(6,182,212,0.2)] transition-all font-mono text-lg uppercase placeholder:text-white/20"
+                            />
+                        </div>
+
+                        <button 
+                            onClick={handleJoin}
+                            disabled={!roomName || loading}
+                            className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95"
+                        >
+                            {loading ? <IconLoader className="animate-spin"/> : <><IconBroadcast size={20}/> START BROADCAST</>}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        ) : (
+            // --- شاشة الاجتماع (Jitsi) ---
+            <div className="w-full h-full relative z-10">
+                <JitsiMeeting
+                    domain="meet.jit.si"
+                    roomName={`RussianMaster_App_${roomName}`}
+                    configOverwrite={{
+                        startWithAudioMuted: true,
+                        disableThirdPartyRequests: true,
+                        prejoinPageEnabled: false,
+                        theme: { default: 'dark' }
+                    }}
+                    interfaceConfigOverwrite={{
+                        TOOLBAR_BUTTONS: [
+                            'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
+                            'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',
+                            'livestreaming', 'etherpad', 'sharedvideo', 'settings', 'raisehand',
+                            'videoquality', 'filmstrip', 'invite', 'feedback', 'stats', 'shortcuts',
+                            'tileview', 'videobackgroundblur', 'download', 'help', 'mute-everyone',
+                            'security'
+                        ],
+                        SHOW_JITSI_WATERMARK: false,
+                        SHOW_WATERMARK_FOR_GUESTS: false,
+                        DEFAULT_BACKGROUND: '#050505',
+                    }}
+                    userInfo={{
+                        displayName: user?.email?.split('@')[0] || "Operative",
+                        email: user?.email
+                    }}
+                    getIFrameRef={(iframeRef) => {
+                        iframeRef.style.height = '100%';
+                        iframeRef.style.width = '100%';
+                        iframeRef.style.border = 'none';
+                        iframeRef.style.backgroundColor = '#000';
+                    }}
                 />
-                
-                {/* تفاعلات تطفو */}
-                <div className="absolute top-4 right-4 flex gap-2">
-                  {reactions.map(r => (
-                    <div
-                      key={r.id}
-                      className="text-3xl animate-bounce"
-                      style={{ animationDelay: `${Math.random()}s` }}
-                    >
-                      {r.reaction}
-                    </div>
-                  ))}
-                </div>
-
-                {/* معلومات الدرس */}
-                <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm p-4 rounded-xl max-w-md">
-                  <h2 className="text-2xl font-bold text-white mb-2">{activeLesson.title}</h2>
-                  <p className="text-white/70 mb-2">{activeLesson.description}</p>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="text-green-400">● مباشر</span>
-                    <span className="text-white/50">{activeLesson.duration}</span>
-                    <span className="text-yellow-400">{activeLesson.level}</span>
-                  </div>
-                </div>
-
-                {/* أدوات المعلم */}
-                {isTeacher && (
-                  <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-sm p-4 rounded-xl">
-                    <h3 className="text-white font-bold mb-2">أدوات المعلم</h3>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={createPoll}
-                        className="p-2 bg-blue-600 rounded-lg text-white hover:bg-blue-500"
-                      >
-                        استطلاع
-                      </button>
-                      <button className="p-2 bg-green-600 rounded-lg text-white hover:bg-green-500">
-                        <IconScreenShare size={20} />
-                      </button>
-                      <button className="p-2 bg-purple-600 rounded-lg text-white hover:bg-purple-500">
-                        <IconSettings size={20} />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full">
-                <IconVideo size={120} className="text-purple-500/30 mb-4" />
-                <h2 className="text-3xl font-bold text-white mb-2">لا يوجد بث نشط</h2>
-                <p className="text-white/50 mb-8">اختر درساً من الجدول</p>
-              </div>
-            )}
-          </div>
-
-          {/* الاستطلاعات */}
-          {polls.length > 0 && (
-            <div className="p-4 border-t border-white/10 bg-black/50">
-              {polls.map(poll => (
-                <div key={poll.id} className="max-w-md mx-auto">
-                  <h4 className="text-white font-bold mb-2">{poll.question}</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    {poll.options.map((option, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => voteInPoll(poll.id, idx)}
-                        className="p-3 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors"
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
             </div>
-          )}
-        </div>
-
-        {/* الشريط الجانبي */}
-        <div className="w-96 border-l border-white/10 flex flex-col bg-black/30">
-          {/* قائمة الدروس */}
-          {!activeLesson ? (
-            <div className="p-4 overflow-y-auto flex-1">
-              <h3 className="text-xl font-bold text-white mb-4">الدروس المجدولة</h3>
-              <div className="space-y-4">
-                {SCHEDULED_LESSONS.map(lesson => (
-                  <div
-                    key={lesson.id}
-                    onClick={() => startLesson(lesson)}
-                    className="bg-white/5 border border-white/10 rounded-xl p-4 hover:bg-white/10 hover:border-purple-500/50 cursor-pointer transition-all"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-bold text-white">{lesson.title}</h4>
-                      <span className="text-sm text-green-400">{lesson.time}</span>
-                    </div>
-                    <p className="text-white/70 text-sm mb-3">{lesson.description}</p>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-yellow-400">{lesson.level}</span>
-                      <span className="text-white/50 flex items-center gap-1">
-                        <IconUsers size={12} /> {lesson.attendees}
-                      </span>
-                      <span className="text-cyan-400">{lesson.duration}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* الدردشة */}
-              <div className="flex-1 flex flex-col">
-                <div className="p-4 border-b border-white/10">
-                  <h3 className="font-bold text-white flex items-center gap-2">
-                    <IconMessageCircle size={20} /> دردشة البث
-                  </h3>
-                </div>
-                
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                  {messages.map(msg => (
-                    <div
-                      key={msg.id}
-                      className={`p-3 rounded-lg ${
-                        msg.isTeacher
-                          ? 'bg-purple-900/30 border-l-4 border-purple-500'
-                          : 'bg-white/5'
-                      }`}
-                    >
-                      <div className="flex justify-between mb-1">
-                        <span className={`font-bold ${
-                          msg.isTeacher ? 'text-purple-300' : 'text-cyan-300'
-                        }`}>
-                          {msg.isTeacher ? '👑 ' : ''}{msg.userName}
-                        </span>
-                        <span className="text-xs text-white/30">
-                          {msg.timestamp?.toDate?.().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                      <p className="text-white">{msg.text}</p>
-                    </div>
-                  ))}
-                  <div ref={messagesEndRef} />
-                </div>
-
-                {/* أدوات التفاعل */}
-                <div className="p-4 border-t border-white/10">
-                  <div className="flex gap-2 mb-3">
-                    {['❤️', '👏', '🎉', '🔥', '🤯'].map(reaction => (
-                      <button
-                        key={reaction}
-                        onClick={() => sendReaction(reaction)}
-                        className="p-2 bg-white/10 hover:bg-white/20 rounded-lg text-xl transition-colors"
-                      >
-                        {reaction}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => sendGift('heart')}
-                      className="p-2 bg-pink-500/20 hover:bg-pink-500/30 rounded-lg text-pink-400"
-                    >
-                      <IconGift size={20} />
-                    </button>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                      placeholder="اكتب رسالتك..."
-                      className="flex-1 bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white outline-none focus:border-purple-500"
-                    />
-                    <button
-                      onClick={sendMessage}
-                      className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg font-bold transition-colors"
-                    >
-                      <IconSend size={20} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
@@ -4264,396 +3993,55 @@ export function MusicPlayer({ music }) {
 FILE: components\ranks\RankSystem.jsx
 ==================================================================
 
+// FILE: components/ranks/RankSystem.jsx
 "use client";
+import React from 'react';
+import { motion } from 'framer-motion';
+import { IconCrown, IconMedal, IconStar } from '@tabler/icons-react';
 
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  IconCrown, IconMedal, IconTrophy, IconStar,
-  IconSword, IconShield, IconFlag, IconUser,
-  IconArrowUp, IconAward, IconChevronRight,
-  IconChartBar, IconTrendingUp, IconSparkles
-} from '@tabler/icons-react';
-import { MILITARY_RANKS, getCurrentRank, getNextRank, getRankProgress, getRankUpRewards } from '../../data/militaryRanks';
-
-const RankSystem = ({ userXP, userStats, onRankUp }) => {
-  const [currentRank, setCurrentRank] = useState(null);
-  const [nextRank, setNextRank] = useState(null);
-  const [progress, setProgress] = useState(0);
-  const [showRankUp, setShowRankUp] = useState(false);
-  const [rewards, setRewards] = useState(null);
-
-  useEffect(() => {
-    const rank = getCurrentRank(userXP);
-    const next = getNextRank(userXP);
-    const prog = getRankProgress(userXP);
-    
-    setCurrentRank(rank);
-    setNextRank(next);
-    setProgress(prog);
-    
-    // التحقق من ترقية جديدة
-    const lastRank = localStorage.getItem('lastRank');
-    if (lastRank && rank.id !== lastRank) {
-      const reward = getRankUpRewards(lastRank, rank.id);
-      setRewards(reward);
-      setShowRankUp(true);
-      localStorage.setItem('lastRank', rank.id);
-      
-      if (onRankUp) {
-        onRankUp(rank, reward);
-      }
-    } else if (!lastRank) {
-      localStorage.setItem('lastRank', rank.id);
-    }
-  }, [userXP, onRankUp]);
-
-  const getRankIcon = (rankId) => {
-    const icons = {
-      recruit: '🪖',
-      private: '🎖️',
-      corporal: '⭐',
-      sergeant: '🎗️',
-      lieutenant: '⚔️',
-      captain: '🎖️',
-      major: '🏅',
-      colonel: '👑',
-      general: '🦅',
-      marshal: '🔥',
-      supreme_commander: '👁️'
-    };
-    return icons[rankId] || '⭐';
-  };
+export default function RankSystem({ xp }) {
+  // حساب الرتبة (معادلة بسيطة)
+  const level = Math.floor(Math.sqrt(xp / 100)); 
+  const progress = (xp - (level * level * 100)) / ((level + 1) * 100 - (level * level * 100)) * 100;
+  
+  const ranks = ["Recruit", "Soldier", "Corporal", "Sergeant", "Lieutenant", "Captain", "Major", "Colonel", "General", "Marshal"];
+  const rankName = ranks[Math.min(level, ranks.length - 1)] || "Legend";
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-6">
-      {/* ترقية الرتبة */}
-      <AnimatePresence>
-        {showRankUp && rewards && (
-          <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          >
-            <div className="bg-gradient-to-br from-yellow-900/30 to-orange-900/30 border-2 border-yellow-500 rounded-3xl p-8 max-w-md w-full shadow-[0_0_100px_rgba(255,193,7,0.5)]">
-              <div className="text-center mb-6">
-                <div className="text-6xl mb-4 animate-pulse">🎉</div>
-                <h2 className="text-3xl font-black text-white mb-2">ترقية!</h2>
-                <p className="text-yellow-300">أنت الآن {currentRank.title}</p>
-              </div>
-              
-              <div className="space-y-4 mb-8">
-                <div className="bg-black/30 p-4 rounded-xl">
-                  <div className="flex items-center justify-center gap-4 mb-3">
-                    <span className="text-4xl">{getRankIcon(currentRank.id)}</span>
-                    <IconArrowUp className="text-yellow-400" />
-                    <span className="text-4xl animate-bounce" style={{ color: currentRank.color }}>
-                      {getRankIcon(currentRank.id)}
-                    </span>
-                  </div>
-                  <h3 className="text-xl font-bold text-center text-white mb-2">{currentRank.name}</h3>
-                  <p className="text-white/70 text-center">{currentRank.description}</p>
-                </div>
-                
-                <div className="bg-black/30 p-4 rounded-xl">
-                  <h4 className="font-bold text-white mb-3">المكافآت</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-white/70">النقاط:</span>
-                      <span className="text-yellow-400 font-bold">+{rewards.xp}</span>
-                    </div>
-                    {rewards.cards.map((card, idx) => (
-                      <div key={idx} className="flex justify-between">
-                        <span className="text-white/70">بطاقة:</span>
-                        <span className="text-cyan-400">{card}</span>
-                      </div>
-                    ))}
-                    {rewards.special && (
-                      <div className="flex justify-between">
-                        <span className="text-white/70">مكافأة خاصة:</span>
-                        <span className="text-purple-400 font-bold">{rewards.special}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              <button
-                onClick={() => setShowRankUp(false)}
-                className="w-full py-3 bg-yellow-600 hover:bg-yellow-500 text-white font-bold rounded-xl transition-colors"
-              >
-                استمر
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className="w-full glass-card p-6 rounded-2xl border-t-4 border-t-purple-500">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+            <h3 className="text-white/50 text-xs font-bold uppercase tracking-widest">Current Rank</h3>
+            <h2 className="text-2xl font-black text-white flex items-center gap-2">
+                {level >= 8 ? <IconCrown className="text-yellow-400"/> : <IconMedal className="text-purple-400"/>}
+                {rankName}
+            </h2>
+        </div>
+        <div className="text-right">
+            <div className="text-3xl font-black text-white">{level}</div>
+            <div className="text-[10px] text-white/30 uppercase">Level</div>
+        </div>
+      </div>
 
-      {/* بطاقة الرتبة الحالية */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
-      >
-        <div className="bg-gradient-to-r from-gray-900 to-black border-2 border-cyan-500/30 rounded-3xl p-8 relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <IconCrown size={120} />
-          </div>
-          
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            {/* شارة الرتبة */}
-            <div className="relative">
-              <div
-                className="w-40 h-40 rounded-full flex items-center justify-center text-6xl shadow-2xl"
-                style={{
-                  background: `radial-gradient(circle, ${currentRank?.color}20, transparent 70%)`,
-                  border: `4px solid ${currentRank?.color}`
-                }}
-              >
-                <span className="text-5xl">{getRankIcon(currentRank?.id)}</span>
-              </div>
-              <div className="absolute -bottom-2 -right-2 bg-cyan-600 text-black px-3 py-1 rounded-full text-xs font-bold">
-                LVL {currentRank ? MILITARY_RANKS.findIndex(r => r.id === currentRank.id) + 1 : 1}
-              </div>
-            </div>
-            
-            {/* معلومات الرتبة */}
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-sm text-cyan-400 font-bold tracking-widest">الرتبة الحالية</span>
-                <div className="flex-1 h-px bg-cyan-500/30"></div>
-              </div>
-              
-              <h2 className="text-4xl font-black text-white mb-2" style={{ color: currentRank?.color }}>
-                {currentRank?.title}
-              </h2>
-              <div className="text-white/50 text-lg mb-4">{currentRank?.name}</div>
-              <p className="text-white/70 mb-6">{currentRank?.description}</p>
-              
-              {/* المزايا */}
-              <div className="flex flex-wrap gap-2">
-                {currentRank?.perks.map((perk, idx) => (
-                  <span
-                    key={idx}
-                    className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-sm text-white/80"
-                  >
-                    {perk}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* تقدم الرتبة */}
-        <div className="lg:col-span-2">
-          <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <IconTrendingUp className="text-green-500" />
-                التقدم للرتبة التالية
-              </h3>
-              <div className="text-cyan-400 font-bold">
-                {progress}%
-              </div>
-            </div>
-            
-            {nextRank ? (
-              <>
-                {/* شريط التقدم */}
-                <div className="relative mb-4">
-                  <div className="h-3 bg-white/5 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${progress}%` }}
-                      transition={{ duration: 1 }}
-                      className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 relative"
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
-                    </motion.div>
-                  </div>
-                  <div className="flex justify-between text-xs text-white/50 mt-2">
-                    <span>{currentRank?.xp} XP</span>
-                    <span>{nextRank.xp} XP</span>
-                  </div>
-                </div>
-                
-                {/* الرتبة التالية */}
-                <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                  <div className="flex items-center gap-4">
-                    <div
-                      className="w-16 h-16 rounded-full flex items-center justify-center text-3xl"
-                      style={{
-                        background: `radial-gradient(circle, ${nextRank.color}20, transparent 70%)`,
-                        border: `2px solid ${nextRank.color}`
-                      }}
-                    >
-                      {getRankIcon(nextRank.id)}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-bold text-white mb-1">{nextRank.title}</h4>
-                      <p className="text-white/50 text-sm">{nextRank.description}</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm text-white/70">تحتاج</div>
-                      <div className="text-xl font-black text-yellow-400">
-                        {nextRank.xp - userXP} XP
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* مزايا الرتبة التالية */}
-                  <div className="mt-4 pt-4 border-t border-white/10">
-                    <div className="text-sm text-white/70 mb-2">مزايا جديدة:</div>
-                    <div className="space-y-2">
-                      {nextRank.perks.map((perk, idx) => (
-                        <div key={idx} className="flex items-center gap-2 text-sm">
-                          <IconStar size={14} className="text-yellow-500" />
-                          <span className="text-white">{perk}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-8">
-                <IconCrown size={48} className="text-yellow-500 mx-auto mb-4" />
-                <h4 className="text-2xl font-bold text-white mb-2">أنت في القمة!</h4>
-                <p className="text-white/50">وصلت لأعلى رتبة ممكنة</p>
-              </div>
-            )}
-          </div>
-          
-          {/* إحصائيات الرتبة */}
-          <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard
-              icon={<IconTrophy className="text-yellow-500" />}
-              title="مركزك"
-              value={`#${Math.ceil((MILITARY_RANKS.findIndex(r => r.id === currentRank?.id) + 1) * 2.5)}`}
-              subtitle="عالمياً"
-            />
-            <StatCard
-              icon={<IconSparkles className="text-cyan-500" />}
-              title="النقاط"
-              value={userXP.toLocaleString()}
-              subtitle="XP"
-            />
-            <StatCard
-              icon={<IconChartBar className="text-green-500" />}
-              title="التقدم اليومي"
-              value={`+${userStats?.dailyXP || 0}`}
-              subtitle="نقاط"
-            />
-            <StatCard
-              icon={<IconAward className="text-purple-500" />}
-              title="الأوسمة"
-              value={userStats?.achievements || 0}
-              subtitle="إنجاز"
-            />
-          </div>
-        </div>
-        
-        {/* قائمة الرتب */}
-        <div className="bg-[#0a0a0a] border border-white/10 rounded-2xl p-6 overflow-hidden">
-          <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-            <IconMedal className="text-yellow-500" />
-            سلم الرتب العسكرية
-          </h3>
-          
-          <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-            {MILITARY_RANKS.map((rank, index) => {
-              const isCurrent = currentRank?.id === rank.id;
-              const isUnlocked = userXP >= rank.xp;
-              
-              return (
-                <div
-                  key={rank.id}
-                  className={`p-4 rounded-xl border transition-all ${
-                    isCurrent
-                      ? 'border-cyan-500 bg-cyan-500/10'
-                      : isUnlocked
-                      ? 'border-white/10 bg-white/5'
-                      : 'border-white/5 bg-black/30 opacity-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center text-xl"
-                      style={{
-                        background: isCurrent 
-                          ? `radial-gradient(circle, ${rank.color}30, transparent 70%)`
-                          : 'transparent',
-                        border: `2px solid ${rank.color}`
-                      }}
-                    >
-                      {getRankIcon(rank.id)}
-                    </div>
-                    
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className={`font-bold ${isCurrent ? 'text-cyan-400' : 'text-white'}`}>
-                          {rank.title}
-                        </h4>
-                        {isCurrent && (
-                          <span className="text-xs bg-cyan-600 text-white px-2 py-0.5 rounded-full">
-                            أنت هنا
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-sm text-white/50">{rank.name}</div>
-                    </div>
-                    
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-white">{rank.xp.toLocaleString()} XP</div>
-                      <div className="text-xs text-white/30">المستوى {index + 1}</div>
-                    </div>
-                  </div>
-                  
-                  {isUnlocked && rank.perks.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-white/10">
-                      <div className="flex flex-wrap gap-1">
-                        {rank.perks.slice(0, 2).map((perk, idx) => (
-                          <span
-                            key={idx}
-                            className="text-xs px-2 py-1 bg-white/5 rounded"
-                          >
-                            {perk}
-                          </span>
-                        ))}
-                        {rank.perks.length > 2 && (
-                          <span className="text-xs px-2 py-1 bg-white/5 rounded">
-                            +{rank.perks.length - 2}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      {/* Progress Bar */}
+      <div className="relative h-4 bg-black/50 rounded-full overflow-hidden border border-white/10">
+        <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${progress}%` }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+            className="absolute top-0 left-0 h-full bg-gradient-to-r from-purple-600 to-blue-500"
+        />
+        {/* Shine Effect */}
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent w-full -translate-x-full animate-shimmer"></div>
+      </div>
+      
+      <div className="flex justify-between mt-2 text-[10px] text-white/40 font-mono">
+        <span>{xp} XP</span>
+        <span>NEXT: {((level + 1) * (level + 1) * 100)} XP</span>
       </div>
     </div>
   );
-};
-
-const StatCard = ({ icon, title, value, subtitle }) => (
-  <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-    <div className="flex items-center gap-3 mb-2">
-      {icon}
-      <div className="text-sm text-white/70">{title}</div>
-    </div>
-    <div className="text-2xl font-black text-white">{value}</div>
-    <div className="text-xs text-white/30">{subtitle}</div>
-  </div>
-);
-
-export default RankSystem;
+}
 
 
 ==================================================================
@@ -5518,80 +4906,179 @@ FILE: components\SettingsView.jsx
 ==================================================================
 
 "use client";
-import React from 'react';
-import { 
-  IconVolume, IconVolumeOff, IconEye, IconEyeOff, IconGauge, IconLogout, IconCpu 
-} from '@tabler/icons-react';
+import React, { useState } from 'react';
 import { useSettings } from '../context/SettingsContext';
+import { 
+  IconVolume, IconEye, IconShield, IconDatabase, IconTrash, 
+  IconDeviceFloppy, IconBell, IconLanguage 
+} from '@tabler/icons-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-export default function SettingsView({ onLogout }) {
+export default function SettingsView({ user, onLogout, resetProgress }) {
   const { settings, updateSettings } = useSettings();
+  const [activeCategory, setActiveCategory] = useState('interface');
 
-  const Toggle = ({ label, icon: Icon, value, onChange }) => (
-    <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl mb-3 hover:bg-white/10 transition-all">
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-lg ${value ? 'bg-cyan-500/20 text-cyan-400' : 'bg-red-500/20 text-red-400'}`}>
-            <Icon size={24} />
-        </div>
-        <span className="font-bold text-sm tracking-widest">{label}</span>
-      </div>
-      <button 
-        onClick={() => onChange(!value)}
-        className={`w-12 h-6 rounded-full p-1 transition-colors ${value ? 'bg-cyan-600' : 'bg-gray-700'}`}
-      >
-        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${value ? 'translate-x-6' : 'translate-x-0'}`} />
-      </button>
-    </div>
-  );
+  const categories = [
+    { id: 'interface', label: 'Interface', icon: IconEye },
+    { id: 'audio', label: 'Audio & Voice', icon: IconVolume },
+    { id: 'data', label: 'Data & Privacy', icon: IconDatabase },
+    { id: 'account', label: 'Account', icon: IconShield },
+  ];
 
   return (
-    <div className="w-full h-full flex flex-col p-6 font-sans text-white pb-32 overflow-y-auto custom-scrollbar">
-      <div className="max-w-2xl mx-auto w-full">
-        <h2 className="text-3xl font-black mb-8 text-cyan-500 tracking-[0.2em] flex items-center gap-2">
-            <IconGauge className="animate-spin-slow" /> SYSTEM CONFIG
-        </h2>
+    <div className="w-full h-full p-8 flex flex-col max-w-5xl mx-auto font-sans">
+      <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-600 mb-8 glow-text-blue">
+        SYSTEM CONFIGURATION
+      </h2>
 
-        {/* إعدادات الصوت */}
-        <div className="mb-8">
-            <h3 className="text-xs text-white/40 uppercase font-bold mb-3 ml-2">Audio Modules</h3>
-            <Toggle label="System SFX" icon={settings.soundEffects ? IconVolume : IconVolumeOff} value={settings.soundEffects} onChange={(v) => updateSettings('soundEffects', v)} />
-            <Toggle label="Voice Assistant" icon={IconCpu} value={settings.speech} onChange={(v) => updateSettings('speech', v)} />
+      <div className="flex flex-col md:flex-row gap-8 flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <div className="w-full md:w-64 flex flex-col gap-2 shrink-0">
+          {categories.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCategory(cat.id)}
+              className={`flex items-center gap-3 p-4 rounded-xl text-left transition-all ${
+                activeCategory === cat.id 
+                ? 'bg-white/10 text-cyan-400 border-l-4 border-cyan-400 shadow-lg' 
+                : 'text-white/50 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <cat.icon size={20} />
+              <span className="font-bold text-sm uppercase tracking-wider">{cat.label}</span>
+            </button>
+          ))}
         </div>
 
-        {/* إعدادات الجرافيك */}
-        <div className="mb-8">
-            <h3 className="text-xs text-white/40 uppercase font-bold mb-3 ml-2">Visual Interface</h3>
-            <Toggle label="High Performance" icon={settings.visualEffects ? IconEye : IconEyeOff} value={settings.visualEffects} onChange={(v) => updateSettings('visualEffects', v)} />
-        </div>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeCategory}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-6"
+            >
+              {activeCategory === 'interface' && (
+                <div className="space-y-4">
+                  <SettingGroup title="Visual Fidelity">
+                    <ToggleOption 
+                      label="High-Res Particles" 
+                      desc="Enable detailed background effects (uses GPU)." 
+                      value={settings.visualEffects} 
+                      onChange={v => updateSettings('visualEffects', v)} 
+                    />
+                    <ToggleOption 
+                      label="Motion Blur" 
+                      desc="Add cinematic blur to animations." 
+                      value={settings.motionBlur} 
+                      onChange={v => updateSettings('motionBlur', v)} 
+                    />
+                  </SettingGroup>
+                  <SettingGroup title="Language">
+                    <div className="flex justify-between items-center p-4 bg-white/5 rounded-lg border border-white/10">
+                        <span className="text-sm font-bold text-white">App Language</span>
+                        <select className="bg-black border border-white/20 rounded px-2 py-1 text-xs outline-none">
+                            <option>English (System)</option>
+                            <option>Arabic (العربية)</option>
+                            <option>Russian (Русский)</option>
+                        </select>
+                    </div>
+                  </SettingGroup>
+                </div>
+              )}
 
-        {/* إعدادات الصعوبة */}
-        <div className="mb-8">
-            <h3 className="text-xs text-white/40 uppercase font-bold mb-3 ml-2">Training Intensity</h3>
-            <div className="grid grid-cols-3 gap-2">
-                {['easy', 'normal', 'hard'].map((mode) => (
-                    <button
-                        key={mode}
-                        onClick={() => updateSettings('difficulty', mode)}
-                        className={`py-3 rounded-lg font-bold text-xs uppercase border transition-all ${
-                            settings.difficulty === mode 
-                            ? 'bg-cyan-600 border-cyan-400 text-white shadow-[0_0_15px_rgba(6,182,212,0.3)]' 
-                            : 'bg-black border-white/10 text-white/40 hover:bg-white/5'
-                        }`}
-                    >
-                        {mode}
-                    </button>
-                ))}
-            </div>
-        </div>
+              {activeCategory === 'audio' && (
+                <div className="space-y-4">
+                  <SettingGroup title="Sound Mixer">
+                    <ToggleOption 
+                      label="UI Sound Effects" 
+                      desc="Clicks, hovers, and system alerts." 
+                      value={settings.soundEffects} 
+                      onChange={v => updateSettings('soundEffects', v)} 
+                    />
+                    <ToggleOption 
+                      label="AI Voice Synthesis" 
+                      desc="Auto-pronounce Russian words." 
+                      value={settings.speech} 
+                      onChange={v => updateSettings('speech', v)} 
+                    />
+                  </SettingGroup>
+                  <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                    <div className="text-sm font-bold text-white mb-2">Voice Speed</div>
+                    <input type="range" min="0.5" max="1.5" step="0.1" className="w-full accent-cyan-500" />
+                    <div className="flex justify-between text-xs text-white/30 mt-1"><span>Slow</span><span>Fast</span></div>
+                  </div>
+                </div>
+              )}
 
-        {/* تسجيل الخروج */}
-        <button onClick={onLogout} className="w-full py-4 mt-4 bg-red-900/20 border border-red-500/50 text-red-500 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-red-900/40 transition-all">
-            <IconLogout size={20} /> TERMINATE SESSION
-        </button>
+              {activeCategory === 'data' && (
+                <div className="space-y-4">
+                  <SettingGroup title="Privacy & Storage">
+                    <div className="p-4 bg-white/5 rounded-xl border border-white/10 flex justify-between items-center">
+                        <div>
+                            <div className="font-bold text-white">Export User Data</div>
+                            <div className="text-xs text-white/40">Download a JSON file of your progress.</div>
+                        </div>
+                        <button className="p-2 bg-cyan-900/30 text-cyan-400 rounded-lg hover:bg-cyan-500 hover:text-black transition-colors"><IconDeviceFloppy/></button>
+                    </div>
+                    <div className="p-4 bg-red-900/10 rounded-xl border border-red-500/30 flex justify-between items-center">
+                        <div>
+                            <div className="font-bold text-red-400">Factory Reset</div>
+                            <div className="text-xs text-red-400/50">Wipe all progress permanently.</div>
+                        </div>
+                        <button onClick={resetProgress} className="p-2 bg-red-500/20 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors"><IconTrash/></button>
+                    </div>
+                  </SettingGroup>
+                </div>
+              )}
+
+              {activeCategory === 'account' && (
+                <div className="space-y-4">
+                    <div className="glass-panel p-6 rounded-xl text-center">
+                        <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-blue-600 rounded-full mx-auto mb-4 flex items-center justify-center text-2xl font-bold">
+                            {user?.email?.[0].toUpperCase()}
+                        </div>
+                        <h3 className="text-xl font-bold text-white">{user?.email}</h3>
+                        <p className="text-white/40 text-xs font-mono mt-1">{user?.uid}</p>
+                        <button onClick={onLogout} className="mt-6 w-full py-3 border border-red-500/50 text-red-500 font-bold rounded-lg hover:bg-red-500 hover:text-white transition-all">
+                            LOGOUT
+                        </button>
+                    </div>
+                </div>
+              )}
+
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );
 }
+
+const SettingGroup = ({ title, children }) => (
+    <div className="space-y-2">
+        <h4 className="text-xs font-bold text-cyan-500 uppercase tracking-widest ml-1">{title}</h4>
+        {children}
+    </div>
+);
+
+const ToggleOption = ({ label, desc, value, onChange }) => (
+    <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors">
+        <div>
+            <div className="text-sm font-bold text-white">{label}</div>
+            <div className="text-xs text-white/40">{desc}</div>
+        </div>
+        <button 
+            onClick={() => onChange(!value)}
+            className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${value ? 'bg-cyan-600' : 'bg-gray-700'}`}
+        >
+            <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${value ? 'translate-x-6' : 'translate-x-0'}`} />
+        </button>
+    </div>
+);
 
 
 ==================================================================
@@ -8684,19 +8171,20 @@ FILE: package.json
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@jitsi/react-sdk": "^1.4.0",
     "@tabler/icons-react": "^3.35.0",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
-    "firebase": "^12.6.0",
-    "framer-motion": "^11.18.2",
+    "firebase": "^10.12.0",
+    "framer-motion": "^11.2.0",
     "mini-svg-data-uri": "^1.4.4",
     "next": "14.2.3",
     "next-pwa": "^5.6.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1",
-    "tailwind-merge": "^2.6.0"
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0",
+    "tailwind-merge": "^2.3.0"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.19",
@@ -8706,7 +8194,6 @@ FILE: package.json
     "tailwindcss": "^3.4.3"
   }
 }
-
 
 
 ==================================================================
@@ -8770,6 +8257,8 @@ FILE: tailwind.config.js
 
 // FILE: tailwind.config.js
 /** @type {import('tailwindcss').Config} */
+const { default: flattenColorPalette } = require("tailwindcss/lib/util/flattenColorPalette");
+
 module.exports = {
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
@@ -8779,34 +8268,51 @@ module.exports = {
   ],
   theme: {
     extend: {
-      // يجب أن تكون الرسوم المتحركة هنا داخل extend
-      keyframes: {
-        shine: {
-          "100%": { transform: "translateX(100%)" },
-        },
-        shimmer: {
-          "0%": { transform: "translateX(-100%)" },
-          "100%": { transform: "translateX(100%)" },
-        },
-        blob: {
-          "0%": { transform: "translate(0px, 0px) scale(1)" },
-          "33%": { transform: "translate(30px, -50px) scale(1.1)" },
-          "66%": { transform: "translate(-20px, 20px) scale(0.9)" },
-          "100%": { transform: "translate(0px, 0px) scale(1)" },
-        },
-        "music-bar": {
-          "0%, 100%": { height: "20%" },
-          "50%": { height: "100%" },
+      colors: {
+        nexus: {
+          dark: "#030014",
+          glass: "rgba(255, 255, 255, 0.05)",
+          border: "rgba(255, 255, 255, 0.1)",
+          primary: "#00f0ff", // Cyber Cyan
+          secondary: "#7000ff", // Electric Purple
+          accent: "#ff003c", // Cyber Red
         }
       },
+      fontFamily: {
+        sans: ['var(--font-cairo)', 'sans-serif'],
+        mono: ['var(--font-mono)', 'monospace'],
+      },
       animation: {
-        shine: "shine 1s",
-        blob: "blob 7s infinite",
-        "music-bar": "music-bar 0.5s ease-in-out infinite",
-        "spin-slow": "spin 8s linear infinite",
+        "meteor-effect": "meteor 5s linear infinite",
+        "shimmer": "shimmer 2s linear infinite",
+        "pulse-slow": "pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "float": "float 6s ease-in-out infinite",
+      },
+      keyframes: {
+        meteor: {
+          "0%": { transform: "rotate(215deg) translateX(0)", opacity: "1" },
+          "70%": { opacity: "1" },
+          "100%": { transform: "rotate(215deg) translateX(-500px)", opacity: "0" },
+        },
+        shimmer: {
+          from: { backgroundPosition: "0 0" },
+          to: { backgroundPosition: "-200% 0" },
+        },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-20px)" },
+        }
       },
     },
   },
-  plugins: [],
+  plugins: [addVariablesForColors],
 };
+
+function addVariablesForColors({ addBase, theme }) {
+  let allColors = flattenColorPalette(theme("colors"));
+  let newVars = Object.fromEntries(
+    Object.entries(allColors).map(([key, val]) => [`--${key}`, val])
+  );
+  addBase({ ":root": newVars });
+}
 
