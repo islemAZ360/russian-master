@@ -1,17 +1,38 @@
 import { NextResponse } from "next/server";
 
+// قائمة بخوادم Cobalt القوية (Failover List)
+// إذا فشل واحد، ينتقل النظام للتالي تلقائياً
+const COBALT_INSTANCES = [
+  "https://co.wuk.sh/api/json",          // خادم قوي جداً ومفتوح
+  "https://cobalt.kwiatekmiki.pl/api/json", // خادم بديل
+  "https://api.cobalt.tools/api/json",   // الخادم الرسمي (احتياطي)
+  "https://cobalt.steamodded.com/api/json" // خادم إضافي
+];
+
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { url, format, quality } = body;
+    let { url, format, quality } = body;
 
     if (!url) {
       return NextResponse.json({ error: "الرابط مفقود" }, { status: 400 });
     }
 
-    // إعدادات الطلب لخدمة Cobalt
-    const cobaltApiUrl = "https://api.cobalt.tools/api/json";
-    
+    // 1. تنظيف الرابط من معاملات التتبع (مثل ?si=...) لأنها تسبب مشاكل أحياناً
+    try {
+      const urlObj = new URL(url);
+      // نحتفظ فقط بمعامل v إذا كان يوتيوب عادي، ونزيل الباقي
+      if (urlObj.hostname.includes("youtube.com") || urlObj.hostname.includes("youtu.be")) {
+        url = urlObj.origin + urlObj.pathname;
+        if (urlObj.searchParams.has("v")) {
+          url += "?v=" + urlObj.searchParams.get("v");
+        }
+      }
+    } catch (e) {
+      // إذا فشل التنظيف، نستخدم الرابط كما هو
+    }
+
+    // إعدادات الطلب
     const payload = {
       url: url,
       vCodec: "h264",
@@ -21,28 +42,52 @@ export async function POST(req) {
       filenamePattern: "basic"
     };
 
-    const response = await fetch(cobaltApiUrl, {
-      method: "POST",
-      headers: {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-      },
-      body: JSON.stringify(payload)
-    });
+    let data = null;
+    let success = false;
 
-    const data = await response.json();
+    // 2. حلقة المحاولة (Retry Logic)
+    for (const apiUrl of COBALT_INSTANCES) {
+      try {
+        console.log(`Trying instance: ${apiUrl}...`); // للتتبع في الكونسول
+        
+        const response = await fetch(apiUrl, {
+          method: "POST",
+          headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          },
+          body: JSON.stringify(payload)
+        });
 
-    if (data.status === "error" || (!data.url && !data.picker)) {
-      console.error("Cobalt Error:", data);
-      return NextResponse.json({ error: "فشل استخراج الفيديو. تأكد أن الرابط عام وصحيح." }, { status: 500 });
+        data = await response.json();
+
+        // التحقق من نجاح العملية
+        if (data && (data.url || data.picker || data.status === "stream" || data.status === "success")) {
+          success = true;
+          break; // نجحنا، نخرج من الحلقة
+        }
+      } catch (err) {
+        console.warn(`Instance failed: ${apiUrl}`, err.message);
+        // نستمر للمحاولة مع الخادم التالي
+      }
     }
 
-    // في بعض الأحيان تعيد الخدمة "picker" إذا كان هناك خيارات متعددة، نأخذ الرابط الأول
-    const finalUrl = data.url || (data.picker && data.picker[0] ? data.picker[0].url : null);
+    // 3. معالجة النتيجة النهائية
+    if (!success || !data) {
+      return NextResponse.json({ error: "فشلت جميع الخوادم في المعالجة. تأكد أن الرابط عام." }, { status: 500 });
+    }
+
+    // التعامل مع أنواع الردود المختلفة من Cobalt
+    let finalUrl = data.url;
+    
+    // أحياناً يعيد النظام قائمة (picker) بدلاً من رابط مباشر
+    if (!finalUrl && data.picker && data.picker.length > 0) {
+      finalUrl = data.picker[0].url;
+    }
 
     if (!finalUrl) {
-       return NextResponse.json({ error: "لم يتم العثور على رابط مباشر للتحميل." }, { status: 500 });
+       return NextResponse.json({ error: "تم تحليل الفيديو لكن لم يتم العثور على رابط مباشر." }, { status: 500 });
     }
 
     // محاولة استخراج صورة الفيديو بشكل مستقل لتحسين العرض
@@ -64,6 +109,6 @@ export async function POST(req) {
 
   } catch (error) {
     console.error("Server Error:", error);
-    return NextResponse.json({ error: "حدث خطأ في خادم المعالجة" }, { status: 500 });
+    return NextResponse.json({ error: "حدث خطأ في خادم المعالجة الداخلي" }, { status: 500 });
   }
 }
