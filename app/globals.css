@@ -1,0 +1,75 @@
+/* FILE: app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@200;400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+:root {
+  --bg-deep: #050505;
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-surface: rgba(20, 20, 20, 0.6);
+  --neon-primary: #00f2ff;
+  --neon-secondary: #ff0055;
+  --neon-accent: #7000ff;
+}
+
+body {
+  background-color: var(--bg-deep);
+  color: white;
+  font-family: 'Cairo', sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- الخلفية الكونية المتحركة --- */
+.nebula-bg {
+  position: fixed;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 15% 50%, rgba(112, 0, 255, 0.08), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(0, 242, 255, 0.08), transparent 25%);
+  z-index: -1;
+  animation: breathe 10s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+/* --- زجاج عالي الجودة --- */
+.glass-card {
+  background: var(--glass-surface);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(30, 30, 30, 0.7);
+}
+
+/* --- أزرار النيون --- */
+.btn-neon {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+.btn-neon::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: 0.5s;
+}
+.btn-neon:hover::after { left: 100%; }
+
+/* --- تخصيصات إضافية --- */
+.font-mono { font-family: 'JetBrains Mono', monospace !important; }
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--neon-primary); }
