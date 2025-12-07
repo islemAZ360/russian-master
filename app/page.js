@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
-  IconShield, IconMessageCircle, IconRobot, IconDeviceGamepad, IconBroadcast 
+  IconShield, IconMessageCircle, IconRobot, IconDeviceGamepad, IconBroadcast,
+  IconDownload // أيقونة التحميل الجديدة
 } from '@tabler/icons-react';
 
 // --- استيراد المكونات ---
@@ -18,13 +19,12 @@ import SettingsView from '../components/SettingsView';
 import AdminDashboard from '../components/AdminDashboard'; 
 import AITutor from '../components/AITutor';
 import GamesHub from '../components/GamesHub';
+import TechZone from '../components/TechZone'; // <--- تم استيراد TechZone هنا
 import { FloatingDock } from '../components/ui/floating-dock';
 import DigitalRain from '../components/ui/DigitalRain'; 
 import IntroSequence from '../components/IntroSequence'; 
 import { BossBattleWrapper } from '../components/BossBattleWrapper'; 
 import DailyReward from '../components/DailyReward';
-
-// 👇 استيراد البث المباشر الجديد 👇
 import RealLiveStream from '../components/live/RealLiveStream';
 
 import { useStudySystem } from '../hooks/useStudySystem';
@@ -124,9 +124,10 @@ export default function RussianApp() {
     { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
     { title: "AI Mentor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => setCurrentView('ai-tutor') },
     { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
+    { title: "Live Ops", icon: <IconBroadcast className="w-full text-red-500" />, onClick: () => setCurrentView('live') },
     
-    // 👇 زر البث المباشر الجديد 👇
-    { title: "Live Ops", icon: <IconBroadcast className="w-full text-red-500 animate-pulse" />, onClick: () => setCurrentView('live') },
+    // 👇 إضافة زر التحميل هنا 👇
+    { title: "Tech Zone", icon: <IconDownload className="w-full text-orange-500" />, onClick: () => setCurrentView('tech') },
 
     { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
     { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
@@ -146,9 +147,10 @@ export default function RussianApp() {
       case 'home': return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
       case 'ai-tutor': return <AITutor user={user} />;
       case 'games': return <GamesHub cards={cards} />;
-      
-      // 👇 عرض شاشة البث المباشر 👇
       case 'live': return <RealLiveStream user={user} onClose={() => setCurrentView('home')} />;
+      
+      // 👇 إضافة حالة العرض هنا 👇
+      case 'tech': return <TechZone />;
       
       case 'chat': return <CommunicationHub user={user} />;
       case 'category': return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
