@@ -3,35 +3,33 @@ import { NextResponse } from "next/server";
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { url, format } = body; // format: 'video' or 'audio'
+    const { url, format } = body;
 
     if (!url) return NextResponse.json({ error: "الرابط مفقود" }, { status: 400 });
 
-    // 1. تنظيف الرابط
     let cleanUrl = url;
     try {
         const urlObj = new URL(url);
-        // نأخذ الـ ID فقط ونعيد بناء الرابط لتجنب أي مشاكل
-        let videoId = "";
-        if (url.includes("youtu.be")) videoId = urlObj.pathname.slice(1);
-        else videoId = urlObj.searchParams.get("v");
-        
-        if (videoId) cleanUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    } catch (e) {}
+        if (urlObj.hostname.includes('youtu')) {
+            let videoId = "";
+            if (url.includes("youtu.be")) videoId = urlObj.pathname.slice(1);
+            else videoId = urlObj.searchParams.get("v");
+            
+            if (videoId) cleanUrl = `https://www.youtube.com/watch?v=${videoId.split('?')[0]}`;
+        }
+    } catch (e) { }
 
-    // 2. إعدادات RapidAPI (من صورك)
     const apiHost = "youtube-info-download-api.p.rapidapi.com";
     const apiKey = "dadaa32ee3mshea65c3b698adda9p1bd70fjsn7f23dfd97126"; 
 
-    // 3. تصحيح الـ Format بناءً على الصورة التي أرسلتها!
-    // الصورة تقول: للفيديو أرسل الدقة (720)، للصوت أرسل الصيغة (mp3)
-    // لا ترسل 'mp4' لأن الـ API لا يقبلها في خانة format
+    // --- التصحيح الجذري هنا ---
+    // للفيديو: نرسل "720" (لأن الـ API يطلب الدقة وليس الامتداد)
+    // للصوت: نرسل "mp3"
     const targetFormat = format === 'audio' ? 'mp3' : '720'; 
     
-    // استخدام نقطة النهاية الموجودة في الـ cURL Snippet
     const apiUrl = `https://${apiHost}/ajax/download.php?format=${targetFormat}&url=${encodeURIComponent(cleanUrl)}`;
 
-    console.log("Requesting:", apiUrl); // للتتبع في Vercel Logs
+    console.log("Requesting URL:", apiUrl);
 
     const response = await fetch(apiUrl, {
       method: "GET",
@@ -42,29 +40,30 @@ export async function POST(req) {
     });
 
     if (!response.ok) {
-        return NextResponse.json({ error: `خطأ من المصدر: ${response.status}` }, { status: response.status });
+        return NextResponse.json({ error: "فشل الاتصال بالمزود" }, { status: response.status });
     }
 
     const data = await response.json();
-    console.log("API Data:", data); // لنرى ماذا يعيد السيرفر
+    console.log("Provider Response:", data);
 
-    // 4. التحقق من الاستجابة
-    // هذا الـ API بالتحديد يعيد أحياناً data.url وأحياناً data.download_url
-    const downloadLink = data.url || data.download_url || (data.downloads && data.downloads[0]?.url);
+    // التحقق الصارم: هل يوجد رابط فعلاً؟
+    // نبحث في data.url وفي data.link احتياطاً
+    const finalLink = data.url || data.link || (data.download && data.download.url);
 
-    if (!data.success && !downloadLink) {
-         return NextResponse.json({ error: "فشل استخراج الرابط، قد يكون الفيديو محمياً أو الرابط غير مدعوم." }, { status: 400 });
+    if (!finalLink) {
+         // إذا نجح الطلب لكن الرابط فارغ، نرجع خطأ للواجهة بدلاً من زر تحميل فارغ
+         return NextResponse.json({ error: "لم يتمكن السيرفر من توليد الرابط. قد يكون الفيديو محمياً أو الجودة غير متاحة." }, { status: 400 });
     }
 
     return NextResponse.json({
       status: "success",
       title: data.title || "YouTube Video",
-      thumb: data.poster || null,
-      downloadUrl: downloadLink // الرابط النهائي
+      thumb: data.poster || `https://img.youtube.com/vi/${cleanUrl.split('v=')[1]}/hqdefault.jpg`,
+      downloadUrl: finalLink
     });
 
   } catch (error) {
-    console.error("Server Error:", error);
-    return NextResponse.json({ error: "حدث خطأ في المعالجة الداخلية" }, { status: 500 });
+    console.error("Internal Error:", error);
+    return NextResponse.json({ error: "حدث خطأ داخلي" }, { status: 500 });
   }
 }
