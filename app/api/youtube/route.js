@@ -9,6 +9,7 @@ export async function POST(req) {
       return NextResponse.json({ error: "الرابط مفقود" }, { status: 400 });
     }
 
+    // استخدام خدمة Cobalt API المجانية والقوية (لا تحتاج API Key)
     const cobaltApiUrl = "https://api.cobalt.tools/api/json";
     
     const payload = {
@@ -32,10 +33,11 @@ export async function POST(req) {
     const data = await response.json();
 
     if (data.status === "error" || !data.url) {
-      return NextResponse.json({ error: "فشل في جلب الفيديو. تأكد من الرابط." }, { status: 500 });
+      console.error("Download Error:", data);
+      return NextResponse.json({ error: "لم نتمكن من معالجة الرابط. تأكد أنه صحيح وعام." }, { status: 500 });
     }
 
-    // محاولة استخراج الصورة المصغرة
+    // محاولة استخراج ID الفيديو لجلب الصورة المصغرة بشكل مستقل
     let videoId = "";
     try {
         if(url.includes("youtu.be")) videoId = url.split("/").pop();
@@ -45,7 +47,7 @@ export async function POST(req) {
     const thumb = videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null;
 
     return NextResponse.json({
-      title: data.filename || "YouTube Content",
+      title: data.filename || "YouTube Video",
       url: data.url,
       thumb: thumb,
       status: "success"
@@ -53,6 +55,6 @@ export async function POST(req) {
 
   } catch (error) {
     console.error("Server Error:", error);
-    return NextResponse.json({ error: "حدث خطأ في السيرفر" }, { status: 500 });
+    return NextResponse.json({ error: "حدث خطأ في الخادم" }, { status: 500 });
   }
 }

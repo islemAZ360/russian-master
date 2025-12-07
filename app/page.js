@@ -1,240 +1,226 @@
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/lib/firebase";
-
-// --- UI Components ---
-import { FloatingDock } from "@/components/ui/floating-dock";
-// تمت إزالة FluidBackground
-import { IntroScreen } from "@/components/IntroScreen";
-import { AuthScreen } from "@/components/AuthScreen";
-
-// --- Icons ---
+import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  IconHome, 
-  IconBook, 
-  IconChartBar, 
-  IconDatabase, 
-  IconCpu 
-} from "@tabler/icons-react";
-// تمت إزالة الأيقونات غير المستخدمة (IconMap2, IconBuildingStore, IconSkull)
+  IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
+  IconShield, IconMessageCircle, IconRobot, IconDeviceGamepad, IconBroadcast 
+} from '@tabler/icons-react';
 
-// --- Feature Components ---
-import { HeroSection } from "@/components/HeroSection";
-import { StudyCard } from "@/components/StudyCard";
-import { StatsView } from "@/components/StatsView";
-import { DataManager } from "@/components/DataManager";
-import TechZone from "@/components/TechZone"; // أبقيت على TechZone لأنه موجود ولم تطلب حذفه
+// --- استيراد المكونات ---
+import { HeroSection } from '../components/HeroSection';
+import { CategorySelect } from '../components/CategorySelect';
+import { StudyCard } from '../components/StudyCard';
+import { AuthScreen } from '../components/AuthScreen';
+import { DataManager } from '../components/DataManager'; 
+import CyberDeck from '../components/CyberDeck'; 
+import CommunicationHub from '../components/CommunicationHub'; 
+import SettingsView from '../components/SettingsView'; 
+import AdminDashboard from '../components/AdminDashboard'; 
+import AITutor from '../components/AITutor';
+import GamesHub from '../components/GamesHub';
+import { FloatingDock } from '../components/ui/floating-dock';
+import DigitalRain from '../components/ui/DigitalRain'; 
+import IntroSequence from '../components/IntroSequence'; 
+import { BossBattleWrapper } from '../components/BossBattleWrapper'; 
+import DailyReward from '../components/DailyReward';
 
-// تمت إزالة (NeuralMap, CyberBase, SlangDistrict)
+// 👇 استيراد البث المباشر الجديد 👇
+import RealLiveStream from '../components/live/RealLiveStream';
 
-// --- Logic Hooks ---
-import { useStudySystem } from "@/hooks/useStudySystem";
+import { useStudySystem } from '../hooks/useStudySystem';
+import { useAudio } from '../hooks/useAudio';
+import { auth, db } from '../lib/firebase';
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, onSnapshot, updateDoc, setDoc, getDoc } from "firebase/firestore";
+
+const MASTER_EMAIL = "islamaz@bomba.com";
 
 export default function RussianApp() {
-  // 1. حالة المصادقة (Authentication State)
   const [user, setUser] = useState(null);
+  const [userData, setUserData] = useState(null); 
+  const [currentView, setCurrentView] = useState('home');
+  const [activeCategory, setActiveCategory] = useState("All");
+  const [showIntro, setShowIntro] = useState(true); 
+  const [broadcast, setBroadcast] = useState(null);
+  const [showDailyReward, setShowDailyReward] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
 
-  // 2. حالة التطبيق (App State)
-  const [currentView, setCurrentView] = useState("hero");
-  const [isIntroDone, setIsIntroDone] = useState(false);
-  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  // حالات المعركة
+  const [battleResult, setBattleResult] = useState(null); 
+  const [battleTrigger, setBattleTrigger] = useState(0);
 
-  // 3. ربط النظام (System Hook)
   const { 
-    cards, 
-    stats, 
-    handleSwipe,  
-    addCard, 
-    deleteCard, 
-    updateCard, 
-    exportData, 
-    importData 
+    cards, currentCard, stats, handleSwipe, resetProgress, 
+    addCard, deleteCard, updateCard 
   } = useStudySystem(user);
 
-  // مراقبة حالة تسجيل الدخول
+  const { speak, playSFX } = useAudio();
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoadingAuth(false);
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+        if (u) {
+            setUser(u);
+            const userRef = doc(db, "users", u.uid);
+            
+            if (u.email === MASTER_EMAIL) {
+                const snap = await getDoc(userRef);
+                if (!snap.exists()) {
+                    await setDoc(userRef, { email: u.email, role: 'admin', xp: 0, createdAt: new Date().toISOString() });
+                } else if (snap.data().role !== 'admin') {
+                    await updateDoc(userRef, { role: 'admin' });
+                }
+            }
+
+            onSnapshot(userRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    setUserData(docSnap.data());
+                    if (docSnap.data().forceLogout) {
+                        auth.signOut();
+                        window.location.reload();
+                    }
+                }
+            });
+            setShowDailyReward(true);
+        } else {
+            setUser(null);
+            setUserData(null);
+        }
+        setLoadingAuth(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // 4. منطق طابور الدراسة (Study Queue Logic)
-  const studyQueue = useMemo(() => {
-    if (!cards) return [];
-    return cards.filter(c => c.level < 5).sort((a, b) => a.reviews - b.reviews);
+  useEffect(() => {
+    const unsubBroad = onSnapshot(doc(db, "system", "broadcast"), (d) => setBroadcast(d.exists() && d.data().active ? d.data().message : null));
+    return () => unsubBroad();
+  }, []);
+
+  const handleLogout = () => auth.signOut().then(() => window.location.reload());
+
+  const categories = useMemo(() => {
+      if (!cards) return [];
+      return [...new Set(cards.map(c => c.category || "General"))];
   }, [cards]);
 
-  // دالة معالجة نتيجة البطاقة (صحيح/خطأ)
-  const handleCardResult = (id, known) => {
-    const direction = known ? 'right' : 'left';
-    handleSwipe(direction); 
+  const isMaster = user?.email === MASTER_EMAIL;
+  const isAdmin = userData?.role === 'admin' || isMaster;
+  const isJunior = userData?.role === 'junior' || isAdmin;
+  const isBanned = userData?.isBanned && !isMaster;
 
-    if (currentCardIndex < studyQueue.length - 1) {
-      setCurrentCardIndex(prev => prev + 1);
-    } else {
-      setCurrentCardIndex(0);
-      setCurrentView("stats");
-    }
-  };
+  if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
 
-  // 5. قائمة التنقل السفلية (Dock Navigation) - تم تنظيف القائمة
-  const navLinks = [
-    { 
-      title: "Base", 
-      icon: <IconHome className="h-full w-full text-neutral-300" />, 
-      onClick: () => setCurrentView("hero") 
-    },
-    { 
-      title: "Training", 
-      icon: <IconBook className="h-full w-full text-neutral-300" />, 
-      onClick: () => setCurrentView("study") 
-    },
-    { 
-      title: "Tech Zone", 
-      icon: <IconCpu className="h-full w-full text-red-500" />, 
-      onClick: () => setCurrentView("tech") 
-    },
-    { 
-      title: "Stats", 
-      icon: <IconChartBar className="h-full w-full text-neutral-300" />, 
-      onClick: () => setCurrentView("stats") 
-    },
-    { 
-      title: "Database", 
-      icon: <IconDatabase className="h-full w-full text-neutral-300" />, 
-      onClick: () => setCurrentView("data") 
-    },
+  if (isBanned) return (
+    <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-red-500 space-y-6 font-mono relative overflow-hidden">
+        <h1 className="text-6xl font-black tracking-widest text-center">ACCESS DENIED</h1>
+        <button onClick={handleLogout} className="px-8 py-3 border border-red-500 rounded hover:bg-red-900/20 transition-colors">LOGOUT</button>
+    </div>
+  );
+
+  if (loadingAuth) return <div className="h-screen bg-black text-cyan-500 flex items-center justify-center font-mono animate-pulse">LOADING NEURAL LINK...</div>;
+  
+  if (!user) return <AuthScreen onLoginSuccess={setUser} />;
+
+  let navLinks = [
+    { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
+    { title: "AI Mentor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => setCurrentView('ai-tutor') },
+    { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
+    
+    // 👇 زر البث المباشر الجديد 👇
+    { title: "Live Ops", icon: <IconBroadcast className="w-full text-red-500 animate-pulse" />, onClick: () => setCurrentView('live') },
+
+    { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
+    { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
+    { title: "Archive", icon: <IconDatabase className="w-full text-emerald-400" />, onClick: () => setCurrentView('data') }, 
+    { title: "ID Card", icon: <IconTrophy className="w-full text-yellow-500" />, onClick: () => setCurrentView('leaderboard') },
+    { title: "Config", icon: <IconSettings className="w-full text-neutral-400" />, onClick: () => setCurrentView('settings') },
   ];
+  
+  if (isJunior) {
+      navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
+  }
 
-  // 6. إدارة العرض (View Manager) - تم حذف الحالات غير الموجودة
   const renderContent = () => {
+    if (currentView === 'admin' && !isJunior) return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
+
     switch (currentView) {
-      case "hero":
+      case 'home': return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
+      case 'ai-tutor': return <AITutor user={user} />;
+      case 'games': return <GamesHub cards={cards} />;
+      
+      // 👇 عرض شاشة البث المباشر 👇
+      case 'live': return <RealLiveStream user={user} onClose={() => setCurrentView('home')} />;
+      
+      case 'chat': return <CommunicationHub user={user} />;
+      case 'category': return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
+      case 'study':
         return (
-          <HeroSection 
-            onStart={() => setCurrentView("study")} 
-            // قمت بتوجيه زر اللعبة إلى Tech Zone بدلاً من Slang المحذوف
-            onOpenGame={() => setCurrentView("tech")} 
-            user={user} 
-          />
+            <div className="flex flex-col items-center justify-center h-full w-full relative pb-32">
+                {currentCard ? (
+                    <BossBattleWrapper isCorrect={battleResult} resetTrigger={battleTrigger}>
+                        <StudyCard 
+                            card={currentCard} 
+                            onResult={(id, known) => {
+                                 setBattleResult(known);
+                                 setBattleTrigger(prev => prev + 1);
+                                 setTimeout(() => {
+                                    handleSwipe(known ? 'right' : 'left');
+                                    setBattleResult(null);
+                                 }, 1000); 
+                                 if(known) playSFX('success'); else playSFX('error');
+                            }} 
+                            speak={speak}
+                        />
+                    </BossBattleWrapper>
+                ) : (
+                    <div className="text-center p-10 bg-black/60 border border-cyan-500/50 rounded-2xl backdrop-blur-md">
+                        <IconCpu size={64} className="text-cyan-500 mx-auto mb-4 animate-pulse" />
+                        <h2 className="text-3xl font-black text-cyan-400 mb-2">MISSION ACCOMPLISHED</h2>
+                        <button onClick={() => setCurrentView('home')} className="px-8 py-3 bg-cyan-600 text-white font-bold rounded-full hover:bg-cyan-500 shadow-[0_0_20px_#06b6d4]">BASE</button>
+                    </div>
+                )}
+            </div>
         );
-      
-      case "study":
-        return (
-          <div className="h-screen flex flex-col items-center justify-center pt-10 pb-32 animate-in fade-in duration-700 relative z-10">
-             {studyQueue.length > 0 ? (
-               <>
-                 <StudyCard 
-                    card={studyQueue[currentCardIndex]} 
-                    onResult={handleCardResult} 
-                 />
-                 <div className="mt-8 flex flex-col items-center gap-2">
-                    <p className="text-neutral-500/80 text-sm bg-black/30 px-4 py-1 rounded-full border border-white/5 font-mono">
-                      DATA_PACKET: {currentCardIndex + 1} / {studyQueue.length}
-                    </p>
-                    <p className="text-[10px] text-cyan-500/50 uppercase tracking-widest">Neural Link Active</p>
-                 </div>
-               </>
-             ) : (
-               <div className="text-center p-10 glass-card rounded-2xl border border-white/10 bg-black/50">
-                 <h2 className="text-2xl font-bold text-white mb-2">MISSION COMPLETE</h2>
-                 <p className="text-white/50 mb-6">No pending data packets for review.</p>
-                 <button 
-                    onClick={() => setCurrentView("stats")} 
-                    className="px-6 py-2 bg-cyan-600 rounded-full text-white font-bold hover:bg-cyan-500 transition-colors"
-                 >
-                    Check Stats
-                 </button>
-               </div>
-             )}
-          </div>
-        );
-      
-      case "tech":
-        return <TechZone />;
-      
-      case "stats":
-        return (
-          <div className="h-screen flex items-center justify-center pt-10 pb-32 animate-in fade-in zoom-in duration-500 relative z-10">
-            <StatsView cards={cards} stats={stats} />
-          </div>
-        );
-      
-      case "data":
-        return (
-          <div className="h-screen flex items-center justify-center pt-10 pb-32 animate-in slide-in-from-bottom duration-500 relative z-10">
-            <DataManager 
-              onAdd={addCard} 
-              onDelete={deleteCard} 
-              onUpdate={updateCard} 
-              onExport={exportData} 
-              onImport={importData} 
-              cards={cards} 
-            />
-          </div>
-        );
-      
-      default:
-        return <HeroSection onStart={() => setCurrentView("study")} user={user} />;
+      case 'data': return <DataManager cards={cards} onAdd={addCard} onDelete={deleteCard} onUpdate={updateCard} isJunior={isJunior} />;
+      case 'leaderboard': return <CyberDeck user={user} stats={stats || { xp: 0, streak: 0, avatar: '👤' }} cards={cards || []} />;
+      case 'settings': return <SettingsView user={user} resetProgress={resetProgress} onLogout={handleLogout} />;
+      case 'admin': return <AdminDashboard currentUser={user} userData={userData} />;
+      default: return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
     }
   };
 
-  // 7. شاشة التحميل والمصادقة (Loading & Auth)
-  if (loadingAuth) {
-    return (
-      <div className="h-screen w-full bg-black flex items-center justify-center text-cyan-500 font-mono animate-pulse">
-        INITIALIZING NEURAL LINK...
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <AuthScreen onLoginSuccess={setUser} />;
-  }
-
-  // 8. واجهة التطبيق الرئيسية (Main Render)
   return (
-    <div className="min-h-screen overflow-hidden font-sans text-white relative bg-[#050505] selection:bg-cyan-500/30 selection:text-cyan-100">
+    <div className="relative min-h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black selection:bg-cyan-500/30 selection:text-cyan-200">
+      <DigitalRain />
+      {showDailyReward && <DailyReward user={user} onClose={() => setShowDailyReward(false)} />}
       
-      {/* شاشة البداية */}
-      <IntroScreen onFinish={() => setIsIntroDone(true)} />
-      
-      {/* تم إزالة FluidBackground من هنا */}
-      
-      {/* أنماط CSS إضافية */}
-      <style jsx global>{`
-        @keyframes blob { 0% { transform: translate(0px, 0px) scale(1); } 33% { transform: translate(30px, -50px) scale(1.1); } 66% { transform: translate(-20px, 20px) scale(0.9); } 100% { transform: translate(0px, 0px) scale(1); } }
-        .animate-blob { animation: blob 7s infinite; }
-        .animation-delay-2000 { animation-delay: 2s; }
-        .animation-delay-4000 { animation-delay: 4s; }
-        .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-        .preserve-3d { transform-style: preserve-3d; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(6,182,212,0.5); }
-        .glass-card { background: rgba(20,20,20,0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
-      `}</style>
+      <AnimatePresence>
+        {broadcast && (
+            <motion.div initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} className="fixed top-0 w-full bg-red-900/90 border-b border-red-500 text-white text-center py-3 z-[100] font-bold shadow-[0_0_30px_rgba(220,38,38,0.5)] flex justify-center items-center gap-3 backdrop-blur-xl">
+                <span className="tracking-widest uppercase text-sm md:text-base">{broadcast}</span>
+            </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* المحتوى الرئيسي */}
-      {isIntroDone && (
-          <>
-            <main className="w-full h-full relative z-10">
-              {renderContent()}
-            </main>
-            
-            {/* شريط التنقل السفلي */}
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full flex justify-center pointer-events-none">
-                <div className="pointer-events-auto">
-                   <FloatingDock items={navLinks.map(link => ({ ...link, href: "#" }))} />
-                </div>
-            </div>
-          </>
-      )}
+      <main className="relative z-10 flex flex-col items-center justify-center min-h-screen w-full pt-10 md:pt-0">
+           <AnimatePresence mode="wait">
+             <motion.div 
+                key={currentView} 
+                initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }} 
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }} 
+                exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }} 
+                transition={{ duration: 0.3 }} 
+                className="w-full h-full flex justify-center"
+             >
+                {renderContent()}
+             </motion.div>
+           </AnimatePresence>
+      </main>
+
+      <div className="fixed bottom-8 left-0 w-full z-50 flex justify-center pointer-events-none">
+          <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="pointer-events-auto">
+              <FloatingDock items={navLinks} />
+          </motion.div>
+      </div>
     </div>
   );
 }
