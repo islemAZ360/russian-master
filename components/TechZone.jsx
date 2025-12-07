@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   IconBrandYoutube, IconDownload, IconCpu, IconMusic, 
-  IconVideo, IconLoader, IconAlertTriangle, IconCheck, IconWifi
+  IconVideo, IconLoader, IconAlertTriangle, IconWifi
 } from "@tabler/icons-react";
 
 export default function TechZone() {
@@ -21,7 +21,7 @@ export default function TechZone() {
     setError(null);
 
     try {
-      // نرسل الطلب للسيرفر الخاص بنا ليقوم بالتنظيف والاتصال
+      // نرسل الطلب لملف الـ route.js الذي أنشأناه
       const response = await fetch('/api/youtube', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -53,9 +53,9 @@ export default function TechZone() {
       <div className="max-w-2xl w-full">
         <div className="text-center mb-10">
             <h1 className="text-5xl font-black text-white mb-2 tracking-tighter">
-                RAPID <span className="text-blue-600">CORE</span>
+                FINAL <span className="text-blue-600">SOLUTION</span>
             </h1>
-            <p className="text-white/40 font-mono text-xs uppercase tracking-[0.3em]">Official API Gateway</p>
+            <p className="text-white/40 font-mono text-xs uppercase tracking-[0.3em]">RapidAPI Corrected</p>
         </div>
 
         <div className="bg-[#0a0a0a] border border-white/10 p-8 rounded-3xl shadow-2xl relative overflow-hidden">
@@ -74,8 +74,8 @@ export default function TechZone() {
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-8">
-                <button onClick={() => setFormat('video')} className={`py-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all border ${format === 'video' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-[#111] border-white/10 text-white/40'}`}><IconVideo size={18}/> MP4</button>
-                <button onClick={() => setFormat('audio')} className={`py-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all border ${format === 'audio' ? 'bg-purple-600 border-purple-500 text-white' : 'bg-[#111] border-white/10 text-white/40'}`}><IconMusic size={18}/> MP3</button>
+                <button onClick={() => setFormat('video')} className={`py-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all border ${format === 'video' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-[#111] border-white/10 text-white/40'}`}><IconVideo size={18}/> 720p Video</button>
+                <button onClick={() => setFormat('audio')} className={`py-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all border ${format === 'audio' ? 'bg-purple-600 border-purple-500 text-white' : 'bg-[#111] border-white/10 text-white/40'}`}><IconMusic size={18}/> MP3 Audio</button>
             </div>
 
             <button 
@@ -83,7 +83,7 @@ export default function TechZone() {
                 disabled={loading || !url}
                 className="w-full py-5 bg-white text-black font-black text-sm tracking-[0.2em] rounded-xl hover:bg-gray-200 transition-all flex justify-center items-center gap-3 disabled:opacity-50"
             >
-                {loading ? <><IconLoader className="animate-spin"/> PROCESSING...</> : <><IconCpu/> GENERATE LINK</>}
+                {loading ? <><IconLoader className="animate-spin"/> PROCESSING...</> : <><IconCpu/> GET LINK</>}
             </button>
 
             <AnimatePresence>
