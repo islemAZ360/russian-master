@@ -5,7 +5,7 @@ import { auth } from "@/lib/firebase";
 
 // --- UI Components ---
 import { FloatingDock } from "@/components/ui/floating-dock";
-import { FluidBackground } from "@/components/ui/fluid-background";
+// تمت إزالة FluidBackground
 import { IntroScreen } from "@/components/IntroScreen";
 import { AuthScreen } from "@/components/AuthScreen";
 
@@ -15,23 +15,18 @@ import {
   IconBook, 
   IconChartBar, 
   IconDatabase, 
-  IconMap2,          
-  IconBuildingStore, 
-  IconSkull,
-  IconCpu // <-- تمت إضافة الأيقونة هنا
+  IconCpu 
 } from "@tabler/icons-react";
+// تمت إزالة الأيقونات غير المستخدمة (IconMap2, IconBuildingStore, IconSkull)
 
 // --- Feature Components ---
 import { HeroSection } from "@/components/HeroSection";
 import { StudyCard } from "@/components/StudyCard";
 import { StatsView } from "@/components/StatsView";
 import { DataManager } from "@/components/DataManager";
+import TechZone from "@/components/TechZone"; // أبقيت على TechZone لأنه موجود ولم تطلب حذفه
 
-// --- New Features Components ---
-import NeuralMap from "@/components/NeuralMap";      
-import CyberBase from "@/components/CyberBase";      
-import SlangDistrict from "@/components/SlangDistrict"; 
-import TechZone from "@/components/TechZone"; // <-- تمت إضافة استدعاء الصفحة الجديدة هنا
+// تمت إزالة (NeuralMap, CyberBase, SlangDistrict)
 
 // --- Logic Hooks ---
 import { useStudySystem } from "@/hooks/useStudySystem";
@@ -54,8 +49,6 @@ export default function RussianApp() {
     addCard, 
     deleteCard, 
     updateCard, 
-    buyItem,      
-    equipItem,    
     exportData, 
     importData 
   } = useStudySystem(user);
@@ -88,7 +81,7 @@ export default function RussianApp() {
     }
   };
 
-  // 5. قائمة التنقل السفلية (Dock Navigation)
+  // 5. قائمة التنقل السفلية (Dock Navigation) - تم تنظيف القائمة
   const navLinks = [
     { 
       title: "Base", 
@@ -96,29 +89,14 @@ export default function RussianApp() {
       onClick: () => setCurrentView("hero") 
     },
     { 
-      title: "Neural Map", 
-      icon: <IconMap2 className="h-full w-full text-cyan-400" />, 
-      onClick: () => setCurrentView("neural") 
-    },
-    { 
       title: "Training", 
       icon: <IconBook className="h-full w-full text-neutral-300" />, 
       onClick: () => setCurrentView("study") 
     },
     { 
-      title: "Tech Zone", // <-- الزر الجديد هنا
+      title: "Tech Zone", 
       icon: <IconCpu className="h-full w-full text-red-500" />, 
       onClick: () => setCurrentView("tech") 
-    },
-    { 
-      title: "Cyber Shop", 
-      icon: <IconBuildingStore className="h-full w-full text-yellow-400" />, 
-      onClick: () => setCurrentView("shop") 
-    },
-    { 
-      title: "Slang Zone", 
-      icon: <IconSkull className="h-full w-full text-red-600" />, 
-      onClick: () => setCurrentView("slang") 
     },
     { 
       title: "Stats", 
@@ -132,20 +110,18 @@ export default function RussianApp() {
     },
   ];
 
-  // 6. إدارة العرض (View Manager)
+  // 6. إدارة العرض (View Manager) - تم حذف الحالات غير الموجودة
   const renderContent = () => {
     switch (currentView) {
       case "hero":
         return (
           <HeroSection 
             onStart={() => setCurrentView("study")} 
-            onOpenGame={() => setCurrentView("slang")} 
+            // قمت بتوجيه زر اللعبة إلى Tech Zone بدلاً من Slang المحذوف
+            onOpenGame={() => setCurrentView("tech")} 
             user={user} 
           />
         );
-      
-      case "neural":
-        return <NeuralMap cards={cards} />;
       
       case "study":
         return (
@@ -178,21 +154,8 @@ export default function RussianApp() {
           </div>
         );
       
-      case "tech": // <-- تشغيل الصفحة الجديدة
+      case "tech":
         return <TechZone />;
-
-      case "shop":
-        return (
-          <CyberBase 
-            user={user} 
-            stats={stats} 
-            onBuy={buyItem} 
-            onEquip={equipItem} 
-          />
-        );
-      
-      case "slang":
-        return <SlangDistrict stats={stats} />;
       
       case "stats":
         return (
@@ -240,8 +203,7 @@ export default function RussianApp() {
       {/* شاشة البداية */}
       <IntroScreen onFinish={() => setIsIntroDone(true)} />
       
-      {/* الخلفية الحية */}
-      <FluidBackground />
+      {/* تم إزالة FluidBackground من هنا */}
       
       {/* أنماط CSS إضافية */}
       <style jsx global>{`
