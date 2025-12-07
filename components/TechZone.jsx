@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   IconBrandYoutube, IconDownload, IconCpu, IconMusic, 
-  IconVideo, IconLoader, IconAlertTriangle, IconWifi
+  IconVideo, IconLoader, IconAlertTriangle, IconWifi, IconExternalLink
 } from "@tabler/icons-react";
 
 export default function TechZone() {
@@ -21,7 +21,6 @@ export default function TechZone() {
     setError(null);
 
     try {
-      // نرسل الطلب لملف الـ route.js الذي أنشأناه
       const response = await fetch('/api/youtube', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -43,9 +42,24 @@ export default function TechZone() {
     }
   };
 
+  // --- التعديل الجذري هنا ---
   const downloadFile = (link) => {
-    if(!link) return;
-    window.open(link, '_blank');
+    if(!link) {
+        alert("خطأ: رابط التحميل فارغ!");
+        return;
+    }
+
+    console.log("Downloading Link:", link); // افحص الكونسول (F12) لرؤية الرابط
+
+    // الطريقة 1: إنشاء رابط مخفي والضغط عليه (تتجاوز مانع الإعلانات غالباً)
+    const a = document.createElement('a');
+    a.href = link;
+    a.target = '_blank'; // فتح في تبويب جديد
+    a.rel = 'noopener noreferrer';
+    a.setAttribute('download', ''); // محاولة إجبار التحميل
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   return (
@@ -53,9 +67,9 @@ export default function TechZone() {
       <div className="max-w-2xl w-full">
         <div className="text-center mb-10">
             <h1 className="text-5xl font-black text-white mb-2 tracking-tighter">
-                FINAL <span className="text-blue-600">SOLUTION</span>
+                RAPID <span className="text-blue-600">CORE</span>
             </h1>
-            <p className="text-white/40 font-mono text-xs uppercase tracking-[0.3em]">RapidAPI Corrected</p>
+            <p className="text-white/40 font-mono text-xs uppercase tracking-[0.3em]">Official API Gateway</p>
         </div>
 
         <div className="bg-[#0a0a0a] border border-white/10 p-8 rounded-3xl shadow-2xl relative overflow-hidden">
@@ -83,7 +97,7 @@ export default function TechZone() {
                 disabled={loading || !url}
                 className="w-full py-5 bg-white text-black font-black text-sm tracking-[0.2em] rounded-xl hover:bg-gray-200 transition-all flex justify-center items-center gap-3 disabled:opacity-50"
             >
-                {loading ? <><IconLoader className="animate-spin"/> PROCESSING...</> : <><IconCpu/> GET LINK</>}
+                {loading ? <><IconLoader className="animate-spin"/> PROCESSING...</> : <><IconCpu/> GENERATE LINK</>}
             </button>
 
             <AnimatePresence>
@@ -103,9 +117,26 @@ export default function TechZone() {
                     </div>
                     <div className="flex-1 min-w-0 text-center md:text-left w-full relative z-10">
                         <h3 className="font-bold text-white text-lg truncate mb-4">{result.title}</h3>
-                        <button onClick={() => downloadFile(result.downloadUrl)} className="w-full md:w-auto px-8 py-3 bg-green-600 hover:bg-green-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-900/20">
-                            <IconDownload size={18}/> DOWNLOAD NOW
-                        </button>
+                        
+                        {/* أزرار التحميل الجديدة */}
+                        <div className="flex flex-col gap-2">
+                            <button 
+                                onClick={() => downloadFile(result.downloadUrl)} 
+                                className="w-full md:w-auto px-8 py-3 bg-green-600 hover:bg-green-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-900/20"
+                            >
+                                <IconDownload size={18}/> DOWNLOAD NOW
+                            </button>
+                            
+                            {/* زر احتياطي في حال فشل الأول */}
+                            <a 
+                                href={result.downloadUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="w-full md:w-auto px-8 py-2 bg-white/5 hover:bg-white/10 text-white/50 hover:text-white text-[10px] font-bold rounded-lg flex items-center justify-center gap-2 transition-all border border-white/10"
+                            >
+                                <IconExternalLink size={14}/> رابط مباشر (اضغط هنا إذا لم يعمل الزر)
+                            </a>
+                        </div>
                     </div>
                 </motion.div>
             )}
