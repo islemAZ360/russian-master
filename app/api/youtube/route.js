@@ -1,23 +1,13 @@
 import { NextResponse } from "next/server";
 
-// 1. قائمة خوادم ضخمة (Massive Node List)
-// تم اختيار هذه الخوادم لأنها تقبل الطلبات من مصادر خارجية (API Friendly)
-const SWARM_NODES = [
-  "https://cobalt.meowing.de/api/json",
-  "https://co.wuk.sh/api/json",
-  "https://api.cobalt.tools/api/json",
-  "https://cobalt.kwiatekmiki.pl/api/json",
-  "https://cobalt.steamodded.com/api/json",
-  "https://us.cobalt.gif.ci/api/json",
-  "https://api.server.larr.dev/api/json",
-  "https://cobalt.xy24.eu.org/api/json"
-];
-
-// قائمة بصمات المتصفح (لتجنب الحظر)
-const USER_AGENTS = [
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
-  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+// قائمة خوادم مختارة بعناية لتعمل مع Vercel (Low-Security Instances)
+const VERCEL_FRIENDLY_NODES = [
+  "https://cobalt.kwiatekmiki.pl/api/json", // غالباً يقبل Vercel
+  "https://cobalt.steamodded.com/api/json", // خادم مفتوح
+  "https://us.cobalt.gif.ci/api/json",      // خادم كندي
+  "https://api.server.larr.dev/api/json",   // خادم مطورين
+  "https://cobalt.xy24.eu.org/api/json",    // خادم أوروبي
+  "https://api.cobalt.tools/api/json"       // الرسمي (محاولة أخيرة)
 ];
 
 export async function POST(req) {
@@ -25,15 +15,19 @@ export async function POST(req) {
     const body = await req.json();
     let { url, format, quality } = body;
 
-    if (!url) return NextResponse.json({ error: "No Target Detected" }, { status: 400 });
+    if (!url) return NextResponse.json({ error: "Missing URL" }, { status: 400 });
 
-    // تنظيف الرابط (إزالة التتبع)
+    // تنظيف الرابط
     try {
         const urlObj = new URL(url);
+        // التعامل مع روابط الشورتس والروابط العادية
         if (urlObj.hostname.includes('youtu')) {
-             const v = urlObj.searchParams.get('v');
-             if(v) url = `https://www.youtube.com/watch?v=${v}`;
-             else if(urlObj.pathname.includes('/shorts/')) url = `https://www.youtube.com${urlObj.pathname}`;
+             if(urlObj.pathname.includes('/shorts/')) {
+                 url = `https://www.youtube.com${urlObj.pathname}`;
+             } else {
+                 const v = urlObj.searchParams.get('v');
+                 if(v) url = `https://www.youtube.com/watch?v=${v}`;
+             }
         }
     } catch(e) {}
 
@@ -43,67 +37,64 @@ export async function POST(req) {
       vQuality: quality || "720",
       aFormat: "mp3",
       isAudioOnly: format === "audio",
-      filenamePattern: "basic"
+      filenamePattern: "basic" // مهم جداً: طلب اسم ملف بسيط
     };
 
-    // خلط الخوادم عشوائياً في كل مرة
-    const shuffledNodes = SWARM_NODES.sort(() => 0.5 - Math.random());
-    let lastError = "";
+    // المحاولة مع القائمة
+    // نخلط القائمة لتوزيع الضغط وتجنب الحظر المتكرر
+    const nodes = VERCEL_FRIENDLY_NODES.sort(() => 0.5 - Math.random());
 
-    // بدء الهجوم (Attack Sequence)
-    for (const node of shuffledNodes) {
+    for (const node of nodes) {
       try {
-        console.log(`[SWARM] Connecting to: ${new URL(node).hostname}...`);
+        console.log(`Trying Node: ${new URL(node).hostname}`);
         
-        // اختيار بصمة عشوائية
-        const randomAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
-
-        // إعدادات الطلب (نظيفة جداً بدون Origin مزيف)
+        // إعدادات الطلب - تم تبسيطها جداً لتجنب كشف هوية Vercel
         const response = await fetch(node, {
           method: "POST",
           headers: {
             "Accept": "application/json",
-            "Content-Type": "application/json",
-            "User-Agent": randomAgent 
-            // حذفنا Origin و Referer لأنها كانت تفضح السيرفر
+            "Content-Type": "application/json"
+            // ملاحظة: أزلنا User-Agent و Origin لأنها تكشف أننا Vercel
           },
           body: JSON.stringify(payload)
         });
 
         const data = await response.json();
 
-        // التحقق الدقيق من النجاح
-        if (data && (data.url || data.picker || data.status === "stream" || data.status === "success")) {
-          
+        // التحقق من نجاح الاستجابة
+        if (data && (data.url || data.picker)) {
           let finalUrl = data.url;
-          // معالجة الـ Picker (إذا أعطانا قائمة جودات)
+          
+          // إذا كان الفيديو صوتي فقط أو يتطلب دمج، قد يرسل الخادم رابط picker
           if (!finalUrl && data.picker && data.picker.length > 0) {
             finalUrl = data.picker[0].url;
           }
 
           if (finalUrl) {
-            console.log(`[SUCCESS] Hit on ${new URL(node).hostname}`);
             return NextResponse.json({
               status: "success",
               node: new URL(node).hostname,
-              data: { url: finalUrl, filename: data.filename || "media_file.mp4" }
+              data: { 
+                  url: finalUrl, 
+                  filename: data.filename || "video.mp4" 
+              }
             });
           }
         }
       } catch (err) {
-        // فشل هذا الخادم، جرب التالي بصمت
-        lastError = err.message;
+        // فشل هذا الخادم، ننتقل للتالي بصمت
         continue;
       }
     }
 
-    // إذا فشل الجميع
+    // إذا فشلت كل الخوادم، نرجع خطأ خاص
     return NextResponse.json({ 
-        error: "SYSTEM_OVERLOAD", 
-        details: "All nodes busy. Please retry in 5 seconds." 
+        error: "SERVER_BUSY", 
+        details: "Vercel IPs are currently rate-limited by providers." 
     }, { status: 503 });
 
   } catch (error) {
-    return NextResponse.json({ error: "INTERNAL_CORE_ERROR" }, { status: 500 });
+    console.error("Vercel Error:", error);
+    return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 });
   }
 }
