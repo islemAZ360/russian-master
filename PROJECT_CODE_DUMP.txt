@@ -71,6 +71,72 @@ export async function POST(req) {
 
 
 ==================================================================
+FILE: app\api\youtube\route.js
+==================================================================
+
+import { NextResponse } from "next/server";
+
+export async function POST(req) {
+  try {
+    const body = await req.json();
+    const { url, format, quality } = body;
+
+    if (!url) {
+      return NextResponse.json({ error: "الرابط مفقود" }, { status: 400 });
+    }
+
+    // استخدام خدمة Cobalt API المجانية والقوية (لا تحتاج API Key)
+    const cobaltApiUrl = "https://api.cobalt.tools/api/json";
+    
+    const payload = {
+      url: url,
+      vCodec: "h264",
+      vQuality: quality || "720",
+      aFormat: "mp3",
+      isAudioOnly: format === "audio",
+      filenamePattern: "basic"
+    };
+
+    const response = await fetch(cobaltApiUrl, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+
+    if (data.status === "error" || !data.url) {
+      console.error("Download Error:", data);
+      return NextResponse.json({ error: "لم نتمكن من معالجة الرابط. تأكد أنه صحيح وعام." }, { status: 500 });
+    }
+
+    // محاولة استخراج ID الفيديو لجلب الصورة المصغرة بشكل مستقل
+    let videoId = "";
+    try {
+        if(url.includes("youtu.be")) videoId = url.split("/").pop();
+        else if(url.includes("v=")) videoId = url.split("v=")[1].split("&")[0];
+    } catch(e) {}
+
+    const thumb = videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null;
+
+    return NextResponse.json({
+      title: data.filename || "YouTube Video",
+      url: data.url,
+      thumb: thumb,
+      status: "success"
+    });
+
+  } catch (error) {
+    console.error("Server Error:", error);
+    return NextResponse.json({ error: "حدث خطأ في الخادم" }, { status: 500 });
+  }
+}
+
+
+==================================================================
 FILE: app\globals.css
 ==================================================================
 
@@ -155,11 +221,11 @@ body {
 FILE: app\layout.js
 ==================================================================
 
+// FILE: app/layout.js
 import { JetBrains_Mono, Cairo } from "next/font/google";
 import "./globals.css";
 import { SettingsProvider } from "../context/SettingsContext";
-import { ThemeProvider } from "../context/ThemeContext"; // استيراد جديد
-import ServiceWorkerRegister from "../components/ServiceWorkerRegister";
+import ServiceWorkerRegister from "../components/ServiceWorkerRegister"; // استيراد المكون الجديد
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin", "cyrillic"],
@@ -192,28 +258,28 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="ar" dir="ltr" className={`${jetbrainsMono.variable} ${cairo.variable}`}>
-      <body className="antialiased bg-[var(--bg-deep)] text-white overflow-hidden selection:bg-[var(--neon-primary)] selection:text-black">
+      <body className="antialiased bg-[#050505] text-white overflow-hidden selection:bg-cyan-500/30 selection:text-cyan-100">
         
         <SettingsProvider>
-          <ThemeProvider> {/* إضافة التغليف هنا */}
+            {/* استدعاء مسجل Service Worker هنا */}
             <ServiceWorkerRegister />
 
             {/* الخلفيات والمؤثرات */}
-            <div className="scanlines pointer-events-none"></div>
-            <div className="vignette pointer-events-none"></div>
-            <div className="noise-overlay pointer-events-none"></div>
+            <div className="scanlines"></div>
+            <div className="vignette"></div>
+            <div className="noise-overlay"></div>
             
-            {/* HUD Elements */}
             <div className="hud-corner tl"></div>
             <div className="hud-corner tr"></div>
             <div className="hud-corner bl"></div>
             <div className="hud-corner br"></div>
 
-            {/* Content */}
+            <div className="fixed top-0 left-1/2 -translate-x-1/2 w-2/3 h-[1px] bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent z-40 opacity-70 shadow-[0_0_10px_#06b6d4]"></div>
+
+            {/* المحتوى الرئيسي */}
             <div className="relative z-10 w-full h-full">
               {children}
             </div>
-          </ThemeProvider>
         </SettingsProvider>
 
       </body>
@@ -277,274 +343,228 @@ FILE: app\page.js
 ==================================================================
 
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/lib/firebase";
-
-// --- UI Components ---
-import { FloatingDock } from "@/components/ui/floating-dock";
-import { FluidBackground } from "@/components/ui/fluid-background";
-import { IntroScreen } from "@/components/IntroScreen";
-import { AuthScreen } from "@/components/AuthScreen";
-
-// --- Icons ---
+import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  IconHome, 
-  IconBook, 
-  IconChartBar, 
-  IconDatabase, 
-  IconMap2,          // للأعصاب
-  IconBuildingStore, // للمتجر
-  IconSkull          // للعامية
-} from "@tabler/icons-react";
+  IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
+  IconShield, IconMessageCircle, IconRobot, IconDeviceGamepad, IconBroadcast 
+} from '@tabler/icons-react';
 
-// --- Feature Components ---
-import { HeroSection } from "@/components/HeroSection";
-import { StudyCard } from "@/components/StudyCard";
-import { StatsView } from "@/components/StatsView";
-import { DataManager } from "@/components/DataManager";
+// --- استيراد المكونات ---
+import { HeroSection } from '../components/HeroSection';
+import { CategorySelect } from '../components/CategorySelect';
+import { StudyCard } from '../components/StudyCard';
+import { AuthScreen } from '../components/AuthScreen';
+import { DataManager } from '../components/DataManager'; 
+import CyberDeck from '../components/CyberDeck'; 
+import CommunicationHub from '../components/CommunicationHub'; 
+import SettingsView from '../components/SettingsView'; 
+import AdminDashboard from '../components/AdminDashboard'; 
+import AITutor from '../components/AITutor';
+import GamesHub from '../components/GamesHub';
+import { FloatingDock } from '../components/ui/floating-dock';
+import DigitalRain from '../components/ui/DigitalRain'; 
+import IntroSequence from '../components/IntroSequence'; 
+import { BossBattleWrapper } from '../components/BossBattleWrapper'; 
+import DailyReward from '../components/DailyReward';
 
-// --- New Features Components ---
-import NeuralMap from "@/components/NeuralMap";      
-import CyberBase from "@/components/CyberBase";      
-import SlangDistrict from "@/components/SlangDistrict"; 
+// 👇 استيراد البث المباشر الجديد 👇
+import RealLiveStream from '../components/live/RealLiveStream';
 
-// --- Logic Hooks ---
-import { useStudySystem } from "@/hooks/useStudySystem";
+import { useStudySystem } from '../hooks/useStudySystem';
+import { useAudio } from '../hooks/useAudio';
+import { auth, db } from '../lib/firebase';
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, onSnapshot, updateDoc, setDoc, getDoc } from "firebase/firestore";
+
+const MASTER_EMAIL = "islamaz@bomba.com";
 
 export default function RussianApp() {
-  // 1. حالة المصادقة (Authentication State)
   const [user, setUser] = useState(null);
+  const [userData, setUserData] = useState(null); 
+  const [currentView, setCurrentView] = useState('home');
+  const [activeCategory, setActiveCategory] = useState("All");
+  const [showIntro, setShowIntro] = useState(true); 
+  const [broadcast, setBroadcast] = useState(null);
+  const [showDailyReward, setShowDailyReward] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
 
-  // 2. حالة التطبيق (App State)
-  const [currentView, setCurrentView] = useState("hero");
-  const [isIntroDone, setIsIntroDone] = useState(false);
-  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  // حالات المعركة
+  const [battleResult, setBattleResult] = useState(null); 
+  const [battleTrigger, setBattleTrigger] = useState(0);
 
-  // 3. ربط النظام (System Hook)
-  // نستدعي كل الدوال والبيانات اللازمة من الـ Hook
   const { 
-    cards, 
-    stats, 
-    handleSwipe,  // دالة معالجة الإجابة
-    addCard, 
-    deleteCard, 
-    updateCard, 
-    buyItem,      // دالة الشراء
-    equipItem,    // دالة التجهيز
-    exportData, 
-    importData 
+    cards, currentCard, stats, handleSwipe, resetProgress, 
+    addCard, deleteCard, updateCard 
   } = useStudySystem(user);
 
-  // مراقبة حالة تسجيل الدخول
+  const { speak, playSFX } = useAudio();
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoadingAuth(false);
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+        if (u) {
+            setUser(u);
+            const userRef = doc(db, "users", u.uid);
+            
+            if (u.email === MASTER_EMAIL) {
+                const snap = await getDoc(userRef);
+                if (!snap.exists()) {
+                    await setDoc(userRef, { email: u.email, role: 'admin', xp: 0, createdAt: new Date().toISOString() });
+                } else if (snap.data().role !== 'admin') {
+                    await updateDoc(userRef, { role: 'admin' });
+                }
+            }
+
+            onSnapshot(userRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    setUserData(docSnap.data());
+                    if (docSnap.data().forceLogout) {
+                        auth.signOut();
+                        window.location.reload();
+                    }
+                }
+            });
+            setShowDailyReward(true);
+        } else {
+            setUser(null);
+            setUserData(null);
+        }
+        setLoadingAuth(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // 4. منطق طابور الدراسة (Study Queue Logic)
-  // نختار البطاقات التي تحتاج مراجعة (مستواها أقل من 5) ونرتبها حسب عدد المراجعات
-  const studyQueue = useMemo(() => {
-    if (!cards) return [];
-    return cards.filter(c => c.level < 5).sort((a, b) => a.reviews - b.reviews);
+  useEffect(() => {
+    const unsubBroad = onSnapshot(doc(db, "system", "broadcast"), (d) => setBroadcast(d.exists() && d.data().active ? d.data().message : null));
+    return () => unsubBroad();
+  }, []);
+
+  const handleLogout = () => auth.signOut().then(() => window.location.reload());
+
+  const categories = useMemo(() => {
+      if (!cards) return [];
+      return [...new Set(cards.map(c => c.category || "General"))];
   }, [cards]);
 
-  // دالة معالجة نتيجة البطاقة (صحيح/خطأ)
-  const handleCardResult = (id, known) => {
-    const direction = known ? 'right' : 'left';
-    handleSwipe(direction); // تحديث قاعدة البيانات وحفظ التقدم
+  const isMaster = user?.email === MASTER_EMAIL;
+  const isAdmin = userData?.role === 'admin' || isMaster;
+  const isJunior = userData?.role === 'junior' || isAdmin;
+  const isBanned = userData?.isBanned && !isMaster;
 
-    // الانتقال للبطاقة التالية في الطابور
-    if (currentCardIndex < studyQueue.length - 1) {
-      setCurrentCardIndex(prev => prev + 1);
-    } else {
-      // إذا انتهت البطاقات، عد للبداية واذهب للإحصائيات
-      setCurrentCardIndex(0);
-      setCurrentView("stats");
-    }
-  };
+  if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
 
-  // 5. قائمة التنقل السفلية (Dock Navigation)
-  const navLinks = [
-    { 
-      title: "Base", 
-      icon: <IconHome className="h-full w-full text-neutral-300" />, 
-      onClick: () => setCurrentView("hero") 
-    },
-    { 
-      title: "Neural Map", 
-      icon: <IconMap2 className="h-full w-full text-cyan-400" />, 
-      onClick: () => setCurrentView("neural") 
-    },
-    { 
-      title: "Training", 
-      icon: <IconBook className="h-full w-full text-neutral-300" />, 
-      onClick: () => setCurrentView("study") 
-    },
-    { 
-      title: "Cyber Shop", 
-      icon: <IconBuildingStore className="h-full w-full text-yellow-400" />, 
-      onClick: () => setCurrentView("shop") 
-    },
-    { 
-      title: "Slang Zone", 
-      icon: <IconSkull className="h-full w-full text-red-600" />, 
-      onClick: () => setCurrentView("slang") 
-    },
-    { 
-      title: "Stats", 
-      icon: <IconChartBar className="h-full w-full text-neutral-300" />, 
-      onClick: () => setCurrentView("stats") 
-    },
-    { 
-      title: "Database", 
-      icon: <IconDatabase className="h-full w-full text-neutral-300" />, 
-      onClick: () => setCurrentView("data") 
-    },
+  if (isBanned) return (
+    <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-red-500 space-y-6 font-mono relative overflow-hidden">
+        <h1 className="text-6xl font-black tracking-widest text-center">ACCESS DENIED</h1>
+        <button onClick={handleLogout} className="px-8 py-3 border border-red-500 rounded hover:bg-red-900/20 transition-colors">LOGOUT</button>
+    </div>
+  );
+
+  if (loadingAuth) return <div className="h-screen bg-black text-cyan-500 flex items-center justify-center font-mono animate-pulse">LOADING NEURAL LINK...</div>;
+  
+  if (!user) return <AuthScreen onLoginSuccess={setUser} />;
+
+  let navLinks = [
+    { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
+    { title: "AI Mentor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => setCurrentView('ai-tutor') },
+    { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
+    
+    // 👇 زر البث المباشر الجديد 👇
+    { title: "Live Ops", icon: <IconBroadcast className="w-full text-red-500 animate-pulse" />, onClick: () => setCurrentView('live') },
+
+    { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
+    { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
+    { title: "Archive", icon: <IconDatabase className="w-full text-emerald-400" />, onClick: () => setCurrentView('data') }, 
+    { title: "ID Card", icon: <IconTrophy className="w-full text-yellow-500" />, onClick: () => setCurrentView('leaderboard') },
+    { title: "Config", icon: <IconSettings className="w-full text-neutral-400" />, onClick: () => setCurrentView('settings') },
   ];
+  
+  if (isJunior) {
+      navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
+  }
 
-  // 6. إدارة العرض (View Manager)
   const renderContent = () => {
+    if (currentView === 'admin' && !isJunior) return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
+
     switch (currentView) {
-      case "hero":
+      case 'home': return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
+      case 'ai-tutor': return <AITutor user={user} />;
+      case 'games': return <GamesHub cards={cards} />;
+      
+      // 👇 عرض شاشة البث المباشر 👇
+      case 'live': return <RealLiveStream user={user} onClose={() => setCurrentView('home')} />;
+      
+      case 'chat': return <CommunicationHub user={user} />;
+      case 'category': return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
+      case 'study':
         return (
-          <HeroSection 
-            onStart={() => setCurrentView("study")} 
-            onOpenGame={() => setCurrentView("slang")} 
-            user={user} 
-          />
+            <div className="flex flex-col items-center justify-center h-full w-full relative pb-32">
+                {currentCard ? (
+                    <BossBattleWrapper isCorrect={battleResult} resetTrigger={battleTrigger}>
+                        <StudyCard 
+                            card={currentCard} 
+                            onResult={(id, known) => {
+                                 setBattleResult(known);
+                                 setBattleTrigger(prev => prev + 1);
+                                 setTimeout(() => {
+                                    handleSwipe(known ? 'right' : 'left');
+                                    setBattleResult(null);
+                                 }, 1000); 
+                                 if(known) playSFX('success'); else playSFX('error');
+                            }} 
+                            speak={speak}
+                        />
+                    </BossBattleWrapper>
+                ) : (
+                    <div className="text-center p-10 bg-black/60 border border-cyan-500/50 rounded-2xl backdrop-blur-md">
+                        <IconCpu size={64} className="text-cyan-500 mx-auto mb-4 animate-pulse" />
+                        <h2 className="text-3xl font-black text-cyan-400 mb-2">MISSION ACCOMPLISHED</h2>
+                        <button onClick={() => setCurrentView('home')} className="px-8 py-3 bg-cyan-600 text-white font-bold rounded-full hover:bg-cyan-500 shadow-[0_0_20px_#06b6d4]">BASE</button>
+                    </div>
+                )}
+            </div>
         );
-      
-      case "neural":
-        return <NeuralMap cards={cards} />;
-      
-      case "study":
-        return (
-          <div className="h-screen flex flex-col items-center justify-center pt-10 pb-32 animate-in fade-in duration-700 relative z-10">
-             {studyQueue.length > 0 ? (
-               <>
-                 <StudyCard 
-                    card={studyQueue[currentCardIndex]} 
-                    onResult={handleCardResult} 
-                 />
-                 <div className="mt-8 flex flex-col items-center gap-2">
-                    <p className="text-neutral-500/80 text-sm bg-black/30 px-4 py-1 rounded-full border border-white/5 font-mono">
-                      DATA_PACKET: {currentCardIndex + 1} / {studyQueue.length}
-                    </p>
-                    <p className="text-[10px] text-cyan-500/50 uppercase tracking-widest">Neural Link Active</p>
-                 </div>
-               </>
-             ) : (
-               <div className="text-center p-10 glass-card rounded-2xl border border-white/10 bg-black/50">
-                 <h2 className="text-2xl font-bold text-white mb-2">MISSION COMPLETE</h2>
-                 <p className="text-white/50 mb-6">No pending data packets for review.</p>
-                 <button 
-                    onClick={() => setCurrentView("stats")} 
-                    className="px-6 py-2 bg-cyan-600 rounded-full text-white font-bold hover:bg-cyan-500 transition-colors"
-                 >
-                    Check Stats
-                 </button>
-               </div>
-             )}
-          </div>
-        );
-      
-      case "shop":
-        return (
-          <CyberBase 
-            user={user} 
-            stats={stats} 
-            onBuy={buyItem} 
-            onEquip={equipItem} 
-          />
-        );
-      
-      case "slang":
-        return <SlangDistrict stats={stats} />;
-      
-      case "stats":
-        return (
-          <div className="h-screen flex items-center justify-center pt-10 pb-32 animate-in fade-in zoom-in duration-500 relative z-10">
-            <StatsView cards={cards} stats={stats} />
-          </div>
-        );
-      
-      case "data":
-        return (
-          <div className="h-screen flex items-center justify-center pt-10 pb-32 animate-in slide-in-from-bottom duration-500 relative z-10">
-            <DataManager 
-              onAdd={addCard} 
-              onDelete={deleteCard} 
-              onUpdate={updateCard} 
-              onExport={exportData} 
-              onImport={importData} 
-              cards={cards} 
-            />
-          </div>
-        );
-      
-      default:
-        return <HeroSection onStart={() => setCurrentView("study")} user={user} />;
+      case 'data': return <DataManager cards={cards} onAdd={addCard} onDelete={deleteCard} onUpdate={updateCard} isJunior={isJunior} />;
+      case 'leaderboard': return <CyberDeck user={user} stats={stats || { xp: 0, streak: 0, avatar: '👤' }} cards={cards || []} />;
+      case 'settings': return <SettingsView user={user} resetProgress={resetProgress} onLogout={handleLogout} />;
+      case 'admin': return <AdminDashboard currentUser={user} userData={userData} />;
+      default: return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
     }
   };
 
-  // 7. شاشة التحميل والمصادقة (Loading & Auth)
-  if (loadingAuth) {
-    return (
-      <div className="h-screen w-full bg-black flex items-center justify-center text-cyan-500 font-mono animate-pulse">
-        INITIALIZING NEURAL LINK...
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <AuthScreen onLoginSuccess={setUser} />;
-  }
-
-  // 8. واجهة التطبيق الرئيسية (Main Render)
   return (
-    <div className="min-h-screen overflow-hidden font-sans text-white relative bg-[#050505] selection:bg-cyan-500/30 selection:text-cyan-100">
+    <div className="relative min-h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black selection:bg-cyan-500/30 selection:text-cyan-200">
+      <DigitalRain />
+      {showDailyReward && <DailyReward user={user} onClose={() => setShowDailyReward(false)} />}
       
-      {/* شاشة البداية */}
-      <IntroScreen onFinish={() => setIsIntroDone(true)} />
-      
-      {/* الخلفية الحية */}
-      <FluidBackground />
-      
-      {/* أنماط CSS إضافية */}
-      <style jsx global>{`
-        @keyframes blob { 0% { transform: translate(0px, 0px) scale(1); } 33% { transform: translate(30px, -50px) scale(1.1); } 66% { transform: translate(-20px, 20px) scale(0.9); } 100% { transform: translate(0px, 0px) scale(1); } }
-        .animate-blob { animation: blob 7s infinite; }
-        .animation-delay-2000 { animation-delay: 2s; }
-        .animation-delay-4000 { animation-delay: 4s; }
-        .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-        .preserve-3d { transform-style: preserve-3d; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(6,182,212,0.5); }
-        .glass-card { background: rgba(20,20,20,0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.08); }
-      `}</style>
+      <AnimatePresence>
+        {broadcast && (
+            <motion.div initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} className="fixed top-0 w-full bg-red-900/90 border-b border-red-500 text-white text-center py-3 z-[100] font-bold shadow-[0_0_30px_rgba(220,38,38,0.5)] flex justify-center items-center gap-3 backdrop-blur-xl">
+                <span className="tracking-widest uppercase text-sm md:text-base">{broadcast}</span>
+            </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* المحتوى الرئيسي */}
-      {isIntroDone && (
-          <>
-            <main className="w-full h-full relative z-10">
-              {renderContent()}
-            </main>
-            
-            {/* شريط التنقل السفلي */}
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-full flex justify-center pointer-events-none">
-                <div className="pointer-events-auto">
-                   <FloatingDock items={navLinks.map(link => ({ ...link, href: "#" }))} />
-                </div>
-            </div>
-          </>
-      )}
+      <main className="relative z-10 flex flex-col items-center justify-center min-h-screen w-full pt-10 md:pt-0">
+           <AnimatePresence mode="wait">
+             <motion.div 
+                key={currentView} 
+                initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }} 
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }} 
+                exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }} 
+                transition={{ duration: 0.3 }} 
+                className="w-full h-full flex justify-center"
+             >
+                {renderContent()}
+             </motion.div>
+           </AnimatePresence>
+      </main>
+
+      <div className="fixed bottom-8 left-0 w-full z-50 flex justify-center pointer-events-none">
+          <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="pointer-events-auto">
+              <FloatingDock items={navLinks} />
+          </motion.div>
+      </div>
     </div>
   );
 }
@@ -1780,125 +1800,6 @@ export default function CommunicationHub({ user }) {
         )}
       </AnimatePresence>
 
-    </div>
-  );
-}
-
-
-==================================================================
-FILE: components\CyberBase.jsx
-==================================================================
-
-"use client";
-import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { IconBuildingStore, IconCoin, IconCheck, IconLock } from "@tabler/icons-react";
-
-const SHOP_ITEMS = [
-    { id: 'bg_neon', type: 'background', name: 'Neon City', price: 500, preview: 'linear-gradient(45deg, #1a0b2e, #2d1b4e)' },
-    { id: 'bg_matrix', type: 'background', name: 'Matrix Code', price: 1000, preview: 'linear-gradient(0deg, #000, #0f0 100%)' },
-    { id: 'border_gold', type: 'border', name: 'Gold Frame', price: 2000, preview: 'border-yellow-500' },
-    { id: 'border_glitch', type: 'border', name: 'Glitch Border', price: 1500, preview: 'border-red-500' },
-    { id: 'hack_hint', type: 'consumable', name: 'Decrypt Key (Hint)', price: 50, preview: 'bg-cyan-500' },
-];
-
-export default function CyberBase({ user, stats, onBuy, onEquip }) {
-  const [filter, setFilter] = useState('all');
-
-  const filteredItems = filter === 'all' ? SHOP_ITEMS : SHOP_ITEMS.filter(i => i.type === filter);
-
-  return (
-    <div className="w-full h-screen p-6 overflow-y-auto pb-32 bg-[#0a0a0a]">
-        {/* Header */}
-        <div className="flex justify-between items-end mb-8 border-b border-white/10 pb-4">
-            <div>
-                <h1 className="text-4xl font-black text-white flex items-center gap-3">
-                    <IconBuildingStore size={40} className="text-purple-500"/> CYBER BASE
-                </h1>
-                <p className="text-white/40 font-mono text-sm mt-1">Black Market Upgrades</p>
-            </div>
-            <div className="text-right">
-                <div className="text-3xl font-black text-yellow-400 flex items-center justify-end gap-2">
-                    {stats.credits} <IconCoin size={28}/>
-                </div>
-                <div className="text-[10px] text-white/30 uppercase tracking-widest">Available Credits</div>
-            </div>
-        </div>
-
-        {/* Filter */}
-        <div className="flex gap-2 mb-6">
-            {['all', 'background', 'border', 'consumable'].map(f => (
-                <button 
-                    key={f}
-                    onClick={() => setFilter(f)}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border transition-all ${filter === f ? 'bg-purple-600 border-purple-400 text-white' : 'border-white/10 text-white/40 hover:bg-white/5'}`}
-                >
-                    {f}
-                </button>
-            ))}
-        </div>
-
-        {/* Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredItems.map(item => {
-                const isOwned = stats.inventory?.includes(item.id);
-                const isEquipped = stats.equipped?.[item.type] === item.id;
-
-                return (
-                    <motion.div 
-                        key={item.id}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className={`relative p-6 rounded-2xl border ${isEquipped ? 'border-green-500 bg-green-900/10' : 'border-white/10 bg-[#111]'} hover:shadow-[0_0_30px_rgba(168,85,247,0.15)] transition-all`}
-                    >
-                        {/* Preview Box */}
-                        <div className="h-32 rounded-xl mb-4 relative overflow-hidden flex items-center justify-center border border-white/5" style={{ background: item.type === 'background' ? item.preview : '#000' }}>
-                            {item.type === 'border' && <div className={`w-20 h-20 rounded-full border-4 ${item.preview}`}></div>}
-                            {item.type === 'consumable' && <div className={`w-10 h-10 rounded ${item.preview}`}></div>}
-                        </div>
-
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <h3 className="font-bold text-white text-lg">{item.name}</h3>
-                                <p className="text-xs text-white/40 capitalize">{item.type}</p>
-                            </div>
-                            {!isOwned && (
-                                <div className="text-yellow-400 font-bold flex items-center gap-1">
-                                    {item.price} <IconCoin size={14}/>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Action Button */}
-                        {isOwned ? (
-                            <button 
-                                onClick={() => onEquip(item.type, item.id)}
-                                disabled={isEquipped}
-                                className={`w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
-                                    isEquipped 
-                                    ? 'bg-green-600/20 text-green-500 cursor-default' 
-                                    : 'bg-white/10 hover:bg-white/20 text-white'
-                                }`}
-                            >
-                                {isEquipped ? <><IconCheck size={18}/> EQUIPPED</> : 'EQUIP'}
-                            </button>
-                        ) : (
-                            <button 
-                                onClick={() => onBuy(item)}
-                                disabled={stats.credits < item.price}
-                                className={`w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
-                                    stats.credits >= item.price
-                                    ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/50' 
-                                    : 'bg-white/5 text-white/20 cursor-not-allowed'
-                                }`}
-                            >
-                                {stats.credits >= item.price ? 'PURCHASE' : <><IconLock size={16}/> LOCKED</>}
-                            </button>
-                        )}
-                    </motion.div>
-                );
-            })}
-        </div>
     </div>
   );
 }
@@ -3812,31 +3713,25 @@ import React, { useState, useRef } from "react";
 import dynamic from 'next/dynamic';
 import { 
   IconBroadcast, IconX, IconLoader, IconVideo, 
-  IconPlayerRecord, IconPlayerStop, IconHeart, IconFlame, IconThumbUp 
+  IconPlayerRecord, IconPlayerStop, IconDownload, IconMicrophone 
 } from "@tabler/icons-react";
-import { motion, AnimatePresence } from 'framer-motion';
 
-// استيراد مكتبة Jitsi بشكل ديناميكي (لأنها لا تعمل في الـ Server Side)
+// استيراد Jitsi بشكل ديناميكي
 const JitsiMeeting = dynamic(
   () => import('@jitsi/react-sdk').then((mod) => mod.JitsiMeeting),
   { ssr: false }
 );
 
 export default function RealLiveStream({ user, onClose }) {
-  // --- الحالات الأساسية ---
   const [roomName, setRoomName] = useState("");
   const [isJoined, setIsJoined] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  // --- منطق التسجيل (من الكود الأصلي) ---
+  // --- منطق التسجيل ---
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
 
-  // --- منطق التفاعلات (الإضافة الجديدة) ---
-  const [reactions, setReactions] = useState([]); 
-
-  // --- دوال الانضمام ---
   const handleJoin = () => {
     if (!roomName.trim()) return;
     setLoading(true);
@@ -3846,14 +3741,16 @@ export default function RealLiveStream({ user, onClose }) {
     }, 800);
   };
 
-  // --- دوال التسجيل (Screen Recording) ---
+  // بدء تسجيل الشاشة
   const startRecording = async () => {
     try {
+      // طلب إذن تسجيل الشاشة والصوت
       const stream = await navigator.mediaDevices.getDisplayMedia({ 
         video: true, 
-        audio: true 
+        audio: true // لتسجيل صوت المحاضرة
       });
 
+      // إعداد المسجل
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
@@ -3867,6 +3764,8 @@ export default function RealLiveStream({ user, onClose }) {
       mediaRecorder.onstop = () => {
         saveVideo();
         setIsRecording(false);
+        
+        // إيقاف التراكات (لإغلاق شارة التسجيل في المتصفح)
         stream.getTracks().forEach(track => track.stop());
       };
 
@@ -3875,16 +3774,18 @@ export default function RealLiveStream({ user, onClose }) {
 
     } catch (err) {
       console.error("Error starting recording:", err);
-      alert("Permission denied or cancelled.");
+      alert("تعذر بدء التسجيل. تأكد من منح الأذونات.");
     }
   };
 
+  // إيقاف التسجيل
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
     }
   };
 
+  // حفظ الفيديو
   const saveVideo = () => {
     const blob = new Blob(chunksRef.current, { type: "video/webm" });
     const url = URL.createObjectURL(blob);
@@ -3892,33 +3793,25 @@ export default function RealLiveStream({ user, onClose }) {
     document.body.appendChild(a);
     a.style = "display: none";
     a.href = url;
-    a.download = `mission-log-${new Date().toISOString().slice(0,10)}.webm`;
+    a.download = `russian-lecture-${new Date().toISOString().slice(0,10)}.webm`;
     a.click();
     window.URL.revokeObjectURL(url);
-  };
-
-  // --- دوال التفاعلات (Reactions Logic) ---
-  const addReaction = (type) => {
-    const id = Date.now() + Math.random();
-    setReactions(prev => [...prev, { id, type }]);
-    // إزالة التفاعل تلقائياً بعد 2.5 ثانية
-    setTimeout(() => {
-        setReactions(prev => prev.filter(r => r.id !== id));
-    }, 2500);
+    alert("تم حفظ المحاضرة بنجاح!");
   };
 
   return (
-    <div className="w-full h-[85vh] flex flex-col bg-[#050505] rounded-3xl border border-[var(--neon-primary)] overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] relative z-50 font-sans">
+    // حاوية رئيسية بتصميم زجاجي محسن
+    <div className="w-full h-[85vh] flex flex-col bg-[#050505] rounded-3xl border border-cyan-500/20 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] relative z-50 font-sans">
       
-      {/* --- الشريط العلوي (Header) --- */}
-      <div className="h-16 bg-[#0a0a0a] border-b border-white/10 flex justify-between items-center px-6 shrink-0 relative overflow-hidden">
-        {/* تأثير الخلفية للشريط */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[var(--neon-primary)]/10 to-transparent pointer-events-none"></div>
+      {/* شريط العنوان المطور */}
+      <div className="h-16 bg-[#0a0a0a] border-b border-white/5 flex justify-between items-center px-6 shrink-0 relative overflow-hidden">
+        {/* تأثير خلفية للشريط */}
+        <div className="absolute inset-0 bg-gradient-to-r from-cyan-900/10 to-transparent pointer-events-none"></div>
 
         <div className="flex items-center gap-4 z-10">
             <div className="relative">
-                <div className={`w-3 h-3 rounded-full ${isJoined ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' : 'bg-gray-500'}`}></div>
-                {isJoined && <div className="absolute inset-0 w-3 h-3 bg-red-500 rounded-full animate-ping opacity-75"></div>}
+                <div className={`w-3 h-3 rounded-full ${isJoined ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 'bg-yellow-500'}`}></div>
+                {isJoined && <div className="absolute inset-0 w-3 h-3 bg-green-500 rounded-full animate-ping opacity-75"></div>}
             </div>
             <div>
                 <h2 className="font-black text-white tracking-[0.2em] text-sm md:text-base">
@@ -3936,7 +3829,7 @@ export default function RealLiveStream({ user, onClose }) {
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-all border ${
                         isRecording 
                         ? 'bg-red-500/10 border-red-500 text-red-500 hover:bg-red-500 hover:text-white' 
-                        : 'bg-white/5 border-white/10 text-white hover:border-[var(--neon-primary)] hover:text-[var(--neon-primary)]'
+                        : 'bg-white/5 border-white/10 text-white hover:border-cyan-500 hover:text-cyan-400'
                     }`}
                 >
                     {isRecording ? <><IconPlayerStop size={16}/> STOP REC</> : <><IconPlayerRecord size={16}/> REC SCREEN</>}
@@ -3949,18 +3842,18 @@ export default function RealLiveStream({ user, onClose }) {
         </div>
       </div>
 
-      {/* --- المحتوى الرئيسي --- */}
+      {/* منطقة المحتوى */}
       <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
         
         {!isJoined ? (
-            // --- شاشة الدخول (Lobby) ---
+            // --- شاشة الدخول (Lobby) بتصميم جديد ---
             <div className="w-full max-w-md p-8 flex flex-col gap-6 relative z-10">
                 {/* تأثيرات الخلفية */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-[var(--neon-primary)]/5 blur-[100px] rounded-full pointer-events-none"></div>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-cyan-500/5 blur-[100px] rounded-full pointer-events-none"></div>
 
                 <div className="text-center relative">
-                    <div className="w-24 h-24 bg-[#111] rounded-2xl flex items-center justify-center mx-auto mb-6 border border-[var(--neon-primary)]/30 shadow-[0_0_30px_rgba(0,240,255,0.15)] group">
-                        <IconVideo size={48} className="text-[var(--neon-primary)] group-hover:scale-110 transition-transform duration-500" />
+                    <div className="w-24 h-24 bg-[#111] rounded-2xl flex items-center justify-center mx-auto mb-6 border border-cyan-500/30 shadow-[0_0_30px_rgba(6,182,212,0.15)] group">
+                        <IconVideo size={48} className="text-cyan-500 group-hover:scale-110 transition-transform duration-500" />
                     </div>
                     <h3 className="text-3xl font-black text-white mb-2 tracking-tight">SECURE CHANNEL</h3>
                     <p className="text-white/40 text-sm font-mono">Enter frequency ID to initialize uplink.</p>
@@ -3968,19 +3861,22 @@ export default function RealLiveStream({ user, onClose }) {
 
                 <div className="space-y-4 relative">
                     <div className="group">
-                        <label className="text-[10px] font-bold text-[var(--neon-primary)] uppercase ml-1 mb-2 block tracking-widest">Channel Identity</label>
-                        <input 
-                            value={roomName}
-                            onChange={(e) => setRoomName(e.target.value)}
-                            placeholder="SQUAD-ALPHA"
-                            className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl py-4 px-5 text-white outline-none focus:border-[var(--neon-primary)] focus:shadow-[0_0_20px_rgba(0,240,255,0.1)] transition-all font-mono uppercase text-lg placeholder:text-white/10 text-center"
-                        />
+                        <label className="text-[10px] font-bold text-cyan-500 uppercase ml-1 mb-2 block tracking-widest">Channel Identity</label>
+                        <div className="relative">
+                            <input 
+                                value={roomName}
+                                onChange={(e) => setRoomName(e.target.value)}
+                                placeholder="SQUAD-ALPHA"
+                                className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl py-4 pl-5 pr-12 text-white outline-none focus:border-cyan-500 focus:shadow-[0_0_20px_rgba(6,182,212,0.1)] transition-all font-mono uppercase text-lg placeholder:text-white/10"
+                            />
+                            <IconMicrophone className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20" size={20}/>
+                        </div>
                     </div>
 
                     <button 
                         onClick={handleJoin}
                         disabled={!roomName || loading}
-                        className="w-full py-4 bg-[var(--neon-primary)] hover:opacity-90 text-black font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed group"
+                        className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-900/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed group"
                     >
                         {loading ? <IconLoader className="animate-spin"/> : (
                             <>
@@ -3992,13 +3888,13 @@ export default function RealLiveStream({ user, onClose }) {
                 </div>
             </div>
         ) : (
-            // --- شاشة البث (Jitsi Meeting + Overlay) ---
-            <div className="w-full h-full relative group">
+            // --- شاشة الفيديو (Jitsi) ---
+            <div className="w-full h-full relative">
                 <JitsiMeeting
                     domain="meet.jit.si"
                     roomName={`RussianApp_Secure_${roomName}`}
                     configOverwrite={{
-                        startWithAudioMuted: true,
+                        startWithAudioMuted: false,
                         disableThirdPartyRequests: true,
                         prejoinPageEnabled: false,
                         toolbarButtons: [
@@ -4014,6 +3910,7 @@ export default function RealLiveStream({ user, onClose }) {
                         SHOW_WATERMARK_FOR_GUESTS: false,
                         DEFAULT_BACKGROUND: '#000000',
                         TOOLBAR_ALWAYS_VISIBLE: true,
+                        DEFAULT_REMOTE_DISPLAY_NAME: 'Operative',
                     }}
                     userInfo={{
                         displayName: user?.email?.split('@')[0] || "Operative"
@@ -4024,49 +3921,12 @@ export default function RealLiveStream({ user, onClose }) {
                         iframeRef.style.border = 'none';
                     }}
                 />
-
-                {/* --- أزرار التفاعل (Overlay Buttons) --- */}
-                <div className="absolute bottom-24 right-6 flex flex-col gap-3 z-50 transition-opacity opacity-50 hover:opacity-100">
-                    <ReactionBtn icon={IconHeart} color="text-red-500" onClick={() => addReaction('heart')} />
-                    <ReactionBtn icon={IconFlame} color="text-orange-500" onClick={() => addReaction('flame')} />
-                    <ReactionBtn icon={IconThumbUp} color="text-blue-500" onClick={() => addReaction('like')} />
-                </div>
-
-                {/* --- منطقة عرض الرسوم المتحركة (Floating Animations) --- */}
-                <div className="absolute inset-0 pointer-events-none overflow-hidden z-40">
-                    <AnimatePresence>
-                        {reactions.map(r => (
-                            <motion.div
-                                key={r.id}
-                                initial={{ y: 50, opacity: 0, x: Math.random() * 50 }}
-                                animate={{ y: -600, opacity: 1, x: (Math.random() - 0.5) * 200 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 2.5, ease: "easeOut" }}
-                                className="absolute bottom-20 right-20 text-5xl drop-shadow-lg"
-                            >
-                                {r.type === 'heart' && '❤️'}
-                                {r.type === 'flame' && '🔥'}
-                                {r.type === 'like' && '👍'}
-                            </motion.div>
-                        ))}
-                    </AnimatePresence>
-                </div>
             </div>
         )}
       </div>
     </div>
   );
 }
-
-// مكون زر التفاعل الصغير
-const ReactionBtn = ({ icon: Icon, color, onClick }) => (
-    <button 
-        onClick={onClick}
-        className="p-3 bg-black/60 backdrop-blur-md rounded-full border border-white/10 hover:border-white/50 hover:scale-110 transition-all active:scale-95 shadow-lg"
-    >
-        <Icon className={color} size={24} filled />
-    </button>
-);
 
 
 ==================================================================
@@ -4157,131 +4017,6 @@ export function MusicPlayer({ music }) {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-
-==================================================================
-FILE: components\NeuralMap.jsx
-==================================================================
-
-"use client";
-import React, { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { IconBrain, IconZoomIn, IconZoomOut } from "@tabler/icons-react";
-
-export default function NeuralMap({ cards }) {
-  const canvasRef = useRef(null);
-  const [hoveredNode, setHoveredNode] = useState(null);
-  const [scale, setScale] = useState(1);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    let animationFrameId;
-
-    // إعداد العقد (Nodes)
-    const nodes = cards.map(card => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      vx: (Math.random() - 0.5) * 0.5,
-      vy: (Math.random() - 0.5) * 0.5,
-      level: card.level,
-      text: card.russian,
-      meaning: card.arabic,
-      color: card.level === 0 ? '#ef4444' : // Red (New)
-             card.level < 4 ? '#eab308' :   // Yellow (Learning)
-             '#06b6d4'                      // Cyan (Mastered)
-    }));
-
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // خلفية شبكية خفيفة
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
-      ctx.lineWidth = 1;
-      for(let i=0; i<canvas.width; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
-      for(let i=0; i<canvas.height; i+=50) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
-
-      // رسم الاتصالات
-      nodes.forEach((node, i) => {
-        // تحديث الموقع
-        node.x += node.vx;
-        node.y += node.vy;
-
-        // ارتداد من الحواف
-        if (node.x < 0 || node.x > canvas.width) node.vx *= -1;
-        if (node.y < 0 || node.y > canvas.height) node.vy *= -1;
-
-        // رسم الخطوط للعقد القريبة
-        for (let j = i + 1; j < nodes.length; j++) {
-          const other = nodes[j];
-          const dx = node.x - other.x;
-          const dy = node.y - other.y;
-          const dist = Math.sqrt(dx*dx + dy*dy);
-
-          if (dist < 100) {
-            ctx.beginPath();
-            ctx.moveTo(node.x, node.y);
-            ctx.lineTo(other.x, other.y);
-            ctx.strokeStyle = `rgba(6, 182, 212, ${1 - dist/100})`; // Cyan glow
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
-          }
-        }
-      });
-
-      // رسم العقد
-      nodes.forEach(node => {
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, 4 + node.level, 0, Math.PI * 2);
-        ctx.fillStyle = node.color;
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = node.color;
-        ctx.fill();
-        ctx.shadowBlur = 0; // Reset
-      });
-      
-      animationFrameId = requestAnimationFrame(draw);
-    };
-
-    // ضبط الحجم
-    const resize = () => {
-        canvas.width = canvas.parentElement.offsetWidth;
-        canvas.height = canvas.parentElement.offsetHeight;
-    };
-    window.addEventListener('resize', resize);
-    resize();
-    draw();
-
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      window.removeEventListener('resize', resize);
-    };
-  }, [cards]);
-
-  return (
-    <div className="w-full h-screen relative bg-[#050505] overflow-hidden flex flex-col">
-      <div className="absolute top-4 left-4 z-10 p-4 glass-card rounded-xl">
-        <h2 className="text-2xl font-black text-white flex items-center gap-2">
-            <IconBrain className="text-cyan-500 animate-pulse"/> NEURAL MAP
-        </h2>
-        <div className="flex gap-4 text-xs mt-2 font-mono">
-            <span className="flex items-center gap-1 text-red-400">● Weak</span>
-            <span className="flex items-center gap-1 text-yellow-400">● Learning</span>
-            <span className="flex items-center gap-1 text-cyan-400">● Mastered</span>
-        </div>
-      </div>
-
-      <div className="flex-1 relative cursor-crosshair">
-         <canvas ref={canvasRef} className="w-full h-full" />
-      </div>
-
-      {/* Hover Info (Mockup logic could be added to canvas interaction) */}
-      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 glass-card px-6 py-2 rounded-full text-xs text-white/50">
-        Active Neural Nodes: {cards.length}
-      </div>
     </div>
   );
 }
@@ -5206,28 +4941,26 @@ FILE: components\SettingsView.jsx
 "use client";
 import React, { useState } from 'react';
 import { useSettings } from '../context/SettingsContext';
-import { useTheme } from '../context/ThemeContext'; // استيراد
 import { 
   IconVolume, IconEye, IconShield, IconDatabase, IconTrash, 
-  IconDeviceFloppy, IconPalette, IconRobot 
+  IconDeviceFloppy, IconBell, IconLanguage 
 } from '@tabler/icons-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function SettingsView({ user, onLogout, resetProgress }) {
   const { settings, updateSettings } = useSettings();
-  const { theme, setTheme } = useTheme(); // استخدام الثيم
   const [activeCategory, setActiveCategory] = useState('interface');
 
   const categories = [
-    { id: 'interface', label: 'Interface & FX', icon: IconEye },
-    { id: 'theme', label: 'System Theme', icon: IconPalette }, // قسم جديد
-    { id: 'audio', label: 'Audio & AI', icon: IconVolume },
-    { id: 'data', label: 'Data & Account', icon: IconDatabase },
+    { id: 'interface', label: 'Interface', icon: IconEye },
+    { id: 'audio', label: 'Audio & Voice', icon: IconVolume },
+    { id: 'data', label: 'Data & Privacy', icon: IconDatabase },
+    { id: 'account', label: 'Account', icon: IconShield },
   ];
 
   return (
     <div className="w-full h-full p-8 flex flex-col max-w-5xl mx-auto font-sans">
-      <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[var(--neon-primary)] to-[var(--neon-secondary)] mb-8">
+      <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-600 mb-8 glow-text-blue">
         SYSTEM CONFIGURATION
       </h2>
 
@@ -5240,7 +4973,7 @@ export default function SettingsView({ user, onLogout, resetProgress }) {
               onClick={() => setActiveCategory(cat.id)}
               className={`flex items-center gap-3 p-4 rounded-xl text-left transition-all ${
                 activeCategory === cat.id 
-                ? 'bg-white/10 text-[var(--neon-primary)] border-l-4 border-[var(--neon-primary)] shadow-lg' 
+                ? 'bg-white/10 text-cyan-400 border-l-4 border-cyan-400 shadow-lg' 
                 : 'text-white/50 hover:bg-white/5 hover:text-white'
               }`}
             >
@@ -5261,24 +4994,31 @@ export default function SettingsView({ user, onLogout, resetProgress }) {
               transition={{ duration: 0.2 }}
               className="space-y-6"
             >
-              {/* قسم الثيمات الجديد */}
-              {activeCategory === 'theme' && (
-                <div className="space-y-6">
-                    <h3 className="text-xl font-bold text-white mb-4">Select Interface Protocol</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <ThemeButton id="neon" label="NEON CITY" color="#00f2ff" current={theme} set={setTheme} desc="Standard Blue/Pink Interface" />
-                        <ThemeButton id="matrix" label="MATRIX" color="#00ff00" current={theme} set={setTheme} desc="Hacker Green Terminal" />
-                        <ThemeButton id="soviet" label="RED ALERT" color="#ff0000" current={theme} set={setTheme} desc="Soviet Military Grade" />
-                        <ThemeButton id="cyberpunk" label="NIGHT CITY" color="#fcee0a" current={theme} set={setTheme} desc="High Contrast Yellow" />
-                    </div>
-                </div>
-              )}
-
               {activeCategory === 'interface' && (
                 <div className="space-y-4">
                   <SettingGroup title="Visual Fidelity">
-                    <ToggleOption label="High-Res Particles" desc="Enable GPU heavy effects." value={settings.visualEffects} onChange={v => updateSettings('visualEffects', v)} />
-                    <ToggleOption label="Scanlines Effect" desc="Retro CRT monitor overlay." value={settings.scanlines} onChange={v => updateSettings('scanlines', v)} />
+                    <ToggleOption 
+                      label="High-Res Particles" 
+                      desc="Enable detailed background effects (uses GPU)." 
+                      value={settings.visualEffects} 
+                      onChange={v => updateSettings('visualEffects', v)} 
+                    />
+                    <ToggleOption 
+                      label="Motion Blur" 
+                      desc="Add cinematic blur to animations." 
+                      value={settings.motionBlur} 
+                      onChange={v => updateSettings('motionBlur', v)} 
+                    />
+                  </SettingGroup>
+                  <SettingGroup title="Language">
+                    <div className="flex justify-between items-center p-4 bg-white/5 rounded-lg border border-white/10">
+                        <span className="text-sm font-bold text-white">App Language</span>
+                        <select className="bg-black border border-white/20 rounded px-2 py-1 text-xs outline-none">
+                            <option>English (System)</option>
+                            <option>Arabic (العربية)</option>
+                            <option>Russian (Русский)</option>
+                        </select>
+                    </div>
                   </SettingGroup>
                 </div>
               )}
@@ -5286,41 +5026,60 @@ export default function SettingsView({ user, onLogout, resetProgress }) {
               {activeCategory === 'audio' && (
                 <div className="space-y-4">
                   <SettingGroup title="Sound Mixer">
-                    <ToggleOption label="UI Sound Effects" desc="Clicks & interactions." value={settings.soundEffects} onChange={v => updateSettings('soundEffects', v)} />
-                    <ToggleOption label="Voice Synthesis" desc="AI pronunciation." value={settings.speech} onChange={v => updateSettings('speech', v)} />
-                  </SettingGroup>
-                  
-                  {/* AI Personality Slider */}
-                  <div className="p-6 rounded-xl bg-white/5 border border-white/10">
-                    <div className="flex items-center gap-3 mb-4">
-                        <IconRobot className="text-[var(--neon-primary)]"/>
-                        <span className="font-bold text-white">AI Tutor Personality</span>
-                    </div>
-                    <input 
-                        type="range" 
-                        min="0" max="100" 
-                        className="w-full accent-[var(--neon-primary)] mb-2"
-                        onChange={(e) => updateSettings('aiPersonality', e.target.value)}
+                    <ToggleOption 
+                      label="UI Sound Effects" 
+                      desc="Clicks, hovers, and system alerts." 
+                      value={settings.soundEffects} 
+                      onChange={v => updateSettings('soundEffects', v)} 
                     />
-                    <div className="flex justify-between text-xs text-white/40 font-mono uppercase">
-                        <span>Helpful Assistant</span>
-                        <span>Strict Commander</span>
-                    </div>
+                    <ToggleOption 
+                      label="AI Voice Synthesis" 
+                      desc="Auto-pronounce Russian words." 
+                      value={settings.speech} 
+                      onChange={v => updateSettings('speech', v)} 
+                    />
+                  </SettingGroup>
+                  <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                    <div className="text-sm font-bold text-white mb-2">Voice Speed</div>
+                    <input type="range" min="0.5" max="1.5" step="0.1" className="w-full accent-cyan-500" />
+                    <div className="flex justify-between text-xs text-white/30 mt-1"><span>Slow</span><span>Fast</span></div>
                   </div>
                 </div>
               )}
 
               {activeCategory === 'data' && (
                 <div className="space-y-4">
-                  <SettingGroup title="Account & Data">
-                    <button onClick={resetProgress} className="w-full p-4 bg-red-900/20 border border-red-500/50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all flex justify-between items-center group">
-                        <span className="font-bold">FACTORY RESET</span>
-                        <IconTrash className="group-hover:rotate-12 transition-transform"/>
-                    </button>
-                    <button onClick={onLogout} className="w-full p-4 border border-white/10 text-white/50 rounded-xl hover:bg-white/10 hover:text-white transition-all text-center font-mono text-sm">
-                        TERMINATE SESSION (LOGOUT)
-                    </button>
+                  <SettingGroup title="Privacy & Storage">
+                    <div className="p-4 bg-white/5 rounded-xl border border-white/10 flex justify-between items-center">
+                        <div>
+                            <div className="font-bold text-white">Export User Data</div>
+                            <div className="text-xs text-white/40">Download a JSON file of your progress.</div>
+                        </div>
+                        <button className="p-2 bg-cyan-900/30 text-cyan-400 rounded-lg hover:bg-cyan-500 hover:text-black transition-colors"><IconDeviceFloppy/></button>
+                    </div>
+                    <div className="p-4 bg-red-900/10 rounded-xl border border-red-500/30 flex justify-between items-center">
+                        <div>
+                            <div className="font-bold text-red-400">Factory Reset</div>
+                            <div className="text-xs text-red-400/50">Wipe all progress permanently.</div>
+                        </div>
+                        <button onClick={resetProgress} className="p-2 bg-red-500/20 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors"><IconTrash/></button>
+                    </div>
                   </SettingGroup>
+                </div>
+              )}
+
+              {activeCategory === 'account' && (
+                <div className="space-y-4">
+                    <div className="glass-panel p-6 rounded-xl text-center">
+                        <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-blue-600 rounded-full mx-auto mb-4 flex items-center justify-center text-2xl font-bold">
+                            {user?.email?.[0].toUpperCase()}
+                        </div>
+                        <h3 className="text-xl font-bold text-white">{user?.email}</h3>
+                        <p className="text-white/40 text-xs font-mono mt-1">{user?.uid}</p>
+                        <button onClick={onLogout} className="mt-6 w-full py-3 border border-red-500/50 text-red-500 font-bold rounded-lg hover:bg-red-500 hover:text-white transition-all">
+                            LOGOUT
+                        </button>
+                    </div>
                 </div>
               )}
 
@@ -5332,21 +5091,9 @@ export default function SettingsView({ user, onLogout, resetProgress }) {
   );
 }
 
-const ThemeButton = ({ id, label, color, current, set, desc }) => (
-    <button 
-        onClick={() => set(id)}
-        className={`p-4 rounded-xl border-2 text-left transition-all relative overflow-hidden group ${current === id ? 'border-white bg-white/10' : 'border-white/5 hover:border-white/20 bg-black'}`}
-    >
-        <div className="absolute top-0 right-0 p-2 opacity-50"><div className="w-3 h-3 rounded-full" style={{background: color}}></div></div>
-        <div className="font-black text-lg mb-1" style={{color: current === id ? '#fff' : color}}>{label}</div>
-        <div className="text-xs text-white/40">{desc}</div>
-        {current === id && <div className="absolute inset-0 bg-white/5 animate-pulse pointer-events-none"></div>}
-    </button>
-);
-
 const SettingGroup = ({ title, children }) => (
     <div className="space-y-2">
-        <h4 className="text-xs font-bold text-[var(--neon-primary)] uppercase tracking-widest ml-1">{title}</h4>
+        <h4 className="text-xs font-bold text-cyan-500 uppercase tracking-widest ml-1">{title}</h4>
         {children}
     </div>
 );
@@ -5359,96 +5106,12 @@ const ToggleOption = ({ label, desc, value, onChange }) => (
         </div>
         <button 
             onClick={() => onChange(!value)}
-            className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${value ? 'bg-[var(--neon-primary)]' : 'bg-gray-700'}`}
+            className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${value ? 'bg-cyan-600' : 'bg-gray-700'}`}
         >
-            <div className={`w-4 h-4 bg-black rounded-full shadow-sm transition-transform duration-300 ${value ? 'translate-x-6' : 'translate-x-0'}`} />
+            <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${value ? 'translate-x-6' : 'translate-x-0'}`} />
         </button>
     </div>
 );
-
-
-==================================================================
-FILE: components\SlangDistrict.jsx
-==================================================================
-
-"use client";
-import React, { useState } from "react";
-import { slangDatabase } from "../data/slangDatabase";
-import { IconLock, IconSkull, IconEyeOff, IconEye } from "@tabler/icons-react";
-import { motion } from "framer-motion";
-
-export default function SlangDistrict({ stats }) {
-  const isLocked = (stats?.level || 1) < 3;
-  const [revealed, setRevealed] = useState({});
-
-  const toggleReveal = (id) => {
-      setRevealed(prev => ({...prev, [id]: !prev[id]}));
-  };
-
-  if (isLocked) {
-      return (
-          <div className="w-full h-screen flex flex-col items-center justify-center bg-black text-red-600 font-mono relative overflow-hidden">
-              <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
-              <div className="z-10 text-center p-10 border-4 border-red-600 rounded-xl bg-black/80">
-                  <IconLock size={64} className="mx-auto mb-4 animate-pulse"/>
-                  <h1 className="text-4xl font-black mb-2">RESTRICTED AREA</h1>
-                  <p className="text-white/50 mb-6">Gopnik clearance Level 3 required.</p>
-                  <div className="text-sm bg-red-900/20 py-2 px-4 rounded border border-red-900">
-                      CURRENT LEVEL: {stats?.level || 1}
-                  </div>
-              </div>
-          </div>
-      );
-  }
-
-  return (
-    <div className="w-full h-screen bg-[#050000] text-red-500 p-6 overflow-y-auto pb-32 font-mono">
-        <div className="border-b-4 border-red-600 pb-6 mb-8 flex justify-between items-end">
-            <div>
-                <h1 className="text-5xl font-black tracking-tighter flex items-center gap-4">
-                    <IconSkull size={48} className="animate-bounce"/> SLANG DISTRICT
-                </h1>
-                <p className="text-red-800 font-bold mt-2">/// STREET KNOWLEDGE ///</p>
-            </div>
-            <div className="hidden md:block text-xs opacity-50 max-w-xs text-right">
-                WARNING: Content may be informal. Use with caution in formal settings.
-            </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {slangDatabase.map((card, i) => (
-                <motion.div 
-                    key={card.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    className="bg-[#110000] border border-red-900/50 p-6 rounded-none relative group hover:bg-red-950/30 transition-colors"
-                >
-                    {/* Graffiti Effect */}
-                    <div className="absolute top-2 right-2 opacity-20 group-hover:opacity-100 transition-opacity">
-                        <span className="text-4xl font-black rotate-12 block">☭</span>
-                    </div>
-
-                    <h2 className="text-3xl font-black text-white mb-4">{card.russian}</h2>
-                    
-                    <div className="relative overflow-hidden rounded bg-black border border-red-900/30">
-                        <div className={`p-4 transition-all duration-300 ${revealed[card.id] ? 'blur-0' : 'blur-sm select-none'}`}>
-                            <p className="text-xl text-red-400 dir-rtl text-center font-bold">{card.arabic}</p>
-                        </div>
-                        
-                        <button 
-                            onClick={() => toggleReveal(card.id)}
-                            className="absolute inset-0 w-full h-full flex items-center justify-center hover:bg-white/5 transition-colors z-10"
-                        >
-                            {!revealed[card.id] && <IconEyeOff className="text-red-600" />}
-                        </button>
-                    </div>
-                </motion.div>
-            ))}
-        </div>
-    </div>
-  );
-}
 
 
 ==================================================================
@@ -6024,28 +5687,6 @@ function IconContainer({ mouseX, title, icon, onClick }) {
 
 
 ==================================================================
-FILE: components\ui\fluid-background.jsx
-==================================================================
-
-"use client";
-import React from "react";
-
-export const FluidBackground = () => {
-  return (
-    <div className="fixed inset-0 -z-10 w-full h-full bg-[#050505] overflow-hidden">
-      {/* الدوائر الملونة المتحركة */}
-      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-purple-900/30 rounded-full blur-[120px] animate-blob"></div>
-      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-blue-900/30 rounded-full blur-[120px] animate-blob animation-delay-2000"></div>
-      <div className="absolute top-[30%] left-[30%] w-[40%] h-[40%] bg-emerald-900/20 rounded-full blur-[120px] animate-blob animation-delay-4000"></div>
-      
-      {/* طبقة الضجيج Noise */}
-      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
-    </div>
-  );
-};
-
-
-==================================================================
 FILE: components\ui\hover-border-gradient.jsx
 ==================================================================
 
@@ -6219,65 +5860,6 @@ export const useSettings = () => {
   }
   return context;
 };
-
-
-==================================================================
-FILE: context\ThemeContext.js
-==================================================================
-
-"use client";
-import React, { createContext, useContext, useState, useEffect } from 'react';
-
-const ThemeContext = createContext();
-
-export const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState('neon'); // 'neon', 'matrix', 'soviet', 'cyberpunk'
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('russian_theme_v1');
-    if (savedTheme) setTheme(savedTheme);
-  }, []);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    localStorage.setItem('russian_theme_v1', theme);
-
-    if (theme === 'matrix') {
-      root.style.setProperty('--neon-primary', '#00ff00');
-      root.style.setProperty('--neon-secondary', '#003300');
-      root.style.setProperty('--neon-accent', '#ccffcc');
-      root.style.setProperty('--bg-deep', '#000500');
-      root.style.setProperty('--glass-surface', 'rgba(0, 20, 0, 0.8)');
-    } else if (theme === 'soviet') {
-      root.style.setProperty('--neon-primary', '#ff0000');
-      root.style.setProperty('--neon-secondary', '#ffcc00');
-      root.style.setProperty('--neon-accent', '#8b0000');
-      root.style.setProperty('--bg-deep', '#1a0505');
-      root.style.setProperty('--glass-surface', 'rgba(30, 0, 0, 0.7)');
-    } else if (theme === 'cyberpunk') {
-      root.style.setProperty('--neon-primary', '#fcee0a'); // Cyber Yellow
-      root.style.setProperty('--neon-secondary', '#00f0ff'); // Cyan
-      root.style.setProperty('--neon-accent', '#ff003c'); // Red
-      root.style.setProperty('--bg-deep', '#0b0b0b');
-      root.style.setProperty('--glass-surface', 'rgba(20, 20, 20, 0.8)');
-    } else {
-      // Default Neon
-      root.style.setProperty('--neon-primary', '#00f2ff');
-      root.style.setProperty('--neon-secondary', '#7000ff');
-      root.style.setProperty('--neon-accent', '#ff0055');
-      root.style.setProperty('--bg-deep', '#050505');
-      root.style.setProperty('--glass-surface', 'rgba(20, 20, 20, 0.6)');
-    }
-  }, [theme]);
-
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  );
-};
-
-export const useTheme = () => useContext(ThemeContext);
 
 
 ==================================================================
@@ -7133,124 +6715,6 @@ export const getRankUpRewards = (oldRankId, newRankId) => {
 
 
 ==================================================================
-FILE: data\slangDatabase.js
-==================================================================
-
-export const slangDatabase = [
-    // =================================================================
-    // 1. الأشخاص والمناداة (People & Addressing)
-    // =================================================================
-    { id: 'sl_p1', russian: "Чувак", arabic: "يا صاح / زلمة (Dude)", level: 0, category: "People" },
-    { id: 'sl_p2', russian: "Братан", arabic: "يا شقيق / يا برو (Bro)", level: 0, category: "People" },
-    { id: 'sl_p3', russian: "Кент", arabic: "رفيق / صاحب مقرب", level: 1, category: "People" },
-    { id: 'sl_p4', russian: "Гопник", arabic: "بلطجي شوارع (Gopnik)", level: 0, category: "People" },
-    { id: 'sl_p5', russian: "Мусор", arabic: "شرطي (لفظ مهين - يعني قمامة)", level: 2, category: "People" },
-    { id: 'sl_p6', russian: "Тип", arabic: "شخص غريب / مشكوك فيه", level: 1, category: "People" },
-    { id: 'sl_p7', russian: "Лох", arabic: "مغفل / ضحية سهلة (Loser)", level: 0, category: "People" },
-    { id: 'sl_p8', russian: "Мажор", arabic: "ابن عز / مدلل (Rich kid)", level: 1, category: "People" },
-    { id: 'sl_p9', russian: "Чика", arabic: "فتاة جذابة (Chic)", level: 1, category: "People" },
-    { id: 'sl_p10', russian: "Бомж", arabic: "متشرد (Homeless)", level: 1, category: "People" },
-    { id: 'sl_p11', russian: "Шкоколо", arabic: "تلميذ مزعج (في الألعاب أونلاين)", level: 2, category: "People" },
-    { id: 'sl_p12', russian: "Стукач", arabic: "واشي / فسّاد (Snitch)", level: 2, category: "People" },
-    { id: 'sl_p13', russian: "Терпила", arabic: "شخص ضعيف الشخصية (يتحمل الإهانة)", level: 2, category: "People" },
-
-    // =================================================================
-    // 2. المال والأعمال (Money & Business)
-    // =================================================================
-    { id: 'sl_m1', russian: "Бабки", arabic: "فلوس / كاش", level: 0, category: "Money" },
-    { id: 'sl_m2', russian: "Бабло", arabic: "ثروة / مال كثير", level: 0, category: "Money" },
-    { id: 'sl_m3', russian: "Капуста", arabic: "دولارات (لأنها خضراء كالكرنب)", level: 1, category: "Money" },
-    { id: 'sl_m4', russian: "Лимон", arabic: "مليون روبل", level: 1, category: "Money" },
-    { id: 'sl_m5', russian: "Косарь", arabic: "ألف روبل (1000)", level: 1, category: "Money" },
-    { id: 'sl_m6', russian: "Пятихатка", arabic: "خمسمائة روبل (500)", level: 2, category: "Money" },
-    { id: 'sl_m7', russian: "Зелень", arabic: "عملة صعبة (دولار)", level: 1, category: "Money" },
-    { id: 'sl_m8', russian: "Халява", arabic: "شيء مجاني (Freebie)", level: 0, category: "Money" },
-    { id: 'sl_m9', russian: "На шару", arabic: "بالمجان / بدون جهد", level: 1, category: "Money" },
-
-    // =================================================================
-    // 3. أفعال وحركة الشارع (Street Actions)
-    // =================================================================
-    { id: 'sl_v1', russian: "Тусить", arabic: "يحتفل / يسهر (Party)", level: 0, category: "Verbs" },
-    { id: 'sl_v2', russian: "Забить", arabic: "طنش / انسى الموضوع", level: 0, category: "Verbs" },
-    { id: 'sl_v3', russian: "Хавать", arabic: "يبلع / يأكل بشراهة", level: 0, category: "Verbs" },
-    { id: 'sl_v4', russian: "Гнать", arabic: "يكذب / يخرط (Lie)", level: 1, category: "Verbs" },
-    { id: 'sl_v5', russian: "Офигеть", arabic: "ينصدم / يُذهل", level: 1, category: "Verbs" },
-    { id: 'sl_v6', russian: "Достать", arabic: "يزعج بشدة (يخرج عن الطور)", level: 1, category: "Verbs" },
-    { id: 'sl_v7', russian: "Пахать", arabic: "يكدح / يعمل كالحمار", level: 1, category: "Verbs" },
-    { id: 'sl_v8', russian: "Тормозить", arabic: "يفهم ببطء / يتنح", level: 1, category: "Verbs" },
-    { id: 'sl_v9', russian: "Бухать", arabic: "يشرب الكحول بكثرة", level: 1, category: "Verbs" },
-    { id: 'sl_v10', russian: "Втыкать", arabic: "يسرح / يحدق بلا هدف", level: 2, category: "Verbs" },
-    { id: 'sl_v11', russian: "Палить", arabic: "يكشف سراً / يراقب", level: 2, category: "Verbs" },
-    { id: 'sl_v12', russian: "Отмазаться", arabic: "يتحجج / يتهرب من مسؤولية", level: 2, category: "Verbs" },
-    { id: 'sl_v13', russian: "Кинуть", arabic: "يخدع / ينصب على شخص", level: 2, category: "Verbs" },
-    { id: 'sl_v14', russian: "Наехать", arabic: "يتهجم لفظياً / يتنمر", level: 2, category: "Verbs" },
-    { id: 'sl_v15', russian: "Свалить", arabic: "يهرب / يغادر بسرعة", level: 1, category: "Verbs" },
-
-    // =================================================================
-    // 4. صفات وردود فعل (Adjectives & Reactions)
-    // =================================================================
-    { id: 'sl_a1', russian: "Круто", arabic: "جامد / رائع (Cool)", level: 0, category: "Adjectives" },
-    { id: 'sl_a2', russian: "Отстой", arabic: "زفت / سيء جداً (Sucks)", level: 0, category: "Adjectives" },
-    { id: 'sl_a3', russian: "Жесть", arabic: "يا ساتر! (للدهشة/الرعب)", level: 0, category: "Adjectives" },
-    { id: 'sl_a4', russian: "Чётко", arabic: "تمام / مضبوط (Gopnik Style)", level: 0, category: "Adjectives" },
-    { id: 'sl_a5', russian: "В натуре", arabic: "فعلاً / حقاً (للتأكيد)", level: 1, category: "Adjectives" },
-    { id: 'sl_a6', russian: "Стрёмно", arabic: "مخيف / محرج / مقلق", level: 1, category: "Adjectives" },
-    { id: 'sl_a7', russian: "Фиолетово", arabic: "لا أبالي (اللون البنفسجي)", level: 2, category: "Adjectives" },
-    { id: 'sl_a8', russian: "Огонь", arabic: "نار / حريقة (للمديح)", level: 0, category: "Adjectives" },
-    { id: 'sl_a9', russian: "Пушка", arabic: "قنبلة / شيء مذهل (Literal: مدفع)", level: 1, category: "Adjectives" },
-    { id: 'sl_a10', russian: "Мутный", arabic: "غامض / مشبوه", level: 2, category: "Adjectives" },
-    { id: 'sl_a11', russian: "Борзый", arabic: "وقح / جريء بزيادة", level: 2, category: "Adjectives" },
-
-    // =================================================================
-    // 5. جمل وعبارات كاملة (Full Phrases)
-    // =================================================================
-    { id: 'sl_ph1', russian: "Ты гонишь!", arabic: "أنت تكذب! / بتهزر؟", level: 1, category: "Phrase" },
-    { id: 'sl_ph2', russian: "Не парься", arabic: "لا تشغل بالك / روق", level: 1, category: "Phrase" },
-    { id: 'sl_ph3', russian: "Фильтруй базар", arabic: "ثمن كلامك / انتبه لألفاظك", level: 3, category: "Phrase" },
-    { id: 'sl_ph4', russian: "Вешать лапшу", arabic: "يكذب / يخدع (يعلق معكرونة)", level: 2, category: "Phrase" },
-    { id: 'sl_ph5', russian: "Руки не доходят", arabic: "ليس لدي وقت (يداي لا تصل)", level: 2, category: "Phrase" },
-    { id: 'sl_ph6', russian: "Без базара", arabic: "بدون نقاش / أكيد", level: 1, category: "Phrase" },
-    { id: 'sl_ph7', russian: "Иди лесом", arabic: "اغرب عن وجهي (اذهب للغابة)", level: 2, category: "Phrase" },
-    { id: 'sl_ph8', russian: "Что за фигня?", arabic: "ما هذا الهراء؟", level: 1, category: "Phrase" },
-    { id: 'sl_ph9', russian: "Есть чё?", arabic: "معك شيء؟ (سجائر/ممنوعات)", level: 3, category: "Phrase" },
-    { id: 'sl_ph10', russian: "Зуб даю", arabic: "أحلف لك (أعطيك سني)", level: 2, category: "Phrase" },
-    { id: 'sl_ph11', russian: "Чё кого?", arabic: "كيف الحال؟ / شوالأخبار؟", level: 1, category: "Phrase" },
-    { id: 'sl_ph12', russian: "Я не в курсе", arabic: "ليس لدي علم / لا أعرف", level: 1, category: "Phrase" },
-    { id: 'sl_ph13', russian: "Мне по барабану", arabic: "لا يهمني (مثل الطبل)", level: 2, category: "Phrase" },
-    { id: 'sl_ph14', russian: "Заткнись", arabic: "اخرس", level: 1, category: "Phrase" },
-    { id: 'sl_ph15', russian: "Попутал?", arabic: "هل جننت؟ / هل أخطأت العنوان؟ (تهديد)", level: 3, category: "Phrase" },
-
-    // =================================================================
-    // 6. أشياء وأدوات (Objects & Misc)
-    // =================================================================
-    { id: 'sl_o1', russian: "Блин", arabic: "تباً (مخففة وشائعة جداً)", level: 0, category: "Misc" },
-    { id: 'sl_o2', russian: "Косяк", arabic: "غلطة كبيرة / مصيبة", level: 1, category: "Misc" },
-    { id: 'sl_o3', russian: "Тачка", arabic: "سيارة (Car/Ride)", level: 0, category: "Misc" },
-    { id: 'sl_o4', russian: "Мобила", arabic: "جوال / هاتف", level: 0, category: "Misc" },
-    { id: 'sl_o5', russian: "Семки", arabic: "بزر / لب (سناك الجوبنيك)", level: 0, category: "Misc" },
-    { id: 'sl_o6', russian: "Шмотки", arabic: "ملابس / هدوم", level: 1, category: "Misc" },
-    { id: 'sl_o7', russian: "Вписка", arabic: "حفلة منزلية (House Party)", level: 2, category: "Misc" },
-    { id: 'sl_o8', russian: "Хата", arabic: "شقة / بيت (Crib)", level: 1, category: "Misc" },
-    { id: 'sl_o9', russian: "Комп", arabic: "كمبيوتر", level: 0, category: "Misc" },
-    { id: 'sl_o10', russian: "Зомбоящик", arabic: "تلفاز (صندوق الزومبي)", level: 2, category: "Misc" },
-    { id: 'sl_o11', russian: "Бычок", arabic: "عقب سيجارة", level: 2, category: "Misc" },
-    { id: 'sl_o12', russian: "Жиза", arabic: "واقع حال / حقيقة مؤلمة", level: 1, category: "Misc" },
-
-    // =================================================================
-    // 7. إنترنت وشات (Internet Slang)
-    // =================================================================
-    { id: 'sl_i1', russian: "Лол", arabic: "لول (ضحك)", level: 0, category: "Internet" },
-    { id: 'sl_i2', russian: "Имба", arabic: "قوي جداً (Imbalanced - Gaming)", level: 1, category: "Internet" },
-    { id: 'sl_i3', russian: "Хайп", arabic: "ضجة إعلامية (Hype)", level: 0, category: "Internet" },
-    { id: 'sl_i4', russian: "Хейтер", arabic: "كاره / حاقد (Hater)", level: 0, category: "Internet" },
-    { id: 'sl_i5', russian: "ЛС (Личка)", arabic: "الخاص (Direct Message)", level: 0, category: "Internet" },
-    { id: 'sl_i6', russian: "Баян", arabic: "نكتة قديمة / مكررة", level: 1, category: "Internet" },
-    { id: 'sl_i7', russian: "Тролль", arabic: "ترول / مستفز", level: 0, category: "Internet" },
-    { id: 'sl_i8', russian: "Ава", arabic: "صورة البروفايل (Avatar)", level: 0, category: "Internet" }
-];
-
-
-==================================================================
 FILE: hooks\useAudio.js
 ==================================================================
 
@@ -7951,21 +7415,16 @@ FILE: hooks\useStudySystem.js
 import { useState, useEffect } from 'react';
 import { fullDatabase } from '../data/fullDatabase';
 import { db } from '../lib/firebase';
-import { doc, setDoc, collection, getDocs, updateDoc, onSnapshot, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, getDocs, updateDoc, onSnapshot } from "firebase/firestore";
 
 export const useStudySystem = (user) => {
   const [cards, setCards] = useState([]);
-  const [stats, setStats] = useState({ 
-      xp: 0, 
-      streak: 0, 
-      credits: 0, // العملة الجديدة
-      level: 1,
-      avatar: "👤", 
-      inventory: [], // العناصر المشتراة
-      equipped: { background: 'default', border: 'default' } 
-  });
+  const [stats, setStats] = useState({ xp: 0, streak: 0, avatar: "👤" });
   const [loading, setLoading] = useState(true);
   const [currentCard, setCurrentCard] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isBanned, setIsBanned] = useState(false);
+  const [broadcast, setBroadcast] = useState(null); // رسالة الأدمن
 
   useEffect(() => {
     if (!user) {
@@ -7974,34 +7433,29 @@ export const useStudySystem = (user) => {
         return;
     }
 
-    const userRef = doc(db, "users", user.uid);
-
-    // مراقبة المستخدم وتحديث الإحصائيات
-    const unsubUser = onSnapshot(userRef, (docSnap) => {
+    // 1. مراقبة المستخدم
+    const unsubUser = onSnapshot(doc(db, "users", user.uid), (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
-            // دمج القيم الافتراضية للحقول الجديدة
-            setStats({
-                ...data,
-                credits: data.credits || data.xp || 0, // تحويل XP لرصيد مبدئياً
-                inventory: data.inventory || [],
-                equipped: data.equipped || { background: 'default', border: 'default' }
-            });
+            setStats(data);
+            setIsAdmin(data.isAdmin === true);
+            setIsBanned(data.isBanned === true);
         } else {
-            setDoc(userRef, { 
-                email: user.email, 
-                xp: 0, 
-                credits: 0,
-                streak: 0, 
-                avatar: "👤", 
-                inventory: [],
-                equipped: { background: 'default', border: 'default' },
-                createdAt: new Date().toISOString() 
-            });
+            const isAdm = user.email.toLowerCase() === 'islamaz@bomba.com';
+            setDoc(doc(db, "users", user.uid), { email: user.email, xp: 0, streak: 0, avatar: "👤", isAdmin: isAdm, isBanned: false, createdAt: new Date().toISOString() });
         }
     });
 
-    // تحميل البطاقات
+    // 2. مراقبة رسائل النظام (البث المباشر)
+    const unsubSystem = onSnapshot(doc(db, "system", "broadcast"), (docSnap) => {
+        if (docSnap.exists() && docSnap.data().active) {
+            setBroadcast(docSnap.data().message);
+        } else {
+            setBroadcast(null);
+        }
+    });
+
+    // 3. تحميل البطاقات
     const loadCards = async () => {
         try {
             const progressRef = collection(db, "users", user.uid, "progress");
@@ -8011,7 +7465,7 @@ export const useStudySystem = (user) => {
 
             const merged = fullDatabase.map(card => {
                 const p = progressMap[card.id];
-                return p ? { ...card, ...p } : { ...card, level: 0, nextReview: Date.now() };
+                return p ? { ...card, ...p } : { ...card, level: 0, steps: 0, nextReview: Date.now() };
             });
 
             setCards(merged);
@@ -8021,25 +7475,19 @@ export const useStudySystem = (user) => {
     };
 
     loadCards();
-    return () => unsubUser();
+    return () => { unsubUser(); unsubSystem(); };
   }, [user]);
 
   const updateCurrentCard = (list) => {
-      // خوارزمية SRS بسيطة: البطاقات التي حان وقت مراجعتها ومستواها أقل من 5
       const due = list.filter(c => c.level < 5 && c.nextReview <= Date.now());
-      // ترتيب عشوائي لعدم الملل
-      const randomDue = due.sort(() => Math.random() - 0.5);
-      setCurrentCard(randomDue.length > 0 ? randomDue[0] : null);
+      setCurrentCard(due.length > 0 ? due[0] : null);
   };
 
   const handleSwipe = async (direction) => {
-      if (!currentCard || !user) return;
+      if (!currentCard || !user || isBanned) return;
       const known = direction === 'right';
-      
-      // SRS Interval Logic (Approximate)
       const nextLevel = known ? Math.min(currentCard.level + 1, 5) : 0;
-      const intervals = [0, 10 * 60 * 1000, 24 * 60 * 60 * 1000, 3 * 24 * 60 * 60 * 1000, 7 * 24 * 60 * 60 * 1000, 30 * 24 * 60 * 60 * 1000];
-      const nextReview = Date.now() + (known ? intervals[nextLevel] : intervals[0]);
+      const nextReview = Date.now() + (known ? (nextLevel * 86400000) + 60000 : 30000);
 
       const updated = { ...currentCard, level: nextLevel, nextReview };
       const newCards = cards.map(c => c.id === currentCard.id ? updated : c);
@@ -8047,42 +7495,29 @@ export const useStudySystem = (user) => {
       setCards(newCards);
       updateCurrentCard(newCards);
 
-      // حفظ التقدم
       const cardRef = doc(db, "users", user.uid, "progress", String(currentCard.id));
       await setDoc(cardRef, { card_id: currentCard.id, level: nextLevel, next_review: nextReview });
       
-      // تحديث المكافآت
       if (known) {
-          const xpGain = 10;
-          const creditsGain = 5;
-          await updateDoc(doc(db, "users", user.uid), { 
-              xp: (stats.xp || 0) + xpGain,
-              credits: (stats.credits || 0) + creditsGain
-          });
+          await updateDoc(doc(db, "users", user.uid), { xp: (stats.xp || 0) + 10 });
       }
   };
 
-  // وظائف المتجر (Cyber-Base)
-  const buyItem = async (item) => {
-      if (stats.credits >= item.price && !stats.inventory.includes(item.id)) {
-          await updateDoc(doc(db, "users", user.uid), {
-              credits: stats.credits - item.price,
-              inventory: [...stats.inventory, item.id]
-          });
-          return true;
-      }
-      return false;
+  // دالة تغيير الأفاتار
+  const setAvatar = async (emoji) => {
+      if (user) await updateDoc(doc(db, "users", user.uid), { avatar: emoji });
   };
 
-  const equipItem = async (type, itemId) => {
-      await updateDoc(doc(db, "users", user.uid), {
-          [`equipped.${type}`]: itemId
-      });
-  };
+  // دوال مساعدة
+  const addCard = () => {}; 
+  const deleteCard = () => {}; 
+  const updateCard = () => {};
+  const resetProgress = async () => { if(confirm("Reset?")) window.location.reload(); };
 
   return { 
-      cards, currentCard, stats, handleSwipe, loading, 
-      buyItem, equipItem
+      cards, currentCard, stats, handleSwipe, 
+      resetProgress, loading, addCard, deleteCard, updateCard, 
+      isAdmin, isBanned, broadcast, setAvatar 
   };
 };
 
