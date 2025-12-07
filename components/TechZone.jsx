@@ -1,63 +1,93 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   IconBrandYoutube, IconDownload, IconCpu, IconMusic, 
   IconVideo, IconLoader, IconAlertTriangle, IconWifi, 
-  IconExternalLink, IconServer
+  IconCheck, IconHourglass
 } from "@tabler/icons-react";
 
 export default function TechZone() {
   const [url, setUrl] = useState("");
-  const [format, setFormat] = useState("video"); // video or audio
-  const [loading, setLoading] = useState(false);
+  const [format, setFormat] = useState("1080"); // 1080 (mp4) or mp3
+  const [status, setStatus] = useState("idle"); // idle, processing, success, error
+  const [progress, setProgress] = useState(0);
   const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const handleProcess = async () => {
+  // دالة بدء الطلب
+  const startConversion = async () => {
     if (!url.trim()) return;
     
-    setLoading(true);
+    setStatus("processing");
+    setProgress(0);
     setResult(null);
-    setError(null);
+    setErrorMsg("");
 
     try {
-      // إرسال الطلب لنظام المحركات المتعددة في السيرفر
-      const response = await fetch('/api/youtube', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, format })
-      });
+      // 1. إرسال طلب التحويل
+      // format: mp3, 1080, 720, 480
+      const apiUrl = `https://api.loader.to/ajax/download.php?format=${format}&url=${encodeURIComponent(url)}`;
+      
+      const res = await fetch(apiUrl);
+      const data = await res.json();
 
-      const data = await response.json();
-
-      if (!response.ok || data.error) {
-          throw new Error(data.error || "فشل التحميل من جميع المصادر");
+      if (!data.success && !data.id) {
+        throw new Error("لم يتمكن السيرفر من بدء المعالجة. تأكد من الرابط.");
       }
 
-      setResult(data);
+      const trackingId = data.id;
+      console.log("Tracking ID:", trackingId);
+
+      // 2. بدء مراقبة التقدم (Polling)
+      trackProgress(trackingId);
 
     } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      console.error(err);
+      setErrorMsg(err.message || "فشل الاتصال بالخادم");
+      setStatus("error");
     }
   };
 
-  // دالة التحميل الذكية (تكسر حماية النوافذ المنبثقة)
-  const downloadFile = (link) => {
-    if(!link) {
-        alert("خطأ: رابط التحميل غير موجود!");
-        return;
+  // دالة مراقبة التقدم (تتكرر حتى يكتمل التحميل)
+  const trackProgress = async (id) => {
+    try {
+      const progressUrl = `https://p.oceansaver.in/ajax/progress.php?id=${id}`;
+      
+      const res = await fetch(progressUrl);
+      const data = await res.json();
+
+      if (data.success === 1) {
+        // تم الانتهاء بنجاح!
+        setProgress(100);
+        setStatus("success");
+        setResult({
+          downloadUrl: data.download_url,
+          title: "Download Ready", // للأسف هذا الـ API لا يعطي الاسم دائماً قبل التحميل
+          text: data.text || "Success"
+        });
+      } else {
+        // ما زال يعمل أو يجهز
+        // data.progress يعطينا النسبة المئوية للتحويل من طرف السيرفر
+        // نقوم بتحديث شريط التقدم
+        let currentProgress = data.progress || 0;
+        
+        // تحسين بصري: إذا كان الرقم 0 أو قليل، نزيد عداد وهمي ليشعر المستخدم بالعمل
+        if(currentProgress < 100) {
+            setProgress((prev) => Math.max(prev, currentProgress)); 
+            // نعيد الفحص بعد 2 ثانية
+            setTimeout(() => trackProgress(id), 2000);
+        }
+      }
+    } catch (err) {
+      // إذا فشل طلب التقدم، نحاول مرة أخرى ولا نوقف العملية فوراً
+      setTimeout(() => trackProgress(id), 3000);
     }
+  };
 
-    // محاولة فتح في نافذة جديدة
-    const newWindow = window.open(link, '_blank');
-
-    // إذا قام المتصفح بحظر النافذة المنبثقة
-    if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
-        // نفتح الرابط في نفس الصفحة إجبارياً
-        window.location.href = link;
+  const downloadFile = () => {
+    if (result?.downloadUrl) {
+      window.open(result.downloadUrl, '_blank');
     }
   };
 
@@ -68,117 +98,78 @@ export default function TechZone() {
         {/* Header */}
         <div className="text-center mb-10">
             <h1 className="text-5xl font-black text-white mb-2 tracking-tighter">
-                MULTI <span className="text-blue-600">ENGINE</span>
+                LOADER <span className="text-green-500">MAX</span>
             </h1>
             <p className="text-white/40 font-mono text-xs uppercase tracking-[0.3em]">
-                Triple Core Extraction System
+                Async Processing System
             </p>
         </div>
 
-        {/* Control Panel */}
+        {/* Main Card */}
         <div className="bg-[#0a0a0a] border border-white/10 p-8 rounded-3xl shadow-2xl relative overflow-hidden">
             
-            {/* URL Input */}
+            {/* Input */}
             <div className="mb-6">
-                <label className="text-xs text-blue-500 font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
-                    <IconWifi size={14} className="animate-pulse"/> YouTube Link
+                <label className="text-xs text-green-500 font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <IconWifi size={14} className="animate-pulse"/> Video URL
                 </label>
-                <div className="flex gap-2 bg-[#111] border border-white/10 p-4 rounded-xl focus-within:border-blue-500 transition-colors">
+                <div className="flex gap-2 bg-[#111] border border-white/10 p-4 rounded-xl focus-within:border-green-500 transition-colors">
                     <input 
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
-                        placeholder="Paste Link Here..."
+                        placeholder="Paste Link (Supports 1h+ videos)..."
                         className="bg-transparent w-full outline-none text-white font-mono text-sm"
                     />
                 </div>
             </div>
 
-            {/* Format Selector */}
+            {/* Options */}
             <div className="grid grid-cols-2 gap-4 mb-8">
-                <button 
-                    onClick={() => setFormat('video')} 
-                    className={`py-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all border ${format === 'video' ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20' : 'bg-[#111] border-white/10 text-white/40 hover:border-white/30'}`}
-                >
-                    <IconVideo size={18}/> MP4 Video
+                <button onClick={() => setFormat('1080')} className={`py-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all border ${format === '1080' ? 'bg-green-600 border-green-500 text-white' : 'bg-[#111] border-white/10 text-white/40'}`}>
+                    <IconVideo size={18}/> 1080p MP4
                 </button>
-                <button 
-                    onClick={() => setFormat('audio')} 
-                    className={`py-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all border ${format === 'audio' ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-900/20' : 'bg-[#111] border-white/10 text-white/40 hover:border-white/30'}`}
-                >
-                    <IconMusic size={18}/> MP3 Audio
+                <button onClick={() => setFormat('mp3')} className={`py-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all border ${format === 'mp3' ? 'bg-blue-600 border-blue-500 text-white' : 'bg-[#111] border-white/10 text-white/40'}`}>
+                    <IconMusic size={18}/> MP3 HQ
                 </button>
             </div>
 
-            {/* Execute Button */}
-            <button 
-                onClick={handleProcess}
-                disabled={loading || !url}
-                className="w-full py-5 bg-white text-black font-black text-sm tracking-[0.2em] rounded-xl hover:bg-gray-200 transition-all flex justify-center items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-                {loading ? <><IconLoader className="animate-spin"/> SCANNING ENGINES...</> : <><IconCpu/> GENERATE LINK</>}
-            </button>
+            {/* Button / Progress */}
+            {status === "processing" ? (
+                <div className="w-full py-4 bg-[#111] border border-white/10 rounded-xl relative overflow-hidden">
+                    <div className="absolute top-0 left-0 h-full bg-green-900/30 transition-all duration-500" style={{width: `${progress}%`}}></div>
+                    <div className="relative flex items-center justify-center gap-3 text-green-400 font-bold font-mono">
+                        <IconLoader className="animate-spin" size={20}/>
+                        <span>PROCESSING {progress/10}%</span>
+                    </div>
+                </div>
+            ) : status === "success" ? (
+                <button onClick={downloadFile} className="w-full py-5 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all flex justify-center items-center gap-2 shadow-[0_0_30px_rgba(34,197,94,0.4)] animate-pulse">
+                    <IconDownload size={20}/> DOWNLOAD READY
+                </button>
+            ) : (
+                <button onClick={startConversion} disabled={!url} className="w-full py-5 bg-white text-black font-black text-sm tracking-[0.2em] rounded-xl hover:bg-gray-200 transition-all flex justify-center items-center gap-3 disabled:opacity-50">
+                    <IconCpu size={20}/> START CONVERSION
+                </button>
+            )}
 
-            {/* Error Message */}
+            {/* Error */}
             <AnimatePresence>
-                {error && (
+                {status === "error" && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="mt-6 overflow-hidden">
                         <div className="p-4 bg-red-900/10 text-red-400 text-center rounded-xl border border-red-500/20 text-sm flex items-center justify-center gap-2">
-                            <IconAlertTriangle size={16}/> {error}
+                            <IconAlertTriangle size={16}/> {errorMsg}
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
         </div>
 
-        {/* Result Area */}
-        <AnimatePresence>
-            {result && (
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }} 
-                    animate={{ opacity: 1, y: 0 }} 
-                    className="mt-8 bg-[#0a0a0a] border border-green-500/30 p-6 rounded-3xl flex flex-col md:flex-row gap-6 items-center shadow-[0_0_60px_rgba(34,197,94,0.15)] relative overflow-hidden"
-                >
-                    {/* Thumbnail */}
-                    <div className="w-full md:w-48 aspect-video bg-gray-800 rounded-xl overflow-hidden shrink-0 border border-white/10 relative z-10 shadow-lg">
-                        {result.thumb ? (
-                            <img src={result.thumb} className="w-full h-full object-cover" alt="thumbnail"/>
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-white/20"><IconVideo/></div>
-                        )}
-                    </div>
-                    
-                    {/* Info & Download */}
-                    <div className="flex-1 min-w-0 text-center md:text-left w-full relative z-10">
-                        {/* Engine Badge */}
-                        <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
-                            <span className="text-[10px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded border border-green-500/20 font-bold uppercase tracking-wider flex items-center gap-1">
-                                <IconServer size={10}/> {result.engine || "Auto"}
-                            </span>
-                        </div>
-                        
-                        <h3 className="font-bold text-white text-lg truncate mb-6" title={result.title}>{result.title}</h3>
-                        
-                        <div className="flex flex-col gap-3">
-                            <button 
-                                onClick={() => downloadFile(result.downloadUrl)} 
-                                className="w-full md:w-auto px-8 py-3 bg-green-600 hover:bg-green-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-900/20 active:scale-95"
-                            >
-                                <IconDownload size={18}/> DOWNLOAD NOW
-                            </button>
-                            
-                            <a 
-                                href={result.downloadUrl} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-[10px] text-white/30 hover:text-white underline text-center block transition-colors"
-                            >
-                                رابط مباشر (احتياطي)
-                            </a>
-                        </div>
-                    </div>
-                </motion.div>
-            )}
-        </AnimatePresence>
+        {/* Notes */}
+        <div className="mt-8 text-center text-white/20 text-xs font-mono">
+            <p>Supported: YouTube (1080p, 4K, 1H+), SoundCloud, Facebook</p>
+            <p className="mt-2">Note: Long videos may take 1-2 mins to process.</p>
+        </div>
+
       </div>
     </div>
   );
