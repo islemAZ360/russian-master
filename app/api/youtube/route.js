@@ -17,87 +17,128 @@ export async function POST(req) {
             else videoId = urlObj.searchParams.get("v");
             
             if (videoId) {
-                videoId = videoId.split('?')[0]; // تنظيف نهائي
+                videoId = videoId.split('?')[0];
                 cleanUrl = `https://www.youtube.com/watch?v=${videoId}`;
             }
         }
     } catch (e) { }
 
-    const apiKey = "dadaa32ee3mshea65c3b698adda9p1bd70fjsn7f23dfd97126"; // مفتاحك
+    if (!videoId) return NextResponse.json({ error: "رابط غير صالح" }, { status: 400 });
 
-    // ==========================================
-    // المحاولة الأولى: المزود السخي (500 طلب)
-    // ==========================================
-    console.log("Attempt 1: High Volume Provider...");
+    // مفتاحك (يعمل على جميع هذه الخدمات لأنها في RapidAPI)
+    const apiKey = "dadaa32ee3mshea65c3b698adda9p1bd70fjsn7f23dfd97126";
+
+    let finalData = null;
+
+    // ============================================================
+    // المحرك 1: السريع (للأغاني والفيديوهات القصيرة)
+    // ============================================================
+    console.log(">>> Engine 1: Starting...");
     try {
         const host1 = "youtube-info-download-api.p.rapidapi.com";
-        const format1 = format === 'audio' ? 'mp3' : '720';
-        const url1 = `https://${host1}/ajax/download.php?format=${format1}&url=${encodeURIComponent(cleanUrl)}`;
-        
-        const res1 = await fetch(url1, {
-            method: "GET",
+        // نجرب mp3 للصوت، و 360 للفيديو (أضمن للجودة الطويلة)
+        const f1 = format === 'audio' ? 'mp3' : '360'; 
+        const response1 = await fetch(`https://${host1}/ajax/download.php?format=${f1}&url=${encodeURIComponent(cleanUrl)}`, {
             headers: { "x-rapidapi-key": apiKey, "x-rapidapi-host": host1 }
         });
-
-        if (res1.ok) {
-            const data1 = await res1.json();
-            const link1 = data1.url || data1.link || (data1.download && data1.download[0]?.url);
-            
-            if (link1) {
-                return NextResponse.json({
-                    status: "success",
-                    title: data1.title || "Video",
-                    thumb: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-                    downloadUrl: link1,
-                    source: "Provider 1"
-                });
-            }
-        }
-    } catch (e) { console.log("Provider 1 failed, switching..."); }
-
-    // ==========================================
-    // المحاولة الثانية: المزود القوي (100 طلب) - للخالات الصعبة
-    // ==========================================
-    console.log("Attempt 2: Premium Provider...");
-    try {
-        const host2 = "youtube-media-downloader.p.rapidapi.com";
-        const url2 = `https://${host2}/v2/video/details?videoId=${videoId}`;
         
-        const res2 = await fetch(url2, {
-            method: "GET",
-            headers: { "x-rapidapi-key": apiKey, "x-rapidapi-host": host2 }
-        });
-
-        if (res2.ok) {
-            const data2 = await res2.json();
-            // استخراج الرابط من المزود الثاني
-            let link2 = null;
-            if (format === 'audio') {
-                link2 = data2.audios?.items[0]?.url;
-            } else {
-                // نبحث عن mp4 بجودة 720 أو 360
-                const videos = data2.videos?.items || [];
-                const v720 = videos.find(v => v.quality === "720p" && v.extension === "mp4");
-                const vAny = videos.find(v => v.extension === "mp4");
-                link2 = v720?.url || vAny?.url;
-            }
-
-            if (link2) {
-                return NextResponse.json({
-                    status: "success",
-                    title: data2.title || "Video",
-                    thumb: data2.thumbnails?.[0]?.url,
-                    downloadUrl: link2,
-                    source: "Provider 2"
-                });
+        if (response1.ok) {
+            const d1 = await response1.json();
+            if (d1.success && (d1.url || d1.download_url)) {
+                finalData = {
+                    title: d1.title,
+                    thumb: d1.poster,
+                    url: d1.url || d1.download_url,
+                    engine: "Engine 1 (Fast)"
+                };
             }
         }
-    } catch (e) { console.log("Provider 2 failed."); }
+    } catch (e) { console.log("Engine 1 Failed."); }
 
-    // إذا فشل الاثنان
-    return NextResponse.json({ error: "عذراً، هذا الفيديو محمي جداً ولم نتمكن من استخراجه." }, { status: 400 });
+    // ============================================================
+    // المحرك 2: القوي (للفيديوهات الطويلة والمحمية)
+    // ============================================================
+    if (!finalData) {
+        console.log(">>> Engine 2: Starting (Deep Search)...");
+        try {
+            const host2 = "youtube-media-downloader.p.rapidapi.com";
+            const response2 = await fetch(`https://${host2}/v2/video/details?videoId=${videoId}`, {
+                headers: { "x-rapidapi-key": apiKey, "x-rapidapi-host": host2 }
+            });
+
+            if (response2.ok) {
+                const d2 = await response2.json();
+                let link = null;
+                // محاولة إيجاد أي رابط يعمل
+                if (format === 'audio') {
+                    link = d2.audios?.items?.[0]?.url;
+                } else {
+                    // نبحث عن mp4 (جودة عالية أو متوسطة)
+                    const vids = d2.videos?.items || [];
+                    link = vids.find(v => v.quality === "720p" && v.extension === "mp4")?.url || 
+                           vids.find(v => v.quality === "360p" && v.extension === "mp4")?.url ||
+                           vids[0]?.url;
+                }
+
+                if (link) {
+                    finalData = {
+                        title: d2.title,
+                        thumb: d2.thumbnails?.[0]?.url,
+                        url: link,
+                        engine: "Engine 2 (Deep)"
+                    };
+                }
+            }
+        } catch (e) { console.log("Engine 2 Failed."); }
+    }
+
+    // ============================================================
+    // المحرك 3: الطوارئ (Yt-Stream) - للفيديوهات الطويلة جداً
+    // ============================================================
+    if (!finalData) {
+        console.log(">>> Engine 3: Starting (Emergency)...");
+        try {
+            const host3 = "ytstream-download-youtube-videos.p.rapidapi.com";
+            const response3 = await fetch(`https://${host3}/dl?id=${videoId}`, {
+                headers: { "x-rapidapi-key": apiKey, "x-rapidapi-host": host3 }
+            });
+
+            if (response3.ok) {
+                const d3 = await response3.json();
+                // هذا الـ API يعيد الروابط في formats
+                const link = d3.formats?.find(f => f.itag === 18)?.url || // 360p mp4 (الأكثر توافراً)
+                             d3.formats?.find(f => f.itag === 22)?.url || // 720p mp4
+                             d3.adaptiveFormats?.find(f => f.mimeType.includes("audio/mp4"))?.url; // audio
+
+                if (link) {
+                    finalData = {
+                        title: d3.title || "YouTube Video",
+                        thumb: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+                        url: link,
+                        engine: "Engine 3 (Backup)"
+                    };
+                }
+            }
+        } catch (e) { console.log("Engine 3 Failed."); }
+    }
+
+    // --- النتيجة النهائية ---
+    if (!finalData) {
+        return NextResponse.json({ 
+            error: "فشلت جميع المحركات. الفيديو طويل جداً (أكثر من ساعة) أو محمي بحقوق صارمة." 
+        }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      status: "success",
+      title: finalData.title || "Video",
+      thumb: finalData.thumb || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+      downloadUrl: finalData.url,
+      engine: finalData.engine
+    });
 
   } catch (error) {
-    return NextResponse.json({ error: "خطأ في النظام" }, { status: 500 });
+    console.error("Critical Error:", error);
+    return NextResponse.json({ error: "خطأ غير متوقع في النظام" }, { status: 500 });
   }
 }

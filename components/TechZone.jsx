@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   IconBrandYoutube, IconDownload, IconCpu, IconMusic, 
   IconVideo, IconLoader, IconAlertTriangle, IconWifi, 
-  IconExternalLink, IconCheck, IconServer
+  IconExternalLink, IconServer
 } from "@tabler/icons-react";
 
 export default function TechZone() {
@@ -22,7 +22,7 @@ export default function TechZone() {
     setError(null);
 
     try {
-      // إرسال الطلب للسيرفر (الذي سيجرب المزود الأول ثم الثاني)
+      // إرسال الطلب لنظام المحركات المتعددة في السيرفر
       const response = await fetch('/api/youtube', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -44,7 +44,7 @@ export default function TechZone() {
     }
   };
 
-  // دالة التحميل الذكية (تضمن فتح الرابط)
+  // دالة التحميل الذكية (تكسر حماية النوافذ المنبثقة)
   const downloadFile = (link) => {
     if(!link) {
         alert("خطأ: رابط التحميل غير موجود!");
@@ -54,7 +54,7 @@ export default function TechZone() {
     // محاولة فتح في نافذة جديدة
     const newWindow = window.open(link, '_blank');
 
-    // إذا قام المتصفح بحظر النافذة المنبثقة (Pop-up blocker)
+    // إذا قام المتصفح بحظر النافذة المنبثقة
     if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
         // نفتح الرابط في نفس الصفحة إجبارياً
         window.location.href = link;
@@ -68,9 +68,11 @@ export default function TechZone() {
         {/* Header */}
         <div className="text-center mb-10">
             <h1 className="text-5xl font-black text-white mb-2 tracking-tighter">
-                HYBRID <span className="text-blue-600">ENGINE</span>
+                MULTI <span className="text-blue-600">ENGINE</span>
             </h1>
-            <p className="text-white/40 font-mono text-xs uppercase tracking-[0.3em]">Dual-Core API System</p>
+            <p className="text-white/40 font-mono text-xs uppercase tracking-[0.3em]">
+                Triple Core Extraction System
+            </p>
         </div>
 
         {/* Control Panel */}
@@ -113,7 +115,7 @@ export default function TechZone() {
                 disabled={loading || !url}
                 className="w-full py-5 bg-white text-black font-black text-sm tracking-[0.2em] rounded-xl hover:bg-gray-200 transition-all flex justify-center items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                {loading ? <><IconLoader className="animate-spin"/> ANALYZING...</> : <><IconCpu/> GENERATE LINK</>}
+                {loading ? <><IconLoader className="animate-spin"/> SCANNING ENGINES...</> : <><IconCpu/> GENERATE LINK</>}
             </button>
 
             {/* Error Message */}
@@ -136,9 +138,6 @@ export default function TechZone() {
                     animate={{ opacity: 1, y: 0 }} 
                     className="mt-8 bg-[#0a0a0a] border border-green-500/30 p-6 rounded-3xl flex flex-col md:flex-row gap-6 items-center shadow-[0_0_60px_rgba(34,197,94,0.15)] relative overflow-hidden"
                 >
-                    {/* Background Glow */}
-                    <div className="absolute -right-10 -top-10 w-40 h-40 bg-green-500/10 blur-[50px] rounded-full pointer-events-none"></div>
-
                     {/* Thumbnail */}
                     <div className="w-full md:w-48 aspect-video bg-gray-800 rounded-xl overflow-hidden shrink-0 border border-white/10 relative z-10 shadow-lg">
                         {result.thumb ? (
@@ -146,16 +145,14 @@ export default function TechZone() {
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-white/20"><IconVideo/></div>
                         )}
-                        <div className="absolute bottom-2 right-2 bg-black/60 px-2 py-1 rounded text-[10px] font-bold text-white backdrop-blur-sm">
-                            {format.toUpperCase()}
-                        </div>
                     </div>
                     
                     {/* Info & Download */}
                     <div className="flex-1 min-w-0 text-center md:text-left w-full relative z-10">
+                        {/* Engine Badge */}
                         <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
-                            <span className="text-[10px] font-bold text-green-400 uppercase tracking-wider flex items-center gap-1">
-                                <IconServer size={12}/> {result.source || "Success"}
+                            <span className="text-[10px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded border border-green-500/20 font-bold uppercase tracking-wider flex items-center gap-1">
+                                <IconServer size={10}/> {result.engine || "Auto"}
                             </span>
                         </div>
                         
