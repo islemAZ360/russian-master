@@ -9,77 +9,95 @@ export async function POST(req) {
 
     // 1. تنظيف الرابط
     let cleanUrl = url;
+    let videoId = "";
     try {
         const urlObj = new URL(url);
         if (urlObj.hostname.includes('youtu')) {
-            let videoId = "";
             if (url.includes("youtu.be")) videoId = urlObj.pathname.slice(1);
             else videoId = urlObj.searchParams.get("v");
             
-            if (videoId) cleanUrl = `https://www.youtube.com/watch?v=${videoId.split('?')[0]}`;
+            if (videoId) {
+                videoId = videoId.split('?')[0]; // تنظيف نهائي
+                cleanUrl = `https://www.youtube.com/watch?v=${videoId}`;
+            }
         }
     } catch (e) { }
 
-    const apiHost = "youtube-info-download-api.p.rapidapi.com";
-    const apiKey = "dadaa32ee3mshea65c3b698adda9p1bd70fjsn7f23dfd97126"; 
+    const apiKey = "dadaa32ee3mshea65c3b698adda9p1bd70fjsn7f23dfd97126"; // مفتاحك
 
-    // دالة مساعدة للاتصال بالـ API مع تحديد الجودة
-    const fetchFromRapid = async (selectedFormat) => {
-        const apiUrl = `https://${apiHost}/ajax/download.php?format=${selectedFormat}&url=${encodeURIComponent(cleanUrl)}`;
-        const res = await fetch(apiUrl, {
-            method: "GET",
-            headers: {
-                "x-rapidapi-key": apiKey,
-                "x-rapidapi-host": apiHost
-            }
-        });
-        if (!res.ok) return null;
-        return await res.json();
-    };
-
-    let data = null;
-
-    // --- منطق المحاولات الذكي (Smart Retry Logic) ---
-    
-    if (format === 'audio') {
-        // إذا كان صوت، جرب mp3
-        data = await fetchFromRapid('mp3');
-    } else {
-        // إذا كان فيديو، ابدأ بـ 720
-        console.log("Trying 720p...");
-        data = await fetchFromRapid('720');
-
-        // إذا فشل (الرابط فارغ)، جرب 360
-        if (!data || !data.url) {
-            console.log("720p failed, Trying 360p...");
-            data = await fetchFromRapid('360');
-        }
+    // ==========================================
+    // المحاولة الأولى: المزود السخي (500 طلب)
+    // ==========================================
+    console.log("Attempt 1: High Volume Provider...");
+    try {
+        const host1 = "youtube-info-download-api.p.rapidapi.com";
+        const format1 = format === 'audio' ? 'mp3' : '720';
+        const url1 = `https://${host1}/ajax/download.php?format=${format1}&url=${encodeURIComponent(cleanUrl)}`;
         
-        // إذا فشل، جرب 480
-        if (!data || !data.url) {
-             console.log("360p failed, Trying 480p...");
-             data = await fetchFromRapid('480');
+        const res1 = await fetch(url1, {
+            method: "GET",
+            headers: { "x-rapidapi-key": apiKey, "x-rapidapi-host": host1 }
+        });
+
+        if (res1.ok) {
+            const data1 = await res1.json();
+            const link1 = data1.url || data1.link || (data1.download && data1.download[0]?.url);
+            
+            if (link1) {
+                return NextResponse.json({
+                    status: "success",
+                    title: data1.title || "Video",
+                    thumb: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+                    downloadUrl: link1,
+                    source: "Provider 1"
+                });
+            }
         }
-    }
+    } catch (e) { console.log("Provider 1 failed, switching..."); }
 
-    // التحقق النهائي
-    const finalLink = data?.url || data?.link || (data?.download && data?.download[0]?.url);
+    // ==========================================
+    // المحاولة الثانية: المزود القوي (100 طلب) - للخالات الصعبة
+    // ==========================================
+    console.log("Attempt 2: Premium Provider...");
+    try {
+        const host2 = "youtube-media-downloader.p.rapidapi.com";
+        const url2 = `https://${host2}/v2/video/details?videoId=${videoId}`;
+        
+        const res2 = await fetch(url2, {
+            method: "GET",
+            headers: { "x-rapidapi-key": apiKey, "x-rapidapi-host": host2 }
+        });
 
-    if (!finalLink) {
-         return NextResponse.json({ 
-             error: "عذراً، هذا الفيديو محمي أو لا يتوفر له روابط تحميل مباشرة حالياً." 
-         }, { status: 400 });
-    }
+        if (res2.ok) {
+            const data2 = await res2.json();
+            // استخراج الرابط من المزود الثاني
+            let link2 = null;
+            if (format === 'audio') {
+                link2 = data2.audios?.items[0]?.url;
+            } else {
+                // نبحث عن mp4 بجودة 720 أو 360
+                const videos = data2.videos?.items || [];
+                const v720 = videos.find(v => v.quality === "720p" && v.extension === "mp4");
+                const vAny = videos.find(v => v.extension === "mp4");
+                link2 = v720?.url || vAny?.url;
+            }
 
-    return NextResponse.json({
-      status: "success",
-      title: data.title || "YouTube Media",
-      thumb: data.poster || `https://img.youtube.com/vi/${cleanUrl.split('v=')[1]}/hqdefault.jpg`,
-      downloadUrl: finalLink
-    });
+            if (link2) {
+                return NextResponse.json({
+                    status: "success",
+                    title: data2.title || "Video",
+                    thumb: data2.thumbnails?.[0]?.url,
+                    downloadUrl: link2,
+                    source: "Provider 2"
+                });
+            }
+        }
+    } catch (e) { console.log("Provider 2 failed."); }
+
+    // إذا فشل الاثنان
+    return NextResponse.json({ error: "عذراً، هذا الفيديو محمي جداً ولم نتمكن من استخراجه." }, { status: 400 });
 
   } catch (error) {
-    console.error("Internal Error:", error);
-    return NextResponse.json({ error: "حدث خطأ داخلي" }, { status: 500 });
+    return NextResponse.json({ error: "خطأ في النظام" }, { status: 500 });
   }
 }
