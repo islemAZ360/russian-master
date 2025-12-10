@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
-  IconShield, IconMessageCircle, IconRobot, IconDeviceGamepad, IconBroadcast
+  IconShield, IconMessageCircle, IconDeviceGamepad, IconBroadcast
 } from '@tabler/icons-react';
 
 // --- استيراد المكونات ---
@@ -16,7 +16,7 @@ import CyberDeck from '../components/CyberDeck';
 import CommunicationHub from '../components/CommunicationHub'; 
 import SettingsView from '../components/SettingsView'; 
 import AdminDashboard from '../components/AdminDashboard'; 
-import AITutor from '../components/AITutor';
+// تم حذف AITutor من هنا
 import GamesHub from '../components/GamesHub';
 import { FloatingDock } from '../components/ui/floating-dock';
 import DigitalRain from '../components/ui/DigitalRain'; 
@@ -25,7 +25,7 @@ import { BossBattleWrapper } from '../components/BossBattleWrapper';
 import DailyReward from '../components/DailyReward';
 import RealLiveStream from '../components/live/RealLiveStream';
 
-// --- استيراد اللعبة الفخمة هنا لتظهر فوق الجميع ---
+// --- استيراد اللعبة الفخمة ---
 import TimeTraveler from '../components/games/TimeTraveler';
 
 import { useStudySystem } from '../hooks/useStudySystem';
@@ -126,7 +126,7 @@ export default function RussianApp() {
 
   let navLinks = [
     { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
-    { title: "AI Mentor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => setCurrentView('ai-tutor') },
+    // تم حذف رابط AI Mentor من هنا
     { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
     { title: "Live Ops", icon: <IconBroadcast className="w-full text-red-500" />, onClick: () => setCurrentView('live') },
     { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
@@ -145,9 +145,8 @@ export default function RussianApp() {
 
     switch (currentView) {
       case 'home': return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
-      case 'ai-tutor': return <AITutor user={user} />;
+      // تم حذف حالة ai-tutor من هنا
       case 'games': 
-        // نمرر دالة فتح اللعبة إلى GamesHub
         return <GamesHub cards={cards} onOpenGame={(gameId) => setActiveOverlayGame(gameId)} />;
       case 'live': return <RealLiveStream user={user} onClose={() => setCurrentView('home')} />;
       case 'chat': return <CommunicationHub user={user} />;
@@ -192,7 +191,6 @@ export default function RussianApp() {
     <div className="relative h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black selection:bg-cyan-500/30 selection:text-cyan-200">
       <DigitalRain />
       
-      {/* عرض اللعبة الفخمة في طبقة علوية مستقلة */}
       {activeOverlayGame === 'time_traveler' && (
           <TimeTraveler onClose={() => setActiveOverlayGame(null)} />
       )}
@@ -207,11 +205,6 @@ export default function RussianApp() {
         )}
       </AnimatePresence>
 
-      {/* 
-         إصلاح السكرول:
-         1. إزالة overflow-hidden من هنا (أو جعله auto إذا لزم الأمر، لكن الأفضل تركه للابناء).
-         2. تغيير justify-center إلى justify-start لكي يبدأ المحتوى من الأعلى ويسمح بالسكرول للأسفل.
-      */}
       <main className="relative z-10 flex flex-col items-center justify-start h-full w-full pt-10 md:pt-0">
            <AnimatePresence mode="wait">
              <motion.div 

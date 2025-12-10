@@ -1,16 +1,13 @@
 "use client";
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { IconTrash, IconPencil, IconSearch, IconDatabase, IconWand, IconLoader } from "@tabler/icons-react";
-
-const API_KEY = "AIzaSyDi8-POg6RGCoBCkni6_8XNikJvTmH4z3M";
+import { IconTrash, IconPencil, IconSearch, IconDatabase } from "@tabler/icons-react";
 
 export function DataManager({ onAdd, onDelete, onUpdate, cards, isJunior }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   
   const [newCard, setNewCard] = useState({ russian: "", arabic: "", category: "General" });
-  const [aiLoading, setAiLoading] = useState(false);
 
   const [editingId, setEditingId] = useState(null);
   const [editRus, setEditRus] = useState("");
@@ -26,38 +23,6 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards, isJunior }) {
       });
   }, [cards, search, filter]);
 
-  const handleAiAutoFill = async () => {
-      if (!newCard.russian) return alert("Write the Russian word first!");
-      setAiLoading(true);
-      try {
-          const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{
-                  parts: [{ 
-                    text: `Analyze this Russian text: "${newCard.russian}". 
-                           Return ONLY a JSON object with: 
-                           { "arabic": "translation", "category": "one_word_category (e.g. Verbs, Nouns, Tech, Slang)" }` 
-                  }]
-                }]
-              }),
-            }
-          );
-          const data = await response.json();
-          let text = data.candidates[0].content.parts[0].text;
-          text = text.replace(/```json|```/g, "").trim();
-          const result = JSON.parse(text);
-          setNewCard({ ...newCard, arabic: result.arabic, category: result.category });
-      } catch (e) {
-          alert("AI Error: " + e.message);
-      } finally {
-          setAiLoading(false);
-      }
-  };
-
   const handleAddSubmit = () => {
       if(newCard.russian && newCard.arabic) {
           onAdd(newCard);
@@ -69,7 +34,6 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards, isJunior }) {
   const saveEdit = () => { onUpdate(editingId, editRus, editAra); setEditingId(null); };
 
   return (
-    // التعديل هنا: تحديد ارتفاع ثابت للشاشة لتفعيل السكرول الداخلي
     <div className="w-full h-[calc(100vh-80px)] flex flex-col p-4 md:p-6 overflow-hidden relative">
       
       {/* Header & Add Section */}
@@ -79,7 +43,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards, isJunior }) {
             <h1 className="text-xl md:text-2xl font-black text-white">NEURAL ARCHIVE</h1>
         </div>
 
-        {/* Input Form - يظهر فقط للأدمن أو المساعد */}
+        {/* Input Form - تم حذف زر الذكاء الاصطناعي */}
         {isJunior && (
             <div className="flex flex-col md:flex-row gap-3">
                 <div className="flex-1 relative">
@@ -89,15 +53,8 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards, isJunior }) {
                         placeholder="Russian Word..." 
                         className="w-full bg-black border border-white/20 p-3 rounded-xl text-white outline-none focus:border-cyan-500"
                     />
-                    <button 
-                        onClick={handleAiAutoFill}
-                        disabled={aiLoading || !newCard.russian}
-                        className="absolute right-2 top-2 p-1.5 bg-purple-600/20 text-purple-400 rounded-lg hover:bg-purple-600 hover:text-white transition-all disabled:opacity-50"
-                    >
-                        {aiLoading ? <IconLoader className="animate-spin" size={18}/> : <IconWand size={18}/>}
-                    </button>
                 </div>
-                <input value={newCard.arabic} onChange={e => setNewCard({...newCard, arabic: e.target.value})} placeholder="Translation (Auto)" className="flex-1 bg-black border border-white/20 p-3 rounded-xl text-white outline-none focus:border-cyan-500 dir-rtl"/>
+                <input value={newCard.arabic} onChange={e => setNewCard({...newCard, arabic: e.target.value})} placeholder="Translation" className="flex-1 bg-black border border-white/20 p-3 rounded-xl text-white outline-none focus:border-cyan-500 dir-rtl"/>
                 <input value={newCard.category} onChange={e => setNewCard({...newCard, category: e.target.value})} placeholder="Category" className="w-full md:w-32 bg-black border border-white/20 p-3 rounded-xl text-white outline-none focus:border-cyan-500"/>
                 <button onClick={handleAddSubmit} className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-6 py-3 rounded-xl shadow-lg transition-all">ADD</button>
             </div>
@@ -119,7 +76,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards, isJunior }) {
         </div>
       </div>
 
-      {/* Scrollable List - min-h-0 هو الحل السحري هنا */}
+      {/* Scrollable List */}
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-24 min-h-0">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <AnimatePresence>
