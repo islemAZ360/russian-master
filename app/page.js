@@ -25,7 +25,9 @@ import { BossBattleWrapper } from '../components/BossBattleWrapper';
 import DailyReward from '../components/DailyReward';
 import RealLiveStream from '../components/live/RealLiveStream';
 import TimeTraveler from '../components/games/TimeTraveler';
-import { GridBackground } from '../components/ui/GridBackground'; // <--- جديد
+import { GridBackground } from '../components/ui/GridBackground'; 
+import { CyberHUD } from '../components/ui/CyberHUD'; // <--- جديد
+import { DecryptText } from '../components/ui/DecryptText'; // <--- جديد (يمكن استخدامه داخل المكونات)
 
 import { useStudySystem } from '../hooks/useStudySystem';
 import { useAudio } from '../hooks/useAudio';
@@ -48,12 +50,11 @@ export default function RussianApp() {
   const [battleResult, setBattleResult] = useState(null); 
   const [battleTrigger, setBattleTrigger] = useState(0);
 
-  const containerRef = useRef(null); // مرجع للحاوية لتتبع الماوس
+  const containerRef = useRef(null);
 
   const { cards, currentCard, stats, handleSwipe, resetProgress, addCard, deleteCard, updateCard } = useStudySystem(user);
   const { speak, playSFX } = useAudio();
 
-  // --- منطق تتبع الماوس (Spotlight) ---
   const handleMouseMove = (e) => {
     if (!containerRef.current) return;
     const { left, top } = containerRef.current.getBoundingClientRect();
@@ -62,7 +63,6 @@ export default function RussianApp() {
     containerRef.current.style.setProperty("--mouse-x", `${x}px`);
     containerRef.current.style.setProperty("--mouse-y", `${y}px`);
   };
-  // -------------------------------------
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
@@ -172,7 +172,9 @@ export default function RussianApp() {
       className="relative h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black selection:bg-cyan-500/30 selection:text-cyan-200 spotlight-bg"
     >
       <GridBackground /> {/* الخلفية الشبكية */}
-      <DigitalRain /> {/* المطر الرقمي */}
+      <CyberHUD /> {/* واجهة HUD التكتيكية */}
+      <div className="crt-overlay"></div> {/* تأثير CRT */}
+      <DigitalRain />
       
       {activeOverlayGame === 'time_traveler' && <TimeTraveler onClose={() => setActiveOverlayGame(null)} />}
       {showDailyReward && <DailyReward user={user} onClose={() => setShowDailyReward(false)} />}
