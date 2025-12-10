@@ -48,12 +48,8 @@ export default function RussianApp() {
   // حالة لتشغيل اللعبة بملء الشاشة
   const [activeOverlayGame, setActiveOverlayGame] = useState(null);
 
-  // عداد الجلسة (جديد)
+  // --- عداد الجلسة (جديد) ---
   const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0 });
-
-  // حالات المعركة
-  const [battleResult, setBattleResult] = useState(null); 
-  const [battleTrigger, setBattleTrigger] = useState(0);
 
   const containerRef = useRef(null);
 
@@ -165,7 +161,6 @@ export default function RussianApp() {
         return (
             <div className="flex flex-col items-center justify-center h-full w-full relative pb-32">
                 
-                {/* --- نظام التعلم غير المحدود (Clean Mode) --- */}
                 {currentCard ? (
                     <motion.div 
                         initial={{ opacity: 0, scale: 0.9 }}
@@ -173,15 +168,15 @@ export default function RussianApp() {
                         className="relative z-10 flex flex-col items-center"
                     >
                         {/* Header بسيط */}
-                        <div className="mb-6 flex items-center gap-2 text-cyan-500/50">
+                        <div className="mb-2 flex items-center gap-2 text-cyan-500/50">
                             <IconInfinity size={20} />
                             <span className="text-xs font-mono tracking-[0.3em]">UNLIMITED_LEARNING_PROTOCOL</span>
                         </div>
 
-                        {/* البطاقة مباشرة بدون Wrapper */}
+                        {/* البطاقة مع العداد الجديد */}
                         <StudyCard 
                             card={currentCard} 
-                            sessionStats={sessionStats} // تمرير الإحصائيات
+                            sessionStats={sessionStats} // تمرير العداد هنا
                             onResult={(id, known) => {
                                  // تحديث العداد
                                  if (known) {
@@ -195,7 +190,7 @@ export default function RussianApp() {
                                  // الانتقال للبطاقة التالية
                                  setTimeout(() => {
                                     handleSwipe(known ? 'right' : 'left');
-                                 }, 500); 
+                                 }, 300); // تقليل الانتظار قليلاً للاستجابة الأسرع
                             }} 
                             speak={speak}
                         />
@@ -207,9 +202,9 @@ export default function RussianApp() {
                         <h2 className="text-3xl font-black text-cyan-400 mb-2 glitch-text" data-text="ALL DATA PROCESSED">ALL DATA PROCESSED</h2>
                         <p className="text-white/50 text-sm mb-6">Neural link synced. No more cards due.</p>
                         
-                        <div className="flex gap-4 justify-center mb-6 text-sm font-mono">
-                            <div className="text-green-500">Correct: {sessionStats.correct}</div>
-                            <div className="text-red-500">Wrong: {sessionStats.wrong}</div>
+                        <div className="flex gap-6 justify-center mb-8 text-lg font-mono border border-white/10 p-4 rounded-xl bg-black/40">
+                            <div className="text-green-500 font-bold">✓ {sessionStats.correct} Correct</div>
+                            <div className="text-red-500 font-bold">✕ {sessionStats.wrong} Wrong</div>
                         </div>
 
                         <button onClick={() => setCurrentView('home')} className="px-8 py-3 bg-cyan-600 text-white font-bold rounded-full hover:bg-cyan-500 shadow-[0_0_20px_#06b6d4]">RETURN TO BASE</button>

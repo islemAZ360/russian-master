@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import { IconVolume, IconRotate, IconCheck, IconX, IconKeyboard, IconEye } from "@tabler/icons-react";
 import confetti from "canvas-confetti";
@@ -8,6 +8,12 @@ export function StudyCard({ card, onResult, speak, sessionStats }) {
   const [flipped, setFlipped] = useState(false);
   const [typingMode, setTypingMode] = useState(false);
   const [inputVal, setInputVal] = useState("");
+
+  // إعادة ضبط البطاقة عند تغيير البيانات
+  useEffect(() => {
+    setFlipped(false);
+    setInputVal("");
+  }, [card]);
 
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -32,31 +38,35 @@ export function StudyCard({ card, onResult, speak, sessionStats }) {
       }
   };
 
-  // تعديل منطق حجم الخط لضمان سطر واحد للكلمات الطويلة
+  // --- دالة ذكية لحجم الخط (Fix Font Size) ---
   const getFontSize = (text) => {
       if (!text) return "text-4xl";
       const len = text.length;
-      if (len > 15) return "text-lg md:text-xl"; // للكلمات الطويلة جداً
-      if (len > 10) return "text-2xl md:text-3xl"; // للمتوسطة
-      return "text-4xl md:text-6xl"; // للقصيرة
+      // إذا الكلمة طويلة جداً (مثل: Достопримечательности) صغر الخط جداً
+      if (len > 14) return "text-2xl md:text-3xl"; 
+      // متوسطة
+      if (len > 9) return "text-3xl md:text-4xl"; 
+      // قصيرة
+      return "text-5xl md:text-6xl"; 
   };
 
   return (
     <div className="perspective-1000 w-full h-[600px] flex flex-col items-center justify-center relative overflow-visible p-4">
       
-      {/* --- شريط العداد العلوي (جديد) --- */}
-      <div className="flex gap-6 mb-6 z-20 shrink-0 bg-black/40 border border-white/10 px-6 py-2 rounded-full backdrop-blur-md">
-         <div className="flex items-center gap-2 text-green-400 font-mono font-bold">
-            <IconCheck size={16} />
+      {/* --- شريط العداد (Session Stats) --- */}
+      <div className="flex gap-6 mb-6 z-20 shrink-0 bg-black/60 border border-white/10 px-6 py-3 rounded-full backdrop-blur-md shadow-lg animate-in fade-in slide-in-from-top-4">
+         <div className="flex items-center gap-3 text-emerald-400 font-mono font-bold text-lg">
+            <IconCheck size={20} stroke={3} />
             <span>{sessionStats?.correct || 0}</span>
          </div>
-         <div className="w-[1px] h-4 bg-white/10"></div>
-         <div className="flex items-center gap-2 text-red-400 font-mono font-bold">
-            <IconX size={16} />
+         <div className="w-[1px] h-6 bg-white/20"></div>
+         <div className="flex items-center gap-3 text-red-500 font-mono font-bold text-lg">
+            <IconX size={20} stroke={3} />
             <span>{sessionStats?.wrong || 0}</span>
          </div>
       </div>
 
+      {/* --- أزرار التحكم في الوضع --- */}
       <div className="flex gap-4 mb-4 z-20 shrink-0">
           <button onClick={() => setTypingMode(!typingMode)} className={`px-4 py-2 rounded-full border text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${typingMode ? 'bg-cyan-600 border-cyan-400 text-white shadow-[0_0_15px_rgba(6,182,212,0.5)]' : 'bg-black/40 border-white/10 text-white/40'}`}>
               {typingMode ? <><IconKeyboard size={14} /> Hacker Mode</> : <><IconEye size={14} /> Observer Mode</>}
@@ -74,7 +84,7 @@ export function StudyCard({ card, onResult, speak, sessionStats }) {
         <motion.div
           initial={false}
           animate={{ rotateY: flipped ? 180 : 0 }}
-          transition={{ duration: 0.6, type: "spring", stiffness: 260, damping: 20 }}
+          transition={{ duration: 0.4, type: "spring", stiffness: 260, damping: 20 }}
           className="w-full h-full relative"
           style={{ transformStyle: "preserve-3d" }}
         >
@@ -83,21 +93,25 @@ export function StudyCard({ card, onResult, speak, sessionStats }) {
           {/* الوجه الأمامي (الروسي) */}
           {/* ========================================================= */}
           <div 
-            className="absolute inset-0 w-full h-full rounded-[2rem] border border-cyan-500/20 bg-[#0a0a0a] shadow-[0_0_50px_-10px_rgba(6,182,212,0.15)] flex flex-col items-center justify-center p-6 overflow-hidden"
+            className="absolute inset-0 w-full h-full rounded-[2rem] border border-cyan-500/30 bg-[#0a0a0a] shadow-[0_0_60px_-10px_rgba(6,182,212,0.1)] flex flex-col items-center justify-center p-4 overflow-hidden"
             style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }} 
           >
             <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent shadow-[0_0_10px_#06b6d4]"></div>
-            <div className="absolute top-4 left-4 w-2 h-2 bg-cyan-500 rounded-full animate-ping"></div>
             <div className="absolute top-4 right-4 text-[10px] text-cyan-500/50 font-mono tracking-widest">SECURE_DATA</div>
 
-            <div className="flex-1 flex items-center justify-center w-full z-10 px-4">
-                <h1 className={`${getFontSize(card.russian)} font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] text-center break-words w-full leading-tight font-mono`}>
+            <div className="flex-1 flex flex-col items-center justify-center w-full z-10 px-2">
+                {/* 
+                    التعديلات هنا:
+                    - whitespace-nowrap: لمنع نزول الكلمة لسطر جديد
+                    - getFontSize: لضبط الحجم
+                */}
+                <h1 className={`${getFontSize(card.russian)} font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.4)] text-center w-full leading-tight font-sans tracking-wide whitespace-nowrap`}>
                     {card.russian}
                 </h1>
             </div>
 
             {typingMode && !flipped ? (
-                 <div className="w-full relative z-30 mt-4" onClick={e => e.stopPropagation()}>
+                 <div className="w-full relative z-30 mt-4 px-4" onClick={e => e.stopPropagation()}>
                     <form id="typing-form" onSubmit={checkAnswer}>
                         <input 
                             autoFocus
@@ -110,9 +124,9 @@ export function StudyCard({ card, onResult, speak, sessionStats }) {
                     </form>
                  </div>
             ) : (
-                <div className="mt-8 flex flex-col items-center gap-2 opacity-50 shrink-0">
-                     <IconRotate size={20} className="text-cyan-400 animate-spin-slow" />
-                     <span className="text-[10px] uppercase tracking-widest text-cyan-400">Tap to Decrypt</span>
+                <div className="mb-8 flex flex-col items-center gap-2 opacity-40 shrink-0">
+                     <IconRotate size={24} className="text-cyan-400 animate-spin-slow" />
+                     <span className="text-[10px] uppercase tracking-[0.2em] text-cyan-400">Tap to Decrypt</span>
                 </div>
             )}
             
@@ -125,7 +139,7 @@ export function StudyCard({ card, onResult, speak, sessionStats }) {
           {/* الوجه الخلفي (العربي) */}
           {/* ========================================================= */}
           <div 
-            className="absolute inset-0 w-full h-full rounded-[2rem] border border-purple-500/20 bg-[#0a0510] shadow-[0_0_50px_-10px_rgba(168,85,247,0.15)] flex flex-col items-center justify-center p-6 overflow-hidden" 
+            className="absolute inset-0 w-full h-full rounded-[2rem] border border-purple-500/30 bg-[#0a0510] shadow-[0_0_60px_-10px_rgba(168,85,247,0.15)] flex flex-col items-center justify-center p-4 overflow-hidden" 
             style={{ 
                 transform: "rotateY(180deg)", 
                 backfaceVisibility: "hidden", 
@@ -135,19 +149,34 @@ export function StudyCard({ card, onResult, speak, sessionStats }) {
              <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent shadow-[0_0_10px_#a855f7]"></div>
              <div className="absolute top-4 left-4 text-[10px] text-purple-500/50 font-mono tracking-widest">TRANSLATION_MATRIX</div>
              
-             <div className="flex-1 flex items-center justify-center w-full z-10 px-4">
-                <h1 className={`${getFontSize(card.arabic)} font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-300 text-center dir-rtl leading-normal break-words w-full font-cairo tracking-normal`}>
+             <div className="flex-1 flex items-center justify-center w-full z-10 px-2">
+                <h1 className={`${getFontSize(card.arabic)} font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-300 text-center dir-rtl leading-normal w-full font-cairo tracking-normal`}>
                     {card.arabic}
                 </h1>
              </div>
 
-             <div className="absolute bottom-0 left-0 w-full flex h-20 border-t border-white/5 shrink-0 z-20">
-                 <button onClick={(e) => {e.stopPropagation(); onResult(card.id, false)}} className="flex-1 bg-red-900/10 hover:bg-red-500/20 text-red-500 font-bold tracking-widest transition-all flex items-center justify-center gap-2 group">
-                    <IconX size={18} className="group-hover:scale-125 transition-transform" /> FAIL
+             {/* أزرار الإجابة - تم التأكد من stopPropagation */}
+             <div className="absolute bottom-0 left-0 w-full flex h-20 border-t border-white/10 shrink-0 z-50 bg-black/20 backdrop-blur-sm">
+                 <button 
+                    onClick={(e) => {
+                        e.stopPropagation(); // منع قلب البطاقة
+                        onResult(card.id, false); // استدعاء دالة الخطأ
+                    }} 
+                    className="flex-1 text-red-500 hover:bg-red-500/10 font-bold tracking-widest transition-all flex items-center justify-center gap-2 group text-sm"
+                 >
+                    <IconX size={20} className="group-hover:scale-125 transition-transform" /> FAIL
                  </button>
-                 <div className="w-[1px] bg-white/5"></div>
-                 <button onClick={(e) => {e.stopPropagation(); onResult(card.id, true)}} className="flex-1 bg-emerald-900/10 hover:bg-emerald-500/20 text-emerald-500 font-bold tracking-widest transition-all flex items-center justify-center gap-2 group">
-                    <IconCheck size={18} className="group-hover:scale-125 transition-transform" /> SUCCESS
+                 
+                 <div className="w-[1px] bg-white/10"></div>
+                 
+                 <button 
+                    onClick={(e) => {
+                        e.stopPropagation(); // منع قلب البطاقة
+                        onResult(card.id, true); // استدعاء دالة الصح
+                    }} 
+                    className="flex-1 text-emerald-500 hover:bg-emerald-500/10 font-bold tracking-widest transition-all flex items-center justify-center gap-2 group text-sm"
+                 >
+                    <IconCheck size={20} className="group-hover:scale-125 transition-transform" /> SUCCESS
                  </button>
              </div>
           </div>
