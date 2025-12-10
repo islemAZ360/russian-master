@@ -6,7 +6,7 @@ import {
   IconEar, IconBolt, IconPuzzle, IconCode, IconRadioactive, IconClock 
 } from "@tabler/icons-react";
 
-// استيراد الألعاب
+// استيراد الألعاب الداخلية (التي تفتح داخل المربع)
 import FlashProtocol from "./games/FlashProtocol";
 import ReactorCore from "./games/ReactorCore";
 import SyntaxHack from "./games/SyntaxHack";
@@ -14,14 +14,21 @@ import ScrambleGame from "./ScrambleGame";
 import AudioIntercept from "./games/AudioIntercept";
 import RapidProtocol from "./games/RapidProtocol";
 import LogicGate from "./games/LogicGate";
-import TimeTraveler from "./games/TimeTraveler"; // <-- اللعبة الجديدة
 
-export default function GamesHub({ cards }) {
+export default function GamesHub({ cards, onOpenGame }) {
   const [activeGame, setActiveGame] = useState(null);
 
   const GAMES = [
-    // اللعبة الجديدة الفخمة
-    { id: 'time_traveler', title: 'THE TIME TRAVELER', desc: 'Master Russian Time.', color: 'text-[#cfb53b]', bg: 'bg-[#cfb53b]/10', icon: <IconClock size={32}/> },
+    // اللعبة الجديدة الفخمة (تفتح في وضع ملء الشاشة عبر onOpenGame)
+    { 
+        id: 'time_traveler', 
+        title: 'THE TIME TRAVELER', 
+        desc: 'Master Russian Time.', 
+        color: 'text-[#cfb53b]', 
+        bg: 'bg-[#cfb53b]/10', 
+        icon: <IconClock size={32}/>,
+        isOverlay: true // علامة لتمييزها
+    },
 
     // باقي الألعاب
     { id: 'flash', title: 'FLASH PROTOCOL', desc: 'Speed binary decisions.', color: 'text-yellow-500', bg: 'bg-yellow-500/10', icon: <IconBolt size={32}/> },
@@ -33,8 +40,18 @@ export default function GamesHub({ cards }) {
     { id: 'logic', title: 'LOGIC GATE', desc: 'Multiple choice exam.', color: 'text-orange-500', bg: 'bg-orange-500/10', icon: <IconPuzzle size={32}/> },
   ];
 
-  // شروط العرض
-  if (activeGame === 'time_traveler') return <TimeTraveler onClose={() => setActiveGame(null)} />;
+  // التعامل مع النقر على اللعبة
+  const handleGameClick = (game) => {
+      if (game.isOverlay) {
+          // إذا كانت لعبة كبيرة (مثل الساعة)، اطلب من الصفحة الرئيسية فتحها
+          if (onOpenGame) onOpenGame(game.id);
+      } else {
+          // وإلا افتحها محلياً
+          setActiveGame(game.id);
+      }
+  };
+
+  // شروط العرض للألعاب الداخلية
   if (activeGame === 'flash') return <FlashProtocol cards={cards} onClose={() => setActiveGame(null)} />;
   if (activeGame === 'reactor') return <ReactorCore cards={cards} onClose={() => setActiveGame(null)} />;
   if (activeGame === 'syntax') return <SyntaxHack cards={cards} onClose={() => setActiveGame(null)} />;
@@ -44,9 +61,9 @@ export default function GamesHub({ cards }) {
   if (activeGame === 'logic') return <LogicGate cards={cards} onClose={() => setActiveGame(null)} />;
 
   return (
-    // التعديل هنا: تحديد ارتفاع (h-[calc(100vh-120px)]) لكي يعمل الـ scroll
-    <div className="w-full h-[calc(100vh-120px)] flex flex-col p-6 overflow-y-auto custom-scrollbar pb-32">
-      <div className="mb-10 text-center relative z-10 shrink-0">
+    // التعديل: إعطاء ارتفاع كامل والسماح بالسكرول، مع مسافة في الأسفل للدُوك
+    <div className="w-full h-full flex flex-col p-6 overflow-y-auto custom-scrollbar pb-32">
+      <div className="mb-10 text-center relative z-10 shrink-0 mt-10 md:mt-0">
           <div className="w-20 h-20 mx-auto bg-gradient-to-br from-gray-900 to-black rounded-full border-2 border-white/20 flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(255,255,255,0.1)]">
               <IconDeviceGamepad size={40} className="text-white"/>
           </div>
@@ -61,8 +78,8 @@ export default function GamesHub({ cards }) {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.05 }}
-                onClick={() => setActiveGame(game.id)}
-                className={`group relative h-64 cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-[#0a0a0a] hover:border-opacity-100 transition-all hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(0,0,0,0.5)]`}
+                onClick={() => handleGameClick(game)}
+                className={`group relative h-64 cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-[#0a0a0a] hover:border-opacity-100 transition-all hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(0,0,0,0.5)] shrink-0`}
               >
                   <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${game.bg}`}></div>
                   <div className="absolute inset-0 p-6 flex flex-col justify-between z-20">

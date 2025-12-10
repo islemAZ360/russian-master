@@ -25,6 +25,9 @@ import { BossBattleWrapper } from '../components/BossBattleWrapper';
 import DailyReward from '../components/DailyReward';
 import RealLiveStream from '../components/live/RealLiveStream';
 
+// --- استيراد اللعبة الفخمة هنا لتظهر فوق الجميع ---
+import TimeTraveler from '../components/games/TimeTraveler';
+
 import { useStudySystem } from '../hooks/useStudySystem';
 import { useAudio } from '../hooks/useAudio';
 import { auth, db } from '../lib/firebase';
@@ -42,6 +45,9 @@ export default function RussianApp() {
   const [broadcast, setBroadcast] = useState(null);
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
+
+  // حالة لتشغيل اللعبة بملء الشاشة
+  const [activeOverlayGame, setActiveOverlayGame] = useState(null);
 
   // حالات المعركة
   const [battleResult, setBattleResult] = useState(null); 
@@ -140,7 +146,9 @@ export default function RussianApp() {
     switch (currentView) {
       case 'home': return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
       case 'ai-tutor': return <AITutor user={user} />;
-      case 'games': return <GamesHub cards={cards} />;
+      case 'games': 
+        // نمرر دالة فتح اللعبة إلى GamesHub
+        return <GamesHub cards={cards} onOpenGame={(gameId) => setActiveOverlayGame(gameId)} />;
       case 'live': return <RealLiveStream user={user} onClose={() => setCurrentView('home')} />;
       case 'chat': return <CommunicationHub user={user} />;
       case 'category': return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
@@ -181,8 +189,14 @@ export default function RussianApp() {
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="relative h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black selection:bg-cyan-500/30 selection:text-cyan-200">
       <DigitalRain />
+      
+      {/* عرض اللعبة الفخمة في طبقة علوية مستقلة */}
+      {activeOverlayGame === 'time_traveler' && (
+          <TimeTraveler onClose={() => setActiveOverlayGame(null)} />
+      )}
+
       {showDailyReward && <DailyReward user={user} onClose={() => setShowDailyReward(false)} />}
       
       <AnimatePresence>
@@ -193,7 +207,12 @@ export default function RussianApp() {
         )}
       </AnimatePresence>
 
-      <main className="relative z-10 flex flex-col items-center justify-center min-h-screen w-full pt-10 md:pt-0">
+      {/* 
+         إصلاح السكرول:
+         1. إزالة overflow-hidden من هنا (أو جعله auto إذا لزم الأمر، لكن الأفضل تركه للابناء).
+         2. تغيير justify-center إلى justify-start لكي يبدأ المحتوى من الأعلى ويسمح بالسكرول للأسفل.
+      */}
+      <main className="relative z-10 flex flex-col items-center justify-start h-full w-full pt-10 md:pt-0">
            <AnimatePresence mode="wait">
              <motion.div 
                 key={currentView} 
