@@ -63,13 +63,18 @@ export function StudyCard({ card, onResult, speak }) {
           className="w-full h-full relative preserve-3d"
         >
           
-          {/* الوجه الروسي (يبقى كما هو Cyberpunk) */}
-          <div className="absolute inset-0 backface-hidden rounded-[2rem] border border-cyan-500/20 bg-black/80 backdrop-blur-2xl shadow-[0_0_50px_-10px_rgba(6,182,212,0.15)] flex flex-col items-center justify-center p-6 overflow-hidden">
+          {/* --- الوجه الروسي (FRONT) --- */}
+          {/* تم إزالة backdrop-blur وتغيير الخلفية إلى لون صلب لمنع ظهور الوجه الآخر */}
+          <div 
+            className="absolute inset-0 backface-hidden rounded-[2rem] border border-cyan-500/20 bg-[#0a0a0a] shadow-[0_0_50px_-10px_rgba(6,182,212,0.15)] flex flex-col items-center justify-center p-6 overflow-hidden"
+            style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+          >
+            {/* تأثيرات بصرية */}
             <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent shadow-[0_0_10px_#06b6d4]"></div>
             <div className="absolute top-4 left-4 w-2 h-2 bg-cyan-500 rounded-full animate-ping"></div>
             <div className="absolute top-4 right-4 text-[10px] text-cyan-500/50 font-mono tracking-widest">SECURE_DATA</div>
 
-            <div className="flex-1 flex items-center justify-center w-full">
+            <div className="flex-1 flex items-center justify-center w-full z-10">
                 <h1 className={`${getFontSize(card.russian)} font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] text-center break-words w-full px-2 leading-tight font-mono`}>
                     {card.russian}
                 </h1>
@@ -95,30 +100,31 @@ export function StudyCard({ card, onResult, speak }) {
                 </div>
             )}
             
-            <button onClick={(e) => { e.stopPropagation(); speak(card.russian); }} className="absolute bottom-6 right-6 p-3 rounded-full bg-white/5 hover:bg-cyan-500 hover:text-black transition-all border border-white/10">
+            <button onClick={(e) => { e.stopPropagation(); speak(card.russian); }} className="absolute bottom-6 right-6 p-3 rounded-full bg-white/5 hover:bg-cyan-500 hover:text-black transition-all border border-white/10 z-20">
                 <IconVolume size={20} />
             </button>
           </div>
 
-          {/* --- الوجه العربي (تم الإصلاح هنا) --- */}
-          <div className="absolute inset-0 backface-hidden rounded-[2rem] border border-purple-500/20 bg-[#0a0510]/95 backdrop-blur-2xl shadow-[0_0_50px_-10px_rgba(168,85,247,0.15)] flex flex-col items-center justify-center p-6 overflow-hidden" style={{ transform: "rotateY(180deg)" }}>
+          {/* --- الوجه العربي (BACK) --- */}
+          {/* تم إزالة backdrop-blur وتغيير الخلفية إلى لون صلب */}
+          <div 
+            className="absolute inset-0 backface-hidden rounded-[2rem] border border-purple-500/20 bg-[#0a0510] shadow-[0_0_50px_-10px_rgba(168,85,247,0.15)] flex flex-col items-center justify-center p-6 overflow-hidden" 
+            style={{ 
+                transform: "rotateY(180deg)", 
+                backfaceVisibility: 'hidden', 
+                WebkitBackfaceVisibility: 'hidden' 
+            }}
+          >
              <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent shadow-[0_0_10px_#a855f7]"></div>
              <div className="absolute top-4 left-4 text-[10px] text-purple-500/50 font-mono tracking-widest">TRANSLATION_MATRIX</div>
              
-             <div className="flex-1 flex items-center justify-center w-full">
-                {/* 
-                    الإصلاحات:
-                    1. font-cairo: استخدام خط عربي حصراً.
-                    2. tracking-normal: إلغاء التباعد بين الحروف.
-                    3. dir="rtl": ضمان الاتجاه الصحيح.
-                    4. حذف font-mono.
-                */}
+             <div className="flex-1 flex items-center justify-center w-full z-10">
                 <h1 className={`${getFontSize(card.arabic)} font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-300 text-center dir-rtl leading-normal break-words w-full font-cairo tracking-normal`}>
                     {card.arabic}
                 </h1>
              </div>
 
-             <div className="absolute bottom-0 left-0 w-full flex h-20 border-t border-white/5 shrink-0">
+             <div className="absolute bottom-0 left-0 w-full flex h-20 border-t border-white/5 shrink-0 z-20">
                  <button onClick={(e) => {e.stopPropagation(); onResult(card.id, false)}} className="flex-1 bg-red-900/10 hover:bg-red-500/20 text-red-500 font-bold tracking-widest transition-all flex items-center justify-center gap-2 group">
                     <IconX size={18} className="group-hover:scale-125 transition-transform" /> FAIL
                  </button>
