@@ -1,12 +1,13 @@
+// FILE: app/page.js
 "use client";
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
   IconShield, IconMessageCircle, IconDeviceGamepad, IconBroadcast
 } from '@tabler/icons-react';
 
-// --- استيراد المكونات ---
+// Components
 import { HeroSection } from '../components/HeroSection';
 import { CategorySelect } from '../components/CategorySelect';
 import { StudyCard } from '../components/StudyCard';
@@ -16,7 +17,6 @@ import CyberDeck from '../components/CyberDeck';
 import CommunicationHub from '../components/CommunicationHub'; 
 import SettingsView from '../components/SettingsView'; 
 import AdminDashboard from '../components/AdminDashboard'; 
-// تم حذف AITutor من هنا
 import GamesHub from '../components/GamesHub';
 import { FloatingDock } from '../components/ui/floating-dock';
 import DigitalRain from '../components/ui/DigitalRain'; 
@@ -24,9 +24,8 @@ import IntroSequence from '../components/IntroSequence';
 import { BossBattleWrapper } from '../components/BossBattleWrapper'; 
 import DailyReward from '../components/DailyReward';
 import RealLiveStream from '../components/live/RealLiveStream';
-
-// --- استيراد اللعبة الفخمة ---
 import TimeTraveler from '../components/games/TimeTraveler';
+import { GridBackground } from '../components/ui/GridBackground'; // <--- جديد
 
 import { useStudySystem } from '../hooks/useStudySystem';
 import { useAudio } from '../hooks/useAudio';
@@ -45,27 +44,31 @@ export default function RussianApp() {
   const [broadcast, setBroadcast] = useState(null);
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
-
-  // حالة لتشغيل اللعبة بملء الشاشة
   const [activeOverlayGame, setActiveOverlayGame] = useState(null);
-
-  // حالات المعركة
   const [battleResult, setBattleResult] = useState(null); 
   const [battleTrigger, setBattleTrigger] = useState(0);
 
-  const { 
-    cards, currentCard, stats, handleSwipe, resetProgress, 
-    addCard, deleteCard, updateCard 
-  } = useStudySystem(user);
+  const containerRef = useRef(null); // مرجع للحاوية لتتبع الماوس
 
+  const { cards, currentCard, stats, handleSwipe, resetProgress, addCard, deleteCard, updateCard } = useStudySystem(user);
   const { speak, playSFX } = useAudio();
+
+  // --- منطق تتبع الماوس (Spotlight) ---
+  const handleMouseMove = (e) => {
+    if (!containerRef.current) return;
+    const { left, top } = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - left;
+    const y = e.clientY - top;
+    containerRef.current.style.setProperty("--mouse-x", `${x}px`);
+    containerRef.current.style.setProperty("--mouse-y", `${y}px`);
+  };
+  // -------------------------------------
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
         if (u) {
             setUser(u);
             const userRef = doc(db, "users", u.uid);
-            
             if (u.email === MASTER_EMAIL) {
                 const snap = await getDoc(userRef);
                 if (!snap.exists()) {
@@ -74,14 +77,10 @@ export default function RussianApp() {
                     await updateDoc(userRef, { role: 'admin' });
                 }
             }
-
             onSnapshot(userRef, (docSnap) => {
                 if (docSnap.exists()) {
                     setUserData(docSnap.data());
-                    if (docSnap.data().forceLogout) {
-                        auth.signOut();
-                        window.location.reload();
-                    }
+                    if (docSnap.data().forceLogout) { auth.signOut(); window.location.reload(); }
                 }
             });
             setShowDailyReward(true);
@@ -115,18 +114,16 @@ export default function RussianApp() {
 
   if (isBanned) return (
     <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-red-500 space-y-6 font-mono relative overflow-hidden">
-        <h1 className="text-6xl font-black tracking-widest text-center">ACCESS DENIED</h1>
+        <h1 className="text-6xl font-black tracking-widest text-center glitch-text" data-text="ACCESS DENIED">ACCESS DENIED</h1>
         <button onClick={handleLogout} className="px-8 py-3 border border-red-500 rounded hover:bg-red-900/20 transition-colors">LOGOUT</button>
     </div>
   );
 
   if (loadingAuth) return <div className="h-screen bg-black text-cyan-500 flex items-center justify-center font-mono animate-pulse">LOADING NEURAL LINK...</div>;
-  
   if (!user) return <AuthScreen onLoginSuccess={setUser} />;
 
   let navLinks = [
     { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
-    // تم حذف رابط AI Mentor من هنا
     { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
     { title: "Live Ops", icon: <IconBroadcast className="w-full text-red-500" />, onClick: () => setCurrentView('live') },
     { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
@@ -135,45 +132,26 @@ export default function RussianApp() {
     { title: "ID Card", icon: <IconTrophy className="w-full text-yellow-500" />, onClick: () => setCurrentView('leaderboard') },
     { title: "Config", icon: <IconSettings className="w-full text-neutral-400" />, onClick: () => setCurrentView('settings') },
   ];
-  
-  if (isJunior) {
-      navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
-  }
+  if (isJunior) navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
 
   const renderContent = () => {
     if (currentView === 'admin' && !isJunior) return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
-
     switch (currentView) {
       case 'home': return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
-      // تم حذف حالة ai-tutor من هنا
-      case 'games': 
-        return <GamesHub cards={cards} onOpenGame={(gameId) => setActiveOverlayGame(gameId)} />;
+      case 'games': return <GamesHub cards={cards} onOpenGame={(gameId) => setActiveOverlayGame(gameId)} />;
       case 'live': return <RealLiveStream user={user} onClose={() => setCurrentView('home')} />;
       case 'chat': return <CommunicationHub user={user} />;
       case 'category': return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
-      case 'study':
-        return (
+      case 'study': return (
             <div className="flex flex-col items-center justify-center h-full w-full relative pb-32">
                 {currentCard ? (
                     <BossBattleWrapper isCorrect={battleResult} resetTrigger={battleTrigger}>
-                        <StudyCard 
-                            card={currentCard} 
-                            onResult={(id, known) => {
-                                 setBattleResult(known);
-                                 setBattleTrigger(prev => prev + 1);
-                                 setTimeout(() => {
-                                    handleSwipe(known ? 'right' : 'left');
-                                    setBattleResult(null);
-                                 }, 1000); 
-                                 if(known) playSFX('success'); else playSFX('error');
-                            }} 
-                            speak={speak}
-                        />
+                        <StudyCard card={currentCard} onResult={(id, known) => { setBattleResult(known); setBattleTrigger(prev => prev + 1); setTimeout(() => { handleSwipe(known ? 'right' : 'left'); setBattleResult(null); }, 1000); if(known) playSFX('success'); else playSFX('error'); }} speak={speak} />
                     </BossBattleWrapper>
                 ) : (
-                    <div className="text-center p-10 bg-black/60 border border-cyan-500/50 rounded-2xl backdrop-blur-md">
+                    <div className="text-center p-10 glass-card-pro rounded-2xl backdrop-blur-md">
                         <IconCpu size={64} className="text-cyan-500 mx-auto mb-4 animate-pulse" />
-                        <h2 className="text-3xl font-black text-cyan-400 mb-2">MISSION ACCOMPLISHED</h2>
+                        <h2 className="text-3xl font-black text-cyan-400 mb-2 glitch-text" data-text="MISSION ACCOMPLISHED">MISSION ACCOMPLISHED</h2>
                         <button onClick={() => setCurrentView('home')} className="px-8 py-3 bg-cyan-600 text-white font-bold rounded-full hover:bg-cyan-500 shadow-[0_0_20px_#06b6d4]">BASE</button>
                     </div>
                 )}
@@ -188,13 +166,15 @@ export default function RussianApp() {
   };
 
   return (
-    <div className="relative h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black selection:bg-cyan-500/30 selection:text-cyan-200">
-      <DigitalRain />
+    <div 
+      ref={containerRef} 
+      onMouseMove={handleMouseMove}
+      className="relative h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black selection:bg-cyan-500/30 selection:text-cyan-200 spotlight-bg"
+    >
+      <GridBackground /> {/* الخلفية الشبكية */}
+      <DigitalRain /> {/* المطر الرقمي */}
       
-      {activeOverlayGame === 'time_traveler' && (
-          <TimeTraveler onClose={() => setActiveOverlayGame(null)} />
-      )}
-
+      {activeOverlayGame === 'time_traveler' && <TimeTraveler onClose={() => setActiveOverlayGame(null)} />}
       {showDailyReward && <DailyReward user={user} onClose={() => setShowDailyReward(false)} />}
       
       <AnimatePresence>

@@ -6,8 +6,6 @@ module.exports = {
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
@@ -15,10 +13,9 @@ module.exports = {
         nexus: {
           dark: "#030014",
           glass: "rgba(255, 255, 255, 0.05)",
-          border: "rgba(255, 255, 255, 0.1)",
-          primary: "#00f0ff", // Cyber Cyan
-          secondary: "#7000ff", // Electric Purple
-          accent: "#ff003c", // Cyber Red
+          primary: "#00f0ff", 
+          secondary: "#7000ff",
+          accent: "#ff003c",
         }
       },
       fontFamily: {
@@ -29,7 +26,7 @@ module.exports = {
         "meteor-effect": "meteor 5s linear infinite",
         "shimmer": "shimmer 2s linear infinite",
         "pulse-slow": "pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-        "float": "float 6s ease-in-out infinite",
+        "border-beam": "border-beam calc(var(--duration)*1s) infinite linear", // <--- تم الإضافة
       },
       keyframes: {
         meteor: {
@@ -41,10 +38,11 @@ module.exports = {
           from: { backgroundPosition: "0 0" },
           to: { backgroundPosition: "-200% 0" },
         },
-        float: {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(-20px)" },
-        }
+        "border-beam": { // <--- تم الإضافة
+          "100%": {
+            "offset-distance": "100%",
+          },
+        },
       },
     },
   },
