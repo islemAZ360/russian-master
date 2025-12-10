@@ -10,7 +10,7 @@ export default function TimeTraveler({ onClose }) {
   const sHandRef = useRef(null);
   const dialRef = useRef(null);
 
-  // حالة اللعبة
+  // State
   const [isQuiz, setIsQuiz] = useState(false);
   const [displayTime, setDisplayTime] = useState("12:00");
   const [russianText, setRussianText] = useState("Ровно двенадцать часов");
@@ -18,11 +18,11 @@ export default function TimeTraveler({ onClose }) {
   const [correctOption, setCorrectOption] = useState("");
   const [btnText, setBtnText] = useState("BEGIN EXAMINATION");
 
-  // متغيرات المنطق (Refs)
+  // Logic Refs
   const tMins = useRef(720);
   const isDragging = useRef(false);
 
-  // --- دوال اللغة الروسية ---
+  // --- Russian Logic ---
   const hNom = ['двенадцать', 'час', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять', 'десять', 'одиннадцать'];
   const hGen = ['двенадцатого', 'первого', 'второго', 'третьего', 'четвёртого', 'пятого', 'шестого', 'седьмого', 'восьмого', 'девятого', 'десятого', 'одиннадцатого'];
 
@@ -58,7 +58,7 @@ export default function TimeTraveler({ onClose }) {
     else return `Без ${getMText(60-m,'gen')} ${hNom[nH]}`;
   };
 
-  // --- تحديث الساعة ---
+  // --- Clock Update ---
   const updateClock = (mins, animate = true) => {
     let m = mins % 720; if(m<0) m+=720;
     let hV = Math.floor(m/60);
@@ -86,15 +86,13 @@ export default function TimeTraveler({ onClose }) {
     }
   };
 
-  // --- منطق الكويز ---
+  // --- Quiz Logic ---
   const toggleMode = () => {
       if(isQuiz) {
-          // إنهاء الكويز
           setIsQuiz(false);
           setBtnText("BEGIN EXAMINATION");
           updateClock(tMins.current, true);
       } else {
-          // بدء الكويز
           setIsQuiz(true);
           setBtnText("ABORT EXAMINATION");
           generateQuestion();
@@ -126,7 +124,7 @@ export default function TimeTraveler({ onClose }) {
         e.target.style.color = 'white';
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#cfb53b', '#ffffff'] });
         setTimeout(() => {
-            e.target.style = ""; // Reset style
+            if (e.target) e.target.style = "";
             generateQuestion();
         }, 1000);
     } else {
@@ -136,10 +134,11 @@ export default function TimeTraveler({ onClose }) {
     }
   };
 
-  // --- إعدادات الصفحة عند التحميل ---
+  // --- Effects ---
   useEffect(() => {
-    // 1. الخلفية المتحركة (Stars)
+    // 1. Particle Background
     const canvas = canvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     let width = canvas.width = window.innerWidth;
     let height = canvas.height = window.innerHeight;
@@ -169,14 +168,16 @@ export default function TimeTraveler({ onClose }) {
     }
     for(let i=0; i<100; i++) particles.push(new Particle());
     
+    let animationId;
     const animateBg = () => {
         ctx.clearRect(0,0,width,height);
         particles.forEach(p => { p.update(); p.draw(); });
-        requestAnimationFrame(animateBg);
+        animationId = requestAnimationFrame(animateBg);
     };
     animateBg();
 
-    // 2. حركة عقرب الثواني
+    // 2. Seconds Hand
+    let secAnimationId;
     const loopSeconds = () => {
         if(!sHandRef.current) return;
         let now = new Date();
@@ -184,11 +185,11 @@ export default function TimeTraveler({ onClose }) {
         let s = now.getSeconds();
         let deg = (s * 6) + (ms * 0.006);
         sHandRef.current.style.transform = `rotate(${deg}deg)`;
-        requestAnimationFrame(loopSeconds);
+        secAnimationId = requestAnimationFrame(loopSeconds);
     };
     loopSeconds();
 
-    // 3. السحب والتحريك
+    // 3. Drag Logic
     const getAng = (e) => {
         if(!dialRef.current) return 0;
         let r = dialRef.current.getBoundingClientRect();
@@ -215,21 +216,28 @@ export default function TimeTraveler({ onClose }) {
     window.addEventListener('mousedown', handleStart); window.addEventListener('touchstart', handleStart);
     window.addEventListener('mousemove', handleMove); window.addEventListener('touchmove', handleMove);
     window.addEventListener('mouseup', handleEnd); window.addEventListener('touchend', handleEnd);
-    window.addEventListener('resize', () => { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; });
+    
+    const handleResize = () => { 
+        if(canvas) { width = canvas.width = window.innerWidth; height = canvas.height = window.innerHeight; }
+    };
+    window.addEventListener('resize', handleResize);
 
     return () => {
         window.removeEventListener('mousedown', handleStart); window.removeEventListener('touchstart', handleStart);
         window.removeEventListener('mousemove', handleMove); window.removeEventListener('touchmove', handleMove);
         window.removeEventListener('mouseup', handleEnd); window.removeEventListener('touchend', handleEnd);
+        window.removeEventListener('resize', handleResize);
+        cancelAnimationFrame(animationId);
+        cancelAnimationFrame(secAnimationId);
     };
   }, [isQuiz]); 
 
   // Initialize
   useEffect(() => { updateClock(720); }, []);
 
+  // التعديل: z-[200] لضمان ظهور اللعبة فوق كل شيء
   return (
-    <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col items-center justify-center font-sans overflow-hidden text-[#cfb53b]">
-      {/* Styles */}
+    <div className="fixed inset-0 z-[200] bg-[#050505] flex flex-col items-center justify-center font-sans overflow-hidden text-[#cfb53b]">
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Playfair+Display:ital@0;1&family=Montserrat:wght@200;400;600&display=swap');
         .font-cinzel { font-family: 'Cinzel', serif; }
@@ -250,7 +258,7 @@ export default function TimeTraveler({ onClose }) {
       <div className="mech-corner mc-bottom-right"></div>
 
       {/* Close Button */}
-      <button onClick={onClose} className="absolute top-6 right-6 z-[100] text-white/50 hover:text-red-500 transition-colors">
+      <button onClick={onClose} className="absolute top-6 right-6 z-[201] text-white/50 hover:text-red-500 transition-colors">
           <IconX size={32}/>
       </button>
 
@@ -311,7 +319,7 @@ export default function TimeTraveler({ onClose }) {
         </div>
 
         {/* Panel */}
-        <div className="w-full max-w-[400px] bg-[#121214]/85 border border-[#cfb53b]/30 rounded-xl p-6 text-center backdrop-blur-xl shadow-[0_10px_40px_rgba(0,0,0,0.7)] relative overflow-hidden flex flex-col gap-4 before:content-[''] before:absolute before:top-0 before:left-0 before:w-full before:h-[2px] before:bg-gradient-to-r before:from-transparent before:via-[#cfb53b] before:to-transparent">
+        <div id="game-panel" className="w-full max-w-[400px] bg-[#121214]/85 border border-[#cfb53b]/30 rounded-xl p-6 text-center backdrop-blur-xl shadow-[0_10px_40px_rgba(0,0,0,0.7)] relative overflow-hidden flex flex-col gap-4 before:content-[''] before:absolute before:top-0 before:left-0 before:w-full before:h-[2px] before:bg-gradient-to-r before:from-transparent before:via-[#cfb53b] before:to-transparent">
             
             {!isQuiz ? (
                 <div className="animate-in fade-in duration-500">

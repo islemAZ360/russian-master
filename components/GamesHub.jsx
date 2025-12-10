@@ -20,7 +20,7 @@ export default function GamesHub({ cards }) {
   const [activeGame, setActiveGame] = useState(null);
 
   const GAMES = [
-    // اللعبة الجديدة الفخمة (في المقدمة)
+    // اللعبة الجديدة الفخمة
     { id: 'time_traveler', title: 'THE TIME TRAVELER', desc: 'Master Russian Time.', color: 'text-[#cfb53b]', bg: 'bg-[#cfb53b]/10', icon: <IconClock size={32}/> },
 
     // باقي الألعاب
@@ -44,8 +44,9 @@ export default function GamesHub({ cards }) {
   if (activeGame === 'logic') return <LogicGate cards={cards} onClose={() => setActiveGame(null)} />;
 
   return (
-    <div className="w-full h-full flex flex-col p-6 overflow-y-auto custom-scrollbar pb-48">
-      <div className="mb-10 text-center relative z-10">
+    // التعديل هنا: تحديد ارتفاع (h-[calc(100vh-120px)]) لكي يعمل الـ scroll
+    <div className="w-full h-[calc(100vh-120px)] flex flex-col p-6 overflow-y-auto custom-scrollbar pb-32">
+      <div className="mb-10 text-center relative z-10 shrink-0">
           <div className="w-20 h-20 mx-auto bg-gradient-to-br from-gray-900 to-black rounded-full border-2 border-white/20 flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(255,255,255,0.1)]">
               <IconDeviceGamepad size={40} className="text-white"/>
           </div>
@@ -53,7 +54,7 @@ export default function GamesHub({ cards }) {
           <p className="text-white/40 font-mono text-sm">SELECT TRAINING MODULE</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto w-full z-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto w-full z-10 pb-10">
           {GAMES.map((game, i) => (
               <motion.div 
                 key={game.id}
