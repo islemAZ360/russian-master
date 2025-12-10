@@ -3,36 +3,38 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { 
   IconAbc, IconPlayerPlay, IconDeviceGamepad, 
-  IconEar, IconBolt, IconPuzzle, IconCode, IconRadioactive 
+  IconEar, IconBolt, IconPuzzle, IconCode, IconRadioactive, IconClock 
 } from "@tabler/icons-react";
 
-// استيراد الألعاب الجديدة
+// استيراد الألعاب
 import FlashProtocol from "./games/FlashProtocol";
 import ReactorCore from "./games/ReactorCore";
 import SyntaxHack from "./games/SyntaxHack";
-
-// استيراد الألعاب القديمة التي تعمل
 import ScrambleGame from "./ScrambleGame";
 import AudioIntercept from "./games/AudioIntercept";
 import RapidProtocol from "./games/RapidProtocol";
 import LogicGate from "./games/LogicGate";
+import TimeTraveler from "./games/TimeTraveler"; // <-- اللعبة الجديدة
 
 export default function GamesHub({ cards }) {
   const [activeGame, setActiveGame] = useState(null);
 
   const GAMES = [
-    // الألعاب الجديدة (بديلة للمعطلة)
+    // اللعبة الجديدة الفخمة (في المقدمة)
+    { id: 'time_traveler', title: 'THE TIME TRAVELER', desc: 'Master Russian Time.', color: 'text-[#cfb53b]', bg: 'bg-[#cfb53b]/10', icon: <IconClock size={32}/> },
+
+    // باقي الألعاب
     { id: 'flash', title: 'FLASH PROTOCOL', desc: 'Speed binary decisions.', color: 'text-yellow-500', bg: 'bg-yellow-500/10', icon: <IconBolt size={32}/> },
     { id: 'reactor', title: 'REACTOR CORE', desc: 'Multiple choice overload.', color: 'text-cyan-500', bg: 'bg-cyan-500/10', icon: <IconRadioactive size={32}/> },
     { id: 'syntax', title: 'SYNTAX HACK', desc: 'Reconstruct corrupted data.', color: 'text-purple-500', bg: 'bg-purple-500/10', icon: <IconCode size={32}/> },
-    
-    // الألعاب القديمة السليمة
     { id: 'scramble', title: 'CRYPTIC CIPHER', desc: 'Reconstruct data.', color: 'text-blue-500', bg: 'bg-blue-500/10', icon: <IconAbc size={32}/> },
     { id: 'audio', title: 'AUDIO INTERCEPT', desc: 'Listen & decode.', color: 'text-emerald-500', bg: 'bg-emerald-500/10', icon: <IconEar size={32}/> },
     { id: 'rapid', title: 'RAPID PROTOCOL', desc: 'True/False speed run.', color: 'text-red-500', bg: 'bg-red-500/10', icon: <IconBolt size={32}/> },
     { id: 'logic', title: 'LOGIC GATE', desc: 'Multiple choice exam.', color: 'text-orange-500', bg: 'bg-orange-500/10', icon: <IconPuzzle size={32}/> },
   ];
 
+  // شروط العرض
+  if (activeGame === 'time_traveler') return <TimeTraveler onClose={() => setActiveGame(null)} />;
   if (activeGame === 'flash') return <FlashProtocol cards={cards} onClose={() => setActiveGame(null)} />;
   if (activeGame === 'reactor') return <ReactorCore cards={cards} onClose={() => setActiveGame(null)} />;
   if (activeGame === 'syntax') return <SyntaxHack cards={cards} onClose={() => setActiveGame(null)} />;
