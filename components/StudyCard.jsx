@@ -4,7 +4,7 @@ import { motion, useMotionValue, useTransform } from "framer-motion";
 import { IconVolume, IconRotate, IconCheck, IconX, IconKeyboard, IconEye } from "@tabler/icons-react";
 import confetti from "canvas-confetti";
 
-export function StudyCard({ card, onResult, speak }) {
+export function StudyCard({ card, onResult, speak, sessionStats }) {
   const [flipped, setFlipped] = useState(false);
   const [typingMode, setTypingMode] = useState(false);
   const [inputVal, setInputVal] = useState("");
@@ -32,18 +32,32 @@ export function StudyCard({ card, onResult, speak }) {
       }
   };
 
+  // تعديل منطق حجم الخط لضمان سطر واحد للكلمات الطويلة
   const getFontSize = (text) => {
       if (!text) return "text-4xl";
       const len = text.length;
-      if (len > 25) return "text-xl md:text-2xl"; 
-      if (len > 15) return "text-2xl md:text-3xl"; 
-      return "text-4xl md:text-5xl"; 
+      if (len > 15) return "text-lg md:text-xl"; // للكلمات الطويلة جداً
+      if (len > 10) return "text-2xl md:text-3xl"; // للمتوسطة
+      return "text-4xl md:text-6xl"; // للقصيرة
   };
 
   return (
-    <div className="perspective-1000 w-full h-[600px] flex flex-col items-center justify-center relative overflow-y-auto custom-scrollbar p-4">
+    <div className="perspective-1000 w-full h-[600px] flex flex-col items-center justify-center relative overflow-visible p-4">
       
-      <div className="flex gap-4 mb-8 z-20 shrink-0">
+      {/* --- شريط العداد العلوي (جديد) --- */}
+      <div className="flex gap-6 mb-6 z-20 shrink-0 bg-black/40 border border-white/10 px-6 py-2 rounded-full backdrop-blur-md">
+         <div className="flex items-center gap-2 text-green-400 font-mono font-bold">
+            <IconCheck size={16} />
+            <span>{sessionStats?.correct || 0}</span>
+         </div>
+         <div className="w-[1px] h-4 bg-white/10"></div>
+         <div className="flex items-center gap-2 text-red-400 font-mono font-bold">
+            <IconX size={16} />
+            <span>{sessionStats?.wrong || 0}</span>
+         </div>
+      </div>
+
+      <div className="flex gap-4 mb-4 z-20 shrink-0">
           <button onClick={() => setTypingMode(!typingMode)} className={`px-4 py-2 rounded-full border text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${typingMode ? 'bg-cyan-600 border-cyan-400 text-white shadow-[0_0_15px_rgba(6,182,212,0.5)]' : 'bg-black/40 border-white/10 text-white/40'}`}>
               {typingMode ? <><IconKeyboard size={14} /> Hacker Mode</> : <><IconEye size={14} /> Observer Mode</>}
           </button>
@@ -76,8 +90,8 @@ export function StudyCard({ card, onResult, speak }) {
             <div className="absolute top-4 left-4 w-2 h-2 bg-cyan-500 rounded-full animate-ping"></div>
             <div className="absolute top-4 right-4 text-[10px] text-cyan-500/50 font-mono tracking-widest">SECURE_DATA</div>
 
-            <div className="flex-1 flex items-center justify-center w-full z-10">
-                <h1 className={`${getFontSize(card.russian)} font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] text-center break-words w-full px-2 leading-tight font-mono`}>
+            <div className="flex-1 flex items-center justify-center w-full z-10 px-4">
+                <h1 className={`${getFontSize(card.russian)} font-black text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] text-center break-words w-full leading-tight font-mono`}>
                     {card.russian}
                 </h1>
             </div>
@@ -121,7 +135,7 @@ export function StudyCard({ card, onResult, speak }) {
              <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent shadow-[0_0_10px_#a855f7]"></div>
              <div className="absolute top-4 left-4 text-[10px] text-purple-500/50 font-mono tracking-widest">TRANSLATION_MATRIX</div>
              
-             <div className="flex-1 flex items-center justify-center w-full z-10">
+             <div className="flex-1 flex items-center justify-center w-full z-10 px-4">
                 <h1 className={`${getFontSize(card.arabic)} font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-300 text-center dir-rtl leading-normal break-words w-full font-cairo tracking-normal`}>
                     {card.arabic}
                 </h1>

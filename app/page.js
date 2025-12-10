@@ -20,7 +20,6 @@ import GamesHub from '../components/GamesHub';
 import { FloatingDock } from '../components/ui/floating-dock';
 import DigitalRain from '../components/ui/DigitalRain'; 
 import IntroSequence from '../components/IntroSequence'; 
-// تم حذف BossBattleWrapper من هنا
 import DailyReward from '../components/DailyReward';
 import RealLiveStream from '../components/live/RealLiveStream';
 import TimeTraveler from '../components/games/TimeTraveler';
@@ -48,6 +47,13 @@ export default function RussianApp() {
 
   // حالة لتشغيل اللعبة بملء الشاشة
   const [activeOverlayGame, setActiveOverlayGame] = useState(null);
+
+  // عداد الجلسة (جديد)
+  const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0 });
+
+  // حالات المعركة
+  const [battleResult, setBattleResult] = useState(null); 
+  const [battleTrigger, setBattleTrigger] = useState(0);
 
   const containerRef = useRef(null);
 
@@ -175,11 +181,18 @@ export default function RussianApp() {
                         {/* البطاقة مباشرة بدون Wrapper */}
                         <StudyCard 
                             card={currentCard} 
+                            sessionStats={sessionStats} // تمرير الإحصائيات
                             onResult={(id, known) => {
-                                 // تشغيل الصوت
-                                 if(known) playSFX('success'); else playSFX('error');
+                                 // تحديث العداد
+                                 if (known) {
+                                    setSessionStats(prev => ({ ...prev, correct: prev.correct + 1 }));
+                                    playSFX('success');
+                                 } else {
+                                    setSessionStats(prev => ({ ...prev, wrong: prev.wrong + 1 }));
+                                    playSFX('error');
+                                 }
                                  
-                                 // الانتقال للبطاقة التالية بانتظار بسيط جداً للأنيميشن
+                                 // الانتقال للبطاقة التالية
                                  setTimeout(() => {
                                     handleSwipe(known ? 'right' : 'left');
                                  }, 500); 
@@ -193,6 +206,12 @@ export default function RussianApp() {
                         <IconCpu size={64} className="text-cyan-500 mx-auto mb-4 animate-pulse" />
                         <h2 className="text-3xl font-black text-cyan-400 mb-2 glitch-text" data-text="ALL DATA PROCESSED">ALL DATA PROCESSED</h2>
                         <p className="text-white/50 text-sm mb-6">Neural link synced. No more cards due.</p>
+                        
+                        <div className="flex gap-4 justify-center mb-6 text-sm font-mono">
+                            <div className="text-green-500">Correct: {sessionStats.correct}</div>
+                            <div className="text-red-500">Wrong: {sessionStats.wrong}</div>
+                        </div>
+
                         <button onClick={() => setCurrentView('home')} className="px-8 py-3 bg-cyan-600 text-white font-bold rounded-full hover:bg-cyan-500 shadow-[0_0_20px_#06b6d4]">RETURN TO BASE</button>
                     </div>
                 )}
