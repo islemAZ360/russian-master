@@ -54,22 +54,24 @@ export function StudyCard({ card, onResult, speak }) {
         drag
         dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
         dragElastic={0.1}
-        className="relative w-full max-w-sm aspect-[3/4] preserve-3d group shrink-0"
+        className="relative w-full max-w-sm aspect-[3/4] group shrink-0"
         onClick={handleFlip}
       >
         <motion.div
+          initial={false}
           animate={{ rotateY: flipped ? 180 : 0 }}
           transition={{ duration: 0.6, type: "spring", stiffness: 260, damping: 20 }}
-          className="w-full h-full relative preserve-3d"
+          className="w-full h-full relative"
+          style={{ transformStyle: "preserve-3d" }}
         >
           
-          {/* --- الوجه الروسي (FRONT) --- */}
-          {/* تم إزالة backdrop-blur وتغيير الخلفية إلى لون صلب لمنع ظهور الوجه الآخر */}
+          {/* ========================================================= */}
+          {/* الوجه الأمامي (الروسي) */}
+          {/* ========================================================= */}
           <div 
-            className="absolute inset-0 backface-hidden rounded-[2rem] border border-cyan-500/20 bg-[#0a0a0a] shadow-[0_0_50px_-10px_rgba(6,182,212,0.15)] flex flex-col items-center justify-center p-6 overflow-hidden"
-            style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+            className="absolute inset-0 w-full h-full rounded-[2rem] border border-cyan-500/20 bg-[#0a0a0a] shadow-[0_0_50px_-10px_rgba(6,182,212,0.15)] flex flex-col items-center justify-center p-6 overflow-hidden"
+            style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }} 
           >
-            {/* تأثيرات بصرية */}
             <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent shadow-[0_0_10px_#06b6d4]"></div>
             <div className="absolute top-4 left-4 w-2 h-2 bg-cyan-500 rounded-full animate-ping"></div>
             <div className="absolute top-4 right-4 text-[10px] text-cyan-500/50 font-mono tracking-widest">SECURE_DATA</div>
@@ -105,14 +107,15 @@ export function StudyCard({ card, onResult, speak }) {
             </button>
           </div>
 
-          {/* --- الوجه العربي (BACK) --- */}
-          {/* تم إزالة backdrop-blur وتغيير الخلفية إلى لون صلب */}
+          {/* ========================================================= */}
+          {/* الوجه الخلفي (العربي) */}
+          {/* ========================================================= */}
           <div 
-            className="absolute inset-0 backface-hidden rounded-[2rem] border border-purple-500/20 bg-[#0a0510] shadow-[0_0_50px_-10px_rgba(168,85,247,0.15)] flex flex-col items-center justify-center p-6 overflow-hidden" 
+            className="absolute inset-0 w-full h-full rounded-[2rem] border border-purple-500/20 bg-[#0a0510] shadow-[0_0_50px_-10px_rgba(168,85,247,0.15)] flex flex-col items-center justify-center p-6 overflow-hidden" 
             style={{ 
                 transform: "rotateY(180deg)", 
-                backfaceVisibility: 'hidden', 
-                WebkitBackfaceVisibility: 'hidden' 
+                backfaceVisibility: "hidden", 
+                WebkitBackfaceVisibility: "hidden" 
             }}
           >
              <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent shadow-[0_0_10px_#a855f7]"></div>
