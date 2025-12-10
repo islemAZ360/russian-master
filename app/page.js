@@ -3,8 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
-  IconShield, IconMessageCircle, IconRobot, IconDeviceGamepad, IconBroadcast,
-  IconDownload // أيقونة التحميل الجديدة
+  IconShield, IconMessageCircle, IconRobot, IconDeviceGamepad, IconBroadcast
 } from '@tabler/icons-react';
 
 // --- استيراد المكونات ---
@@ -19,7 +18,6 @@ import SettingsView from '../components/SettingsView';
 import AdminDashboard from '../components/AdminDashboard'; 
 import AITutor from '../components/AITutor';
 import GamesHub from '../components/GamesHub';
-import TechZone from '../components/TechZone'; // <--- تم استيراد TechZone هنا
 import { FloatingDock } from '../components/ui/floating-dock';
 import DigitalRain from '../components/ui/DigitalRain'; 
 import IntroSequence from '../components/IntroSequence'; 
@@ -125,10 +123,6 @@ export default function RussianApp() {
     { title: "AI Mentor", icon: <IconRobot className="w-full text-pink-500" />, onClick: () => setCurrentView('ai-tutor') },
     { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
     { title: "Live Ops", icon: <IconBroadcast className="w-full text-red-500" />, onClick: () => setCurrentView('live') },
-    
-    // 👇 إضافة زر التحميل هنا 👇
-    { title: "Tech Zone", icon: <IconDownload className="w-full text-orange-500" />, onClick: () => setCurrentView('tech') },
-
     { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
     { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
     { title: "Archive", icon: <IconDatabase className="w-full text-emerald-400" />, onClick: () => setCurrentView('data') }, 
@@ -148,10 +142,6 @@ export default function RussianApp() {
       case 'ai-tutor': return <AITutor user={user} />;
       case 'games': return <GamesHub cards={cards} />;
       case 'live': return <RealLiveStream user={user} onClose={() => setCurrentView('home')} />;
-      
-      // 👇 إضافة حالة العرض هنا 👇
-      case 'tech': return <TechZone />;
-      
       case 'chat': return <CommunicationHub user={user} />;
       case 'category': return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
       case 'study':

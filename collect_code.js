@@ -16,8 +16,7 @@ const ignoreDirs = [
 ];
 
 // الملفات التي سيتم تجاهلها
-const ignoreFiles = [
-    'package-lock.json', 
+const ignoreFiles = [ 
     'yarn.lock', 
     '.DS_Store', 
     '.env', 
@@ -27,7 +26,7 @@ const ignoreFiles = [
 ];
 
 // الامتدادات المسموح بها (لضمان أننا نقرأ أكواداً فقط وليس صوراً)
-const allowedExtensions = ['.js', '.jsx', '.ts', '.tsx', '.css', '.json', '.html', '.md'];
+const allowedExtensions = ['.json','.js', '.jsx', '.ts', '.tsx', '.css', '.json', '.html', '.md'];
 
 function getAllFiles(dirPath, arrayOfFiles) {
   const files = fs.readdirSync(dirPath);
