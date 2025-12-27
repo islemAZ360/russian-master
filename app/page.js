@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
-  IconShield, IconMessageCircle, IconDeviceGamepad, IconBroadcast, IconInfinity
+  IconShield, IconMessageCircle, IconDeviceGamepad, IconBroadcast, 
+  IconInfinity, IconLifebuoy
 } from '@tabler/icons-react';
 
 // --- استيراد المكونات ---
@@ -15,17 +16,16 @@ import { DataManager } from '../components/DataManager';
 import CyberDeck from '../components/CyberDeck'; 
 import CommunicationHub from '../components/CommunicationHub'; 
 import SettingsView from '../components/SettingsView'; 
-import AdminDashboard from '../components/AdminDashboard'; 
+import AdminDashboard from '../components/AdminDashboard'; // اللوحة الجديدة
 import GamesHub from '../components/GamesHub';
 import { FloatingDock } from '../components/ui/floating-dock';
 import DigitalRain from '../components/ui/DigitalRain'; 
 import IntroSequence from '../components/IntroSequence'; 
-// تم إزالة استيراد DailyReward من هنا
 import RealLiveStream from '../components/live/RealLiveStream';
 import TimeTraveler from '../components/games/TimeTraveler';
+import SupportModal from '../components/SupportModal'; // نافذة الدعم
 import { GridBackground } from '../components/ui/GridBackground'; 
 import { CyberHUD } from '../components/ui/CyberHUD';
-import { DecryptText } from '../components/ui/DecryptText';
 
 import { useStudySystem } from '../hooks/useStudySystem';
 import { useAudio } from '../hooks/useAudio';
@@ -42,17 +42,20 @@ export default function RussianApp() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [showIntro, setShowIntro] = useState(true); 
   const [broadcast, setBroadcast] = useState(null);
-  // تم إزالة حالة showDailyReward من هنا
   const [loadingAuth, setLoadingAuth] = useState(true);
+  
+  // حالة نافذة الدعم الفني
+  const [showSupport, setShowSupport] = useState(false);
 
   // حالة لتشغيل اللعبة بملء الشاشة
   const [activeOverlayGame, setActiveOverlayGame] = useState(null);
 
-  // --- عداد الجلسة (جديد) ---
+  // --- عداد الجلسة ---
   const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0 });
 
   const containerRef = useRef(null);
 
+  // استدعاء الهوك المحدث الذي يدعم البيانات الشخصية
   const { 
     cards, currentCard, stats, handleSwipe, resetProgress, 
     addCard, deleteCard, updateCard 
@@ -69,31 +72,41 @@ export default function RussianApp() {
     containerRef.current.style.setProperty("--mouse-y", `${y}px`);
   };
 
+  // مراقبة حالة تسجيل الدخول
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
         if (u) {
             setUser(u);
             const userRef = doc(db, "users", u.uid);
             
+            // التأكد من وجود وثيقة للمستخدم
+            const snap = await getDoc(userRef);
+            
+            // إذا كان هو الماستر، نمنحه الصلاحية فوراً
             if (u.email === MASTER_EMAIL) {
-                const snap = await getDoc(userRef);
                 if (!snap.exists()) {
-                    await setDoc(userRef, { email: u.email, role: 'admin', xp: 0, createdAt: new Date().toISOString() });
-                } else if (snap.data().role !== 'admin') {
-                    await updateDoc(userRef, { role: 'admin' });
+                    await setDoc(userRef, { email: u.email, role: 'master', xp: 0, createdAt: new Date().toISOString() });
+                } else if (snap.data().role !== 'master') {
+                    await updateDoc(userRef, { role: 'master' });
                 }
+            } else if (!snap.exists()) {
+                // مستخدم عادي جديد
+                await setDoc(userRef, { email: u.email, role: 'user', xp: 0, createdAt: new Date().toISOString() });
             }
 
+            // الاستماع للتحديثات الحية للمستخدم (للرتب والحظر)
             onSnapshot(userRef, (docSnap) => {
                 if (docSnap.exists()) {
-                    setUserData(docSnap.data());
-                    if (docSnap.data().forceLogout) {
+                    const data = docSnap.data();
+                    setUserData(data);
+                    
+                    // طرد المستخدم إذا تم حظره
+                    if (data.isBanned && u.email !== MASTER_EMAIL) {
                         auth.signOut();
                         window.location.reload();
                     }
                 }
             });
-            // تم إزالة تفعيل setShowDailyReward(true) من هنا
         } else {
             setUser(null);
             setUserData(null);
@@ -103,6 +116,7 @@ export default function RussianApp() {
     return () => unsubscribe();
   }, []);
 
+  // مراقبة البث العام
   useEffect(() => {
     const unsubBroad = onSnapshot(doc(db, "system", "broadcast"), (d) => setBroadcast(d.exists() && d.data().active ? d.data().message : null));
     return () => unsubBroad();
@@ -115,17 +129,22 @@ export default function RussianApp() {
       return [...new Set(cards.map(c => c.category || "General"))];
   }, [cards]);
 
+  // تحديد الصلاحيات
   const isMaster = user?.email === MASTER_EMAIL;
-  const isAdmin = userData?.role === 'admin' || isMaster;
+  const isAdmin = userData?.role === 'admin' || userData?.role === 'master' || isMaster;
   const isJunior = userData?.role === 'junior' || isAdmin;
   const isBanned = userData?.isBanned && !isMaster;
+
+  // --- شاشات خاصة ---
 
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
 
   if (isBanned) return (
     <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-red-500 space-y-6 font-mono relative overflow-hidden">
+        <div className="absolute inset-0 bg-red-900/10 animate-pulse pointer-events-none"></div>
         <h1 className="text-6xl font-black tracking-widest text-center glitch-text" data-text="ACCESS DENIED">ACCESS DENIED</h1>
-        <button onClick={handleLogout} className="px-8 py-3 border border-red-500 rounded hover:bg-red-900/20 transition-colors">LOGOUT</button>
+        <p className="text-white/50 tracking-widest uppercase">Your neural link has been severed by the Administrator.</p>
+        <button onClick={handleLogout} className="px-8 py-3 border border-red-500 rounded hover:bg-red-900/20 transition-colors z-10">TERMINATE CONNECTION</button>
     </div>
   );
 
@@ -133,6 +152,12 @@ export default function RussianApp() {
   
   if (!user) return <AuthScreen onLoginSuccess={setUser} />;
 
+  // *** نقطة التحول: إذا كان العرض هو لوحة الأدمن، نخرج من الثيم بالكامل ***
+  if (currentView === 'admin_panel' && isAdmin) {
+      return <AdminDashboard currentUser={user} userData={userData} />;
+  }
+
+  // --- القائمة السفلية ---
   let navLinks = [
     { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
     { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
@@ -144,15 +169,22 @@ export default function RussianApp() {
     { title: "Config", icon: <IconSettings className="w-full text-neutral-400" />, onClick: () => setCurrentView('settings') },
   ];
   
-  if (isJunior) {
-      navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
+  // زر الدعم الفني للمستخدمين العاديين
+  if (!isAdmin) {
+      navLinks.push({ title: "Support", icon: <IconLifebuoy className="w-full text-orange-500" />, onClick: () => setShowSupport(true) });
   }
 
+  // --- محتوى التطبيق ---
   const renderContent = () => {
-    if (currentView === 'admin' && !isJunior) return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
-
     switch (currentView) {
-      case 'home': return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
+      case 'home': 
+        return <HeroSection 
+                  onStart={() => setCurrentView('category')} 
+                  onOpenGame={() => setCurrentView('games')} 
+                  user={user} 
+                  isAdmin={isAdmin}
+                  onOpenAdmin={() => setCurrentView('admin_panel')}
+               />;
       case 'games': return <GamesHub cards={cards} onOpenGame={(gameId) => setActiveOverlayGame(gameId)} />;
       case 'live': return <RealLiveStream user={user} onClose={() => setCurrentView('home')} />;
       case 'chat': return <CommunicationHub user={user} />;
@@ -160,25 +192,21 @@ export default function RussianApp() {
       case 'study':
         return (
             <div className="flex flex-col items-center justify-center h-full w-full relative pb-32">
-                
                 {currentCard ? (
                     <motion.div 
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         className="relative z-10 flex flex-col items-center"
                     >
-                        {/* Header بسيط */}
                         <div className="mb-2 flex items-center gap-2 text-cyan-500/50">
                             <IconInfinity size={20} />
                             <span className="text-xs font-mono tracking-[0.3em]">UNLIMITED_LEARNING_PROTOCOL</span>
                         </div>
 
-                        {/* البطاقة مع العداد الجديد */}
                         <StudyCard 
                             card={currentCard} 
-                            sessionStats={sessionStats} // تمرير العداد هنا
+                            sessionStats={sessionStats}
                             onResult={(id, known) => {
-                                 // تحديث العداد
                                  if (known) {
                                     setSessionStats(prev => ({ ...prev, correct: prev.correct + 1 }));
                                     playSFX('success');
@@ -186,15 +214,12 @@ export default function RussianApp() {
                                     setSessionStats(prev => ({ ...prev, wrong: prev.wrong + 1 }));
                                     playSFX('error');
                                  }
-                                 
-                                 // الانتقال للبطاقة التالية
                                  setTimeout(() => {
                                     handleSwipe(known ? 'right' : 'left');
-                                 }, 300); // تقليل الانتظار قليلاً للاستجابة الأسرع
+                                 }, 300);
                             }} 
                             speak={speak}
                         />
-                        
                     </motion.div>
                 ) : (
                     <div className="text-center p-10 glass-card-pro rounded-2xl backdrop-blur-md">
@@ -212,10 +237,10 @@ export default function RussianApp() {
                 )}
             </div>
         );
-      case 'data': return <DataManager cards={cards} onAdd={addCard} onDelete={deleteCard} onUpdate={updateCard} isJunior={isJunior} />;
+      // هنا DataManager يستخدم الدوال التي تعدل على personal_cards فقط
+      case 'data': return <DataManager cards={cards} onAdd={addCard} onDelete={deleteCard} onUpdate={updateCard} isJunior={true} />; 
       case 'leaderboard': return <CyberDeck user={user} stats={stats || { xp: 0, streak: 0, avatar: '👤' }} cards={cards || []} />;
       case 'settings': return <SettingsView user={user} resetProgress={resetProgress} onLogout={handleLogout} />;
-      case 'admin': return <AdminDashboard currentUser={user} userData={userData} />;
       default: return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
     }
   };
@@ -231,9 +256,9 @@ export default function RussianApp() {
       <div className="crt-overlay"></div>
       <DigitalRain />
       
+      {/* نوافذ الألعاب والأدوات العائمة */}
       {activeOverlayGame === 'time_traveler' && <TimeTraveler onClose={() => setActiveOverlayGame(null)} />}
-      
-      {/* تم حذف مكون DailyReward من هنا */}
+      {showSupport && <SupportModal user={user} onClose={() => setShowSupport(false)} />}
       
       <AnimatePresence>
         {broadcast && (
