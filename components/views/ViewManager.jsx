@@ -1,10 +1,13 @@
 "use client";
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useUI } from '../../context/UIContext';
 import { useAuth } from '../../context/AuthContext';
 
-// Views Imports
+// Themes
+import { GamesTheme, StudyTheme, AdminTheme, DataTheme, DefaultTheme } from '../ui/PageThemes';
+
+// Views
 import HeroView from './HeroView';
 import AdminView from './AdminView';
 import StudyView from './StudyView';
@@ -14,72 +17,90 @@ import DataView from './DataView';
 import LeaderboardView from './LeaderboardView';
 import SettingsViewWrapper from './SettingsViewWrapper';
 
-// Components
 import { CategorySelect } from '../CategorySelect';
 import CommunicationHub from '../CommunicationHub';
 
-export default function ViewManager({ 
-  cards, currentCard, sessionStats, setSessionStats, 
-  handleSwipe, playSFX, speak, 
-  addCard, deleteCard, updateCard, stats, categories, 
-  resetProgress 
-}) {
-  const { currentView, setCurrentView, activeCategory, setActiveCategory } = useUI();
-  const { user, isAdmin } = useAuth();
+export default function ViewManager(props) {
+  const { currentView } = useUI();
+  const { isAdmin } = useAuth();
 
   // تحويل فوري للأدمن
   if (currentView === 'admin_panel' && isAdmin) {
-    return <AdminView />;
+    return (
+        <AdminTheme>
+            <AdminView />
+        </AdminTheme>
+    );
   }
 
-  const renderContent = () => {
-    switch (currentView) {
-      case 'home': return <HeroView />;
-      case 'games': return <GamesView cards={cards} />;
-      case 'live': return <LiveView />;
-      case 'chat': return <CommunicationHub user={user} />;
-      
-      case 'category': 
-        return <CategorySelect 
-                  categories={categories} 
-                  activeCategory={activeCategory} 
-                  onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} 
-               />;
-      
-      case 'study':
-        return <StudyView 
-                  currentCard={currentCard}
-                  sessionStats={sessionStats}
-                  handleSwipe={handleSwipe}
-                  setSessionStats={setSessionStats}
-                  playSFX={playSFX}
-                  speak={speak}
-               />;
+  // تحديد المحتوى والثيم
+  let Content = null;
+  let ThemeWrapper = DefaultTheme; // الافتراضي
 
-      case 'data': 
-        return <DataView cards={cards} addCard={addCard} deleteCard={deleteCard} updateCard={updateCard} />; 
-      
-      case 'leaderboard': 
-        return <LeaderboardView cards={cards} stats={stats} />;
-      
-      case 'settings': 
-        return <SettingsViewWrapper resetProgress={resetProgress} />;
-      
-      default: return <HeroView />;
-    }
-  };
+  switch (currentView) {
+    case 'home':
+        Content = <HeroView />;
+        ThemeWrapper = DefaultTheme;
+        break;
+    
+    case 'games':
+        Content = <GamesView cards={props.cards} />;
+        ThemeWrapper = GamesTheme; // ثيم الأركيد
+        break;
+
+    case 'study':
+        Content = <StudyView {...props} />;
+        ThemeWrapper = StudyTheme; // ثيم التركيز
+        break;
+
+    case 'category':
+        Content = <CategorySelect {...props} />;
+        ThemeWrapper = DefaultTheme;
+        break;
+
+    case 'data':
+        Content = <DataView {...props} />;
+        ThemeWrapper = DataTheme; // ثيم الأرشيف
+        break;
+
+    case 'leaderboard':
+        Content = <LeaderboardView {...props} />;
+        ThemeWrapper = DefaultTheme;
+        break;
+    
+    case 'chat':
+        Content = <CommunicationHub {...props} />;
+        ThemeWrapper = DefaultTheme;
+        break;
+
+    case 'live':
+        Content = <LiveView />;
+        ThemeWrapper = DefaultTheme;
+        break;
+
+    case 'settings':
+        Content = <SettingsViewWrapper {...props} />;
+        ThemeWrapper = DefaultTheme;
+        break;
+
+    default:
+        Content = <HeroView />;
+        ThemeWrapper = DefaultTheme;
+  }
 
   return (
     <AnimatePresence mode="wait">
         <motion.div 
-        key={currentView} 
-        initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }} 
-        animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }} 
-        exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }} 
-        transition={{ duration: 0.3 }} 
-        className="w-full h-full flex justify-center"
+            key={currentView}
+            initial={{ opacity: 0, filter: "blur(20px)" }}
+            animate={{ opacity: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, filter: "blur(20px)" }}
+            transition={{ duration: 0.4 }}
+            className="w-full h-full"
         >
-        {renderContent()}
+            <ThemeWrapper>
+                {Content}
+            </ThemeWrapper>
         </motion.div>
     </AnimatePresence>
   );
