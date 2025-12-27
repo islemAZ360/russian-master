@@ -22,13 +22,12 @@ import { GridBackground } from '../components/ui/GridBackground';
 import { CyberHUD } from '../components/ui/CyberHUD';
 import { AuthScreen } from '../components/AuthScreen'; 
 
-// Hooks & Libs
 import { useStudySystem } from '../hooks/useStudySystem';
 import { useAudio } from '../hooks/useAudio';
 import { db } from '../lib/firebase';
 import { doc, onSnapshot } from "firebase/firestore";
 
-// المكون الرئيسي الذي يعيش داخل الـ Providers
+// المكون الداخلي للتطبيق
 function MainApp() {
   const { user, loading, isAdmin, isJunior } = useAuth();
   const { 
@@ -41,15 +40,14 @@ function MainApp() {
   const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0 });
   const containerRef = useRef(null);
 
-  // استخدام الهوك للبيانات
+  // استدعاء نظام الدراسة (الذي تم إصلاحه ليعرض البيانات فوراً)
   const { 
     cards, currentCard, stats, handleSwipe, resetProgress, 
-    addCard, deleteCard, updateCard, isBanned 
+    addCard, deleteCard, updateCard 
   } = useStudySystem(user);
 
   const { speak, playSFX } = useAudio();
 
-  // تأثير الماوس
   const handleMouseMove = (e) => {
     if (!containerRef.current) return;
     const { left, top } = containerRef.current.getBoundingClientRect();
@@ -59,7 +57,6 @@ function MainApp() {
     containerRef.current.style.setProperty("--mouse-y", `${y}px`);
   };
 
-  // الاستماع للبث
   useEffect(() => {
     const unsubBroad = onSnapshot(doc(db, "system", "broadcast"), (d) => setBroadcast(d.exists() && d.data().active ? d.data().message : null));
     return () => unsubBroad();
@@ -70,7 +67,6 @@ function MainApp() {
       return [...new Set(cards.map(c => c.category || "General"))];
   }, [cards]);
 
-  // روابط التنقل
   let navLinks = [
     { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
     { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
@@ -85,11 +81,11 @@ function MainApp() {
   if (isJunior) navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin_panel') });
   if (!isAdmin) navLinks.push({ title: "Support", icon: <IconLifebuoy className="w-full text-orange-500" />, onClick: () => setShowSupport(true) });
 
-  // Renders
+  // هنا التغيير الجذري: لا نمنع العرض إذا كان Loading، بل نعرض Intro فقط
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
-  if (isBanned) return <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-red-500 space-y-6 font-mono"><h1 className="text-6xl font-black">ACCESS DENIED</h1><p className="text-white/50">Your Neural Link has been severed.</p></div>;
-  if (loading) return <div className="h-screen bg-black text-cyan-500 flex items-center justify-center font-mono animate-pulse">LOADING NEURAL LINK...</div>;
-  if (!user) return <AuthScreen onLoginSuccess={() => {}} />;
+  
+  // إذا انتهى الـ Loading وما زال لا يوجد مستخدم، اعرض شاشة الدخول
+  if (!loading && !user) return <AuthScreen onLoginSuccess={() => {}} />;
 
   return (
     <div 
@@ -97,7 +93,6 @@ function MainApp() {
       onMouseMove={handleMouseMove}
       className="relative h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black spotlight-bg"
     >
-      {/* Backgrounds - تختفي في وضع الأدمن */}
       {!(isAdmin && currentView === 'admin_panel') && (
           <>
             <GridBackground /> 
@@ -107,13 +102,12 @@ function MainApp() {
           </>
       )}
       
-      {/* Modals & Overlays */}
       {activeOverlayGame === 'time_traveler' && <TimeTraveler onClose={() => setActiveOverlayGame(null)} />}
       {showSupport && <SupportModal user={user} onClose={() => setShowSupport(false)} />}
       
       <AnimatePresence>
         {broadcast && (
-            <motion.div initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} className="fixed top-0 w-full bg-red-900/90 text-white text-center py-3 z-[100] font-bold shadow-[0_0_20px_#ff0000]">
+            <motion.div initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} className="fixed top-0 w-full bg-red-900/90 text-white text-center py-3 z-[100] font-bold">
                 {broadcast}
             </motion.div>
         )}
@@ -137,7 +131,6 @@ function MainApp() {
            />
       </main>
 
-      {/* القائمة السفلية - تختفي في وضع الأدمن */}
       {!(isAdmin && currentView === 'admin_panel') && (
           <div className="fixed bottom-8 left-0 w-full z-50 flex justify-center pointer-events-none">
               <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="pointer-events-auto">
