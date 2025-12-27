@@ -4,17 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUI } from '../../context/UIContext';
 import { useAuth } from '../../context/AuthContext';
 
-// 1. استيراد الثيمات (العوالم المختلفة لكل صفحة)
-// تأكد من أنك قمت بإنشاء ملف PageThemes.jsx كما اتفقنا سابقاً
-import { 
-  GamesTheme, 
-  StudyTheme, 
-  AdminTheme, 
-  DataTheme, 
-  DefaultTheme 
-} from '../ui/PageThemes';
+// Layouts - الاستيراد من الملف الجديد
+import { HubLayout, ArcadeLayout, ArchiveLayout, FocusLayout } from '../layouts/DistinctLayouts';
+import TerminalLayout from '../layouts/TerminalLayout'; // الأدمن له ملفه الخاص كما اتفقنا
 
-// 2. استيراد المشاهد (Views)
+// Views
 import HeroView from './HeroView';
 import AdminView from './AdminView';
 import StudyView from './StudyView';
@@ -23,8 +17,6 @@ import LiveView from './LiveView';
 import DataView from './DataView';
 import LeaderboardView from './LeaderboardView';
 import SettingsViewWrapper from './SettingsViewWrapper';
-
-// 3. استيراد مكونات إضافية (تستخدم كـ Views مباشرة)
 import { CategorySelect } from '../CategorySelect';
 import CommunicationHub from '../CommunicationHub';
 
@@ -32,98 +24,83 @@ export default function ViewManager(props) {
   const { currentView, setCurrentView, activeCategory, setActiveCategory } = useUI();
   const { isAdmin } = useAuth();
 
-  // --- منطق توجيه الأدمن ---
-  // إذا كان المستخدم أدمن واختار لوحة التحكم، نستخدم ثيم الأدمن الخاص
+  // --- ADMIN OVERRIDE ---
   if (currentView === 'admin_panel' && isAdmin) {
     return (
-        <AdminTheme>
+        <TerminalLayout onExit={() => window.location.reload()}>
             <AdminView />
-        </AdminTheme>
+        </TerminalLayout>
     );
   }
 
-  // --- تحديد المحتوى والثيم بناءً على الصفحة ---
+  // --- VIEW ROUTING ---
   let Content = null;
-  let ThemeWrapper = DefaultTheme; // الثيم الافتراضي (الرئيسي)
+  let LayoutWrapper = HubLayout; // الافتراضي هو الهب
 
   switch (currentView) {
     case 'home':
         Content = <HeroView />;
-        ThemeWrapper = DefaultTheme;
+        LayoutWrapper = HubLayout;
         break;
     
     case 'games':
-        // نمرر الـ cards للعبة
-        Content = <GamesView cards={props.cards} />;
-        ThemeWrapper = GamesTheme; // تطبيق ثيم الأركيد/النيون
+        Content = <GamesView cards={props.cards} />; // تم استخدام المكون المحدث
+        LayoutWrapper = ArcadeLayout; // <--- لاحظ تغيير القالب
         break;
 
     case 'study':
-        // نمرر جميع props الخاصة بالدراسة
         Content = <StudyView {...props} />;
-        ThemeWrapper = StudyTheme; // تطبيق ثيم التركيز العميق
+        LayoutWrapper = FocusLayout; // <--- قالب التركيز
         break;
 
     case 'category':
-        Content = <CategorySelect 
-                    categories={props.categories} 
-                    activeCategory={activeCategory} 
-                    onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} 
-                  />;
-        ThemeWrapper = DefaultTheme;
+        Content = <CategorySelect {...props} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
+        LayoutWrapper = FocusLayout; // اختيار الفئة جزء من الدراسة
         break;
 
     case 'data':
-        // صفحة البيانات
-        Content = <DataView 
-                    cards={props.cards} 
-                    addCard={props.addCard} 
-                    deleteCard={props.deleteCard} 
-                    updateCard={props.updateCard} 
-                  />;
-        ThemeWrapper = DataTheme; // تطبيق ثيم الأرشيف/البيانات
+        Content = <DataView {...props} />;
+        LayoutWrapper = ArchiveLayout; // <--- قالب الأرشيف
         break;
 
     case 'leaderboard':
-        Content = <LeaderboardView cards={props.cards} stats={props.stats} />;
-        ThemeWrapper = DefaultTheme;
+        Content = <LeaderboardView {...props} />;
+        LayoutWrapper = HubLayout;
         break;
     
     case 'chat':
         Content = <CommunicationHub user={props.user} />;
-        ThemeWrapper = DefaultTheme;
+        LayoutWrapper = HubLayout; // الشات يناسبه الهب
         break;
 
     case 'live':
         Content = <LiveView />;
-        ThemeWrapper = DefaultTheme;
+        LayoutWrapper = HubLayout;
         break;
 
     case 'settings':
-        Content = <SettingsViewWrapper resetProgress={props.resetProgress} />;
-        ThemeWrapper = DefaultTheme;
+        Content = <SettingsViewWrapper {...props} />;
+        LayoutWrapper = ArchiveLayout; // الإعدادات تناسب الأرشيف
         break;
 
     default:
         Content = <HeroView />;
-        ThemeWrapper = DefaultTheme;
+        LayoutWrapper = HubLayout;
   }
 
-  // --- العرض النهائي ---
   return (
     <AnimatePresence mode="wait">
         <motion.div 
             key={currentView}
-            initial={{ opacity: 0, filter: "blur(10px)" }}
-            animate={{ opacity: 1, filter: "blur(0px)" }}
-            exit={{ opacity: 0, filter: "blur(10px)" }}
-            transition={{ duration: 0.4, ease: "easeInOut" }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
             className="w-full h-full"
         >
-            {/* تغليف المحتوى بالثيم المحدد */}
-            <ThemeWrapper>
+            <LayoutWrapper>
                 {Content}
-            </ThemeWrapper>
+            </LayoutWrapper>
         </motion.div>
     </AnimatePresence>
   );
