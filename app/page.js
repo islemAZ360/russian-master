@@ -20,7 +20,7 @@ import GamesHub from '../components/GamesHub';
 import { FloatingDock } from '../components/ui/floating-dock';
 import DigitalRain from '../components/ui/DigitalRain'; 
 import IntroSequence from '../components/IntroSequence'; 
-import DailyReward from '../components/DailyReward';
+// تم إزالة استيراد DailyReward من هنا
 import RealLiveStream from '../components/live/RealLiveStream';
 import TimeTraveler from '../components/games/TimeTraveler';
 import { GridBackground } from '../components/ui/GridBackground'; 
@@ -42,7 +42,7 @@ export default function RussianApp() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [showIntro, setShowIntro] = useState(true); 
   const [broadcast, setBroadcast] = useState(null);
-  const [showDailyReward, setShowDailyReward] = useState(false);
+  // تم إزالة حالة showDailyReward من هنا
   const [loadingAuth, setLoadingAuth] = useState(true);
 
   // حالة لتشغيل اللعبة بملء الشاشة
@@ -93,7 +93,7 @@ export default function RussianApp() {
                     }
                 }
             });
-            setShowDailyReward(true);
+            // تم إزالة تفعيل setShowDailyReward(true) من هنا
         } else {
             setUser(null);
             setUserData(null);
@@ -232,7 +232,8 @@ export default function RussianApp() {
       <DigitalRain />
       
       {activeOverlayGame === 'time_traveler' && <TimeTraveler onClose={() => setActiveOverlayGame(null)} />}
-      {showDailyReward && <DailyReward user={user} onClose={() => setShowDailyReward(false)} />}
+      
+      {/* تم حذف مكون DailyReward من هنا */}
       
       <AnimatePresence>
         {broadcast && (
