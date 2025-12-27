@@ -1,297 +1,254 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, orderBy, addDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, query, orderBy } from "firebase/firestore";
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  IconShield, IconUser, IconActivity, IconChartBar, 
-  IconBroadcast, IconSearch, IconCpu, IconMessage2, 
-  IconLock, IconLockOpen, IconTrash, IconEye
+  IconShieldLock, IconUsers, IconActivity, IconLayoutDashboard, 
+  IconBroadcast, IconSearch, IconMessage2, IconLogout, 
+  IconTerminal2, IconCpu, IconServer, IconEye, IconBan, IconCheck
 } from '@tabler/icons-react';
 
 export default function AdminDashboard({ currentUser }) {
-  const [activeView, setActiveView] = useState('overview'); 
+  const [loading, setLoading] = useState(true);
+  const [activeView, setActiveView] = useState('overview');
   const [users, setUsers] = useState([]);
   const [tickets, setTickets] = useState([]);
   const [broadcastMsg, setBroadcastMsg] = useState("");
-  const [selectedUser, setSelectedUser] = useState(null); // لعرض تفاصيل مستخدم أو مراسلته
 
-  // 1. جلب المستخدمين
+  // محاكاة تحميل النظام (System Boot)
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // جلب البيانات
   useEffect(() => {
     const unsubUsers = onSnapshot(collection(db, "users"), (snap) => 
       setUsers(snap.docs.map(d => ({id: d.id, ...d.data()})))
     );
-    return () => unsubUsers();
-  }, []);
-
-  // 2. جلب تذاكر الدعم
-  useEffect(() => {
-    const q = query(collection(db, "support_tickets"), orderBy("lastUpdate", "desc"));
-    const unsubTickets = onSnapshot(q, (snap) => 
+    const qTickets = query(collection(db, "support_tickets"), orderBy("lastUpdate", "desc"));
+    const unsubTickets = onSnapshot(qTickets, (snap) => 
         setTickets(snap.docs.map(d => ({id: d.id, ...d.data()})))
     );
-    return () => unsubTickets();
+    return () => { unsubUsers(); unsubTickets(); };
   }, []);
 
-  // --- ACTIONS ---
-
-  const handleRoleChange = async (targetUid, newRole, targetEmail) => {
-      // قانون التحريم: لا يمكن لمستخدم عادي تعديل الماستر
-      if (targetEmail === 'islamaz@bomba.com') {
-          alert("خطأ: لا يمكن تعديل رتبة القائد الأعلى (Master).");
-          return;
-      }
-      await updateDoc(doc(db, "users", targetUid), { role: newRole });
+  // Actions
+  const handleRoleChange = async (uid, role) => {
+      await updateDoc(doc(db, "users", uid), { role });
   };
-
-  const toggleBan = async (user) => {
-      if (user.email === 'islamaz@bomba.com') return;
-      await updateDoc(doc(db, "users", user.id), { isBanned: !user.isBanned });
+  
+  const toggleBan = async (uid, currentStatus) => {
+      await updateDoc(doc(db, "users", uid), { isBanned: !currentStatus });
   };
 
   const sendBroadcast = async () => {
     if(!broadcastMsg) return;
     await updateDoc(doc(db, "system", "broadcast"), { 
-        message: broadcastMsg, 
-        active: true,
-        sentBy: currentUser.email,
-        timestamp: new Date().toISOString()
+        message: broadcastMsg, active: true, sentBy: currentUser.email, timestamp: new Date().toISOString()
     });
-    alert("تم إرسال الرسالة العامة لجميع الوحدات.");
     setBroadcastMsg("");
+    alert("TRANSMISSION SENT");
   };
 
-  const replyToTicket = async (ticketId, reply) => {
-      // إضافة رد على تذكرة
-      // ... (يمكن تنفيذها بفتح مودال)
-      alert("خاصية الرد قيد التطوير في النسخة 2.1");
+  // زر الخروج: يقوم فقط بإعادة تحميل الصفحة لإعادة المستخدم للواجهة الرئيسية
+  const exitAdminMode = () => {
+      window.location.reload();
   };
+
+  if (loading) return <BootSequence />;
 
   return (
-    // التصميم: أبيض وأسود صارم (Monochrome Corporate)
-    <div className="w-full h-screen bg-[#f5f5f5] text-black font-mono flex overflow-hidden selection:bg-black selection:text-white">
+    <div className="flex h-screen w-full bg-[#050505] text-white font-mono overflow-hidden selection:bg-green-500/30">
       
-      {/* SIDEBAR */}
-      <div className="w-64 bg-black text-white flex flex-col border-r border-gray-800 shadow-2xl shrink-0">
-        <div className="p-6 border-b border-gray-800">
-            <h1 className="text-2xl font-black tracking-tighter">NEXUS<span className="text-gray-500">ADMIN</span></h1>
-            <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">
-                Level 5 Clearance
-            </p>
+      {/* SIDEBAR NAVIGATION */}
+      <nav className="w-20 lg:w-64 border-r border-white/10 flex flex-col bg-[#0a0a0a] shrink-0">
+        <div className="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-white/10">
+            <IconShieldLock className="text-red-500 w-8 h-8" />
+            <span className="hidden lg:block ml-3 font-bold tracking-widest text-lg">NEXUS<span className="text-red-500">ADMIN</span></span>
         </div>
-        
-        <nav className="flex-1 p-4 space-y-2">
-            <MenuBtn id="overview" label="لوحة القيادة" icon={IconChartBar} active={activeView} set={setActiveView} />
-            <MenuBtn id="users" label="المستخدمين والرتب" icon={IconUser} active={activeView} set={setActiveView} />
-            <MenuBtn id="support" label="مركز الدعم والشكاوى" icon={IconMessage2} active={activeView} set={setActiveView} badge={tickets.length} />
-            <MenuBtn id="broadcast" label="البث العام" icon={IconBroadcast} active={activeView} set={setActiveView} />
-        </nav>
 
-        <div className="p-4 border-t border-gray-800 text-xs text-gray-500 text-center">
-            SYSTEM V.2.0 <br/> SECURE CONNECTION
+        <div className="flex-1 py-6 space-y-2">
+            <NavBtn id="overview" icon={IconLayoutDashboard} label="DASHBOARD" active={activeView} set={setActiveView} />
+            <NavBtn id="users" icon={IconUsers} label="OPERATIVES" active={activeView} set={setActiveView} />
+            <NavBtn id="support" icon={IconMessage2} label="COMMS LINK" active={activeView} set={setActiveView} badge={tickets.length} />
+            <NavBtn id="broadcast" icon={IconBroadcast} label="BROADCAST" active={activeView} set={setActiveView} />
         </div>
-      </div>
 
-      {/* MAIN CONTENT */}
-      <div className="flex-1 overflow-y-auto bg-white p-8">
+        <button onClick={exitAdminMode} className="p-4 border-t border-white/10 hover:bg-red-900/20 text-red-500 flex items-center justify-center lg:justify-start gap-3 transition-colors">
+            <IconLogout size={20} />
+            <span className="hidden lg:block font-bold">DISCONNECT</span>
+        </button>
+      </nav>
+
+      {/* MAIN CONTENT AREA */}
+      <main className="flex-1 flex flex-col overflow-hidden relative">
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-5 pointer-events-none"></div>
         
-        {/* OVERVIEW */}
-        {activeView === 'overview' && (
-            <div className="space-y-8 animate-in fade-in duration-500">
-                <h2 className="text-3xl font-black border-b-4 border-black pb-2 mb-6">تقرير الحالة</h2>
-                <div className="grid grid-cols-4 gap-6">
-                    <StatBox title="إجمالي المستخدمين" value={users.length} />
-                    <StatBox title="تذاكر مفتوحة" value={tickets.length} highlight />
-                    <StatBox title="إجمالي XP" value={users.reduce((a,b)=>a+(b.xp||0),0)} />
-                    <StatBox title="حالات الحظر" value={users.filter(u=>u.isBanned).length} />
+        {/* Header */}
+        <header className="h-16 border-b border-white/10 flex items-center justify-between px-8 bg-[#0a0a0a]/50 backdrop-blur-md">
+            <div className="flex items-center gap-4 text-xs text-white/40">
+                <span className="flex items-center gap-2"><IconServer size={14}/> SERVER: ONLINE</span>
+                <span className="w-1 h-4 bg-white/10"></span>
+                <span className="flex items-center gap-2"><IconCpu size={14}/> CPU: STABLE</span>
+            </div>
+            <div className="flex items-center gap-3">
+                <div className="text-right hidden md:block">
+                    <div className="text-sm font-bold text-white">{currentUser.email}</div>
+                    <div className="text-[10px] text-red-500 tracking-widest uppercase">Supreme Commander</div>
                 </div>
-                
-                {/* User Growth Chart Placeholder */}
-                <div className="h-64 bg-gray-100 border border-gray-300 flex items-center justify-center rounded-sm">
-                    <p className="text-gray-400 text-sm">[ رسم بياني لنشاط الموقع يظهر هنا ]</p>
+                <div className="w-10 h-10 bg-red-900/20 border border-red-500/50 rounded-full flex items-center justify-center text-red-500 font-bold">
+                    {currentUser.email[0].toUpperCase()}
                 </div>
             </div>
-        )}
+        </header>
 
-        {/* USER MANAGEMENT (THE POWER TOOL) */}
-        {activeView === 'users' && (
-            <div className="space-y-6 animate-in fade-in duration-500">
-                <div className="flex justify-between items-center border-b-4 border-black pb-2">
-                    <h2 className="text-3xl font-black">إدارة المستخدمين</h2>
-                    <div className="relative">
-                        <IconSearch className="absolute right-3 top-2.5 text-gray-400" size={18} />
-                        <input placeholder="بحث عن عميل..." className="bg-gray-100 border border-gray-300 rounded-none py-2 pr-10 pl-4 w-64 focus:bg-white focus:border-black outline-none text-sm transition-all" />
+        {/* View Container */}
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+            
+            {activeView === 'overview' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <KpiCard title="TOTAL OPERATIVES" value={users.length} icon={IconUsers} color="text-blue-400" />
+                        <KpiCard title="ACTIVE TICKETS" value={tickets.length} icon={IconMessage2} color="text-yellow-400" />
+                        <KpiCard title="SYSTEM LOAD" value="12%" icon={IconActivity} color="text-green-400" />
+                        <KpiCard title="BANNED UNITS" value={users.filter(u=>u.isBanned).length} icon={IconBan} color="text-red-500" />
+                    </div>
+                    
+                    <div className="border border-white/10 bg-[#0f0f0f] rounded-xl p-6">
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><IconTerminal2 size={20} className="text-green-500"/> SYSTEM LOGS</h3>
+                        <div className="font-mono text-xs text-green-500/60 space-y-1 h-48 overflow-hidden relative">
+                            <p>&gt; System initialized at {new Date().toLocaleTimeString()}</p>
+                            <p>&gt; Secure connection established via port 443</p>
+                            <p>&gt; Database synchronized: {users.length} records updated</p>
+                            <p>&gt; Neural interface active. Waiting for input...</p>
+                            <div className="absolute bottom-0 left-0 w-full h-20 bg-gradient-to-t from-[#0f0f0f] to-transparent"></div>
+                        </div>
                     </div>
                 </div>
+            )}
 
-                <div className="overflow-hidden border border-gray-200 shadow-sm">
-                    <table className="w-full text-right text-sm">
-                        <thead className="bg-black text-white uppercase tracking-wider">
-                            <tr>
-                                <th className="p-4">المستخدم</th>
-                                <th className="p-4">البريد الإلكتروني</th>
-                                <th className="p-4">الرتبة الحالية</th>
-                                <th className="p-4">النقاط (XP)</th>
-                                <th className="p-4 text-center">الإجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {users.map(u => {
-                                const isTargetMaster = u.email === 'islamaz@bomba.com';
-                                return (
-                                    <tr key={u.id} className={`hover:bg-gray-50 transition-colors ${u.isBanned ? 'bg-red-50' : ''}`}>
-                                        <td className="p-4 font-bold">{u.id.substring(0,8)}...</td>
-                                        <td className="p-4 font-mono">{u.email}</td>
-                                        <td className="p-4">
-                                            {isTargetMaster ? (
-                                                <span className="bg-black text-white px-2 py-1 text-xs font-bold rounded">MASTER</span>
-                                            ) : (
-                                                <select 
-                                                    value={u.role || 'user'} 
-                                                    onChange={(e) => handleRoleChange(u.id, e.target.value, u.email)}
-                                                    className="bg-white border border-gray-300 px-2 py-1 text-xs focus:border-black outline-none cursor-pointer"
-                                                >
-                                                    <option value="user">مستخدم</option>
-                                                    <option value="junior_admin">أدمن مساعد</option>
-                                                    <option value="admin">أدمن</option>
-                                                </select>
-                                            )}
-                                        </td>
-                                        <td className="p-4">{u.xp}</td>
-                                        <td className="p-4 flex justify-center gap-2">
-                                            <button onClick={() => setSelectedUser(u)} className="p-2 border border-gray-300 hover:bg-black hover:text-white transition-colors" title="عرض الملف">
-                                                <IconEye size={16}/>
-                                            </button>
-                                            {!isTargetMaster && (
-                                                <button 
-                                                    onClick={() => toggleBan(u)} 
-                                                    className={`p-2 border transition-colors ${u.isBanned ? 'bg-red-600 text-white border-red-600' : 'border-gray-300 hover:bg-red-600 hover:text-white'}`}
-                                                    title={u.isBanned ? "إلغاء الحظر" : "حظر المستخدم"}
-                                                >
-                                                    {u.isBanned ? <IconLockOpen size={16}/> : <IconLock size={16}/>}
-                                                </button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        )}
+            {activeView === 'users' && (
+                <div className="space-y-4 animate-in fade-in duration-300">
+                    <div className="flex justify-between items-center bg-[#0f0f0f] p-4 rounded-lg border border-white/10">
+                        <h2 className="text-xl font-bold">OPERATIVE DATABASE</h2>
+                        <div className="relative">
+                            <IconSearch className="absolute left-3 top-2.5 text-white/30" size={16} />
+                            <input placeholder="SEARCH ID..." className="bg-black border border-white/20 rounded pl-10 pr-4 py-2 text-sm text-white focus:border-red-500 outline-none w-64" />
+                        </div>
+                    </div>
 
-        {/* SUPPORT & TICKETS */}
-        {activeView === 'support' && (
-            <div className="space-y-6 animate-in fade-in duration-500">
-                <h2 className="text-3xl font-black border-b-4 border-black pb-2">مركز الشكاوى</h2>
-                
-                <div className="grid gap-4">
-                    {tickets.length === 0 ? (
-                        <div className="text-center py-10 text-gray-400">لا توجد رسائل جديدة.</div>
-                    ) : (
-                        tickets.map(ticket => (
-                            <div key={ticket.id} className="bg-white border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col md:flex-row gap-4">
-                                <div className="md:w-1/4 border-l border-gray-100 pl-4">
-                                    <div className="font-bold text-lg mb-1">{ticket.userEmail}</div>
-                                    <div className="text-xs text-gray-500 mb-2">UID: {ticket.userId}</div>
-                                    <div className={`text-xs px-2 py-1 inline-block rounded ${ticket.status === 'open' ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
-                                        {ticket.status === 'open' ? 'مفتوح' : 'مغلق'}
+                    <div className="grid gap-2">
+                        {users.map(u => (
+                            <div key={u.id} className="group flex items-center justify-between p-4 bg-[#0a0a0a] border border-white/5 hover:border-white/20 hover:bg-[#111] transition-all rounded-lg">
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-2 h-2 rounded-full ${u.isBanned ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                                    <div>
+                                        <div className="font-bold text-white">{u.email}</div>
+                                        <div className="text-[10px] text-white/40 font-mono">UID: {u.id}</div>
                                     </div>
                                 </div>
-                                <div className="flex-1">
-                                    <div className="bg-gray-50 p-4 rounded-lg text-sm mb-4 max-h-40 overflow-y-auto">
-                                        {ticket.messages && ticket.messages.map((m, i) => (
-                                            <div key={i} className={`mb-2 p-2 rounded ${m.sender === 'user' ? 'bg-white border border-gray-200' : 'bg-black text-white ml-auto w-fit'}`}>
-                                                <p>{m.text}</p>
-                                                <span className="text-[10px] opacity-50 block mt-1">{new Date(m.createdAt).toLocaleString()}</span>
-                                            </div>
-                                        ))}
+                                
+                                <div className="flex items-center gap-6">
+                                    <div className="text-right">
+                                        <div className="text-xs text-white/40 uppercase">XP Level</div>
+                                        <div className="font-mono text-yellow-500">{u.xp || 0}</div>
                                     </div>
-                                    <button onClick={() => alert("سيتم فتح نافذة الرد هنا")} className="bg-black text-white px-4 py-2 text-sm hover:opacity-80">
-                                        فتح المحادثة والرد
-                                    </button>
+                                    
+                                    <select 
+                                        value={u.role || 'user'} 
+                                        onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                                        className="bg-black border border-white/20 text-xs py-1 px-2 rounded focus:border-blue-500 outline-none"
+                                        disabled={u.email === 'islamaz@bomba.com'}
+                                    >
+                                        <option value="user">USER</option>
+                                        <option value="admin">ADMIN</option>
+                                    </select>
+
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => toggleBan(u.id, u.isBanned)}
+                                            className={`p-2 rounded border ${u.isBanned ? 'border-green-500 text-green-500' : 'border-red-500 text-red-500'} hover:bg-white/5`}
+                                            title={u.isBanned ? "Unban" : "Ban"}
+                                        >
+                                            {u.isBanned ? <IconCheck size={16} /> : <IconBan size={16} />}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        ))
-                    )}
+                        ))}
+                    </div>
                 </div>
-            </div>
-        )}
+            )}
 
-        {/* BROADCAST SYSTEM */}
-        {activeView === 'broadcast' && (
-            <div className="max-w-2xl mx-auto mt-10 animate-in fade-in duration-500">
-                <div className="bg-white border-2 border-black p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-                    <h2 className="text-2xl font-black mb-6 flex items-center gap-2">
-                        <IconBroadcast /> بروتوكول البث العام
-                    </h2>
-                    <p className="mb-4 text-sm text-gray-600">
-                        تحذير: هذه الرسالة ستظهر لجميع المستخدمين المتصلين فوراً في أعلى شاشتهم.
-                    </p>
-                    <textarea 
-                        value={broadcastMsg}
-                        onChange={(e) => setBroadcastMsg(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-300 p-4 text-sm focus:border-black outline-none h-32 resize-none mb-4"
-                        placeholder="اكتب رسالة النظام هنا..."
-                    />
-                    <button 
-                        onClick={sendBroadcast}
-                        disabled={!broadcastMsg}
-                        className="w-full bg-black text-white py-4 font-bold text-lg hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                    >
-                        إرسال الإشارة
-                    </button>
+            {activeView === 'broadcast' && (
+                <div className="max-w-2xl mx-auto mt-10">
+                    <div className="bg-[#0f0f0f] border border-red-500/30 p-8 rounded-xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50"></div>
+                        <h2 className="text-2xl font-black text-white mb-2 flex items-center gap-2"><IconBroadcast className="text-red-500"/> GLOBAL ALERT SYSTEM</h2>
+                        <p className="text-white/40 text-sm mb-6">This message will be transmitted to all connected neural links immediately.</p>
+                        
+                        <textarea 
+                            value={broadcastMsg}
+                            onChange={(e) => setBroadcastMsg(e.target.value)}
+                            className="w-full h-32 bg-black border border-white/20 rounded-lg p-4 text-white focus:border-red-500 outline-none mb-4 font-mono"
+                            placeholder="TYPE SYSTEM MESSAGE HERE..."
+                        />
+                        
+                        <button 
+                            onClick={sendBroadcast}
+                            disabled={!broadcastMsg}
+                            className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            INITIATE BROADCAST
+                        </button>
+                    </div>
                 </div>
-            </div>
-        )}
-
-      </div>
-
-      {/* USER DETAILS MODAL (Simple overlay) */}
-      {selectedUser && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm" onClick={() => setSelectedUser(null)}>
-              <div className="bg-white p-8 max-w-lg w-full shadow-2xl border-2 border-black" onClick={e => e.stopPropagation()}>
-                  <h3 className="text-2xl font-black mb-4">بيانات العميل</h3>
-                  <div className="space-y-2 text-sm">
-                      <p><strong>ID:</strong> {selectedUser.id}</p>
-                      <p><strong>Email:</strong> {selectedUser.email}</p>
-                      <p><strong>XP:</strong> {selectedUser.xp}</p>
-                      <p><strong>Last Login:</strong> {selectedUser.lastLogin || 'N/A'}</p>
-                  </div>
-                  
-                  <div className="mt-6 border-t pt-4">
-                      <h4 className="font-bold mb-2">تعديل الرصيد (XP)</h4>
-                      <div className="flex gap-2">
-                          <button onClick={async () => { await updateDoc(doc(db, "users", selectedUser.id), { xp: (selectedUser.xp || 0) + 100 }); alert("تمت الزيادة"); }} className="bg-green-600 text-white px-4 py-2 text-xs">+100 XP</button>
-                          <button onClick={async () => { await updateDoc(doc(db, "users", selectedUser.id), { xp: Math.max(0, (selectedUser.xp || 0) - 100) }); alert("تم الخصم"); }} className="bg-red-600 text-white px-4 py-2 text-xs">-100 XP</button>
-                      </div>
-                  </div>
-
-                  <button onClick={() => setSelectedUser(null)} className="mt-6 w-full border border-black py-2 hover:bg-black hover:text-white transition-colors">إغلاق</button>
-              </div>
-          </div>
-      )}
-
+            )}
+        </div>
+      </main>
     </div>
   );
 }
 
-const MenuBtn = ({ id, label, icon: Icon, active, set, badge }) => (
+// --- Components ---
+
+const NavBtn = ({ id, icon: Icon, label, active, set, badge }) => (
     <button 
         onClick={() => set(id)}
-        className={`w-full flex items-center justify-between p-3 text-sm font-bold transition-all ${active === id ? 'bg-white text-black translate-x-2' : 'text-gray-400 hover:text-white hover:bg-gray-900'}`}
+        className={`w-full flex items-center justify-center lg:justify-start gap-4 px-6 py-4 transition-all relative ${active === id ? 'text-white bg-white/5 border-r-2 border-red-500' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
     >
-        <div className="flex items-center gap-3">
-            <Icon size={18} />
-            <span>{label}</span>
-        </div>
-        {badge > 0 && <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full">{badge}</span>}
+        <Icon size={20} />
+        <span className="hidden lg:block font-bold text-xs tracking-widest">{label}</span>
+        {badge > 0 && <span className="absolute top-2 right-2 lg:top-auto lg:right-4 w-4 h-4 bg-red-500 text-white text-[9px] flex items-center justify-center rounded-full font-bold">{badge}</span>}
     </button>
 );
 
-const StatBox = ({ title, value, highlight }) => (
-    <div className={`p-6 border ${highlight ? 'bg-black text-white border-black' : 'bg-white border-gray-200'} shadow-sm`}>
-        <div className="text-3xl font-black mb-1">{value}</div>
-        <div className={`text-xs uppercase tracking-widest ${highlight ? 'text-gray-400' : 'text-gray-500'}`}>{title}</div>
+const KpiCard = ({ title, value, icon: Icon, color }) => (
+    <div className="bg-[#0f0f0f] border border-white/10 p-6 rounded-xl flex items-center gap-4 hover:border-white/20 transition-colors group">
+        <div className={`p-3 bg-white/5 rounded-lg ${color} group-hover:scale-110 transition-transform`}>
+            <Icon size={24} />
+        </div>
+        <div>
+            <div className="text-2xl font-black text-white">{value}</div>
+            <div className="text-[10px] text-white/40 uppercase tracking-widest">{title}</div>
+        </div>
+    </div>
+);
+
+const BootSequence = () => (
+    <div className="h-screen w-full bg-black flex flex-col items-center justify-center font-mono text-green-500">
+        <IconShieldLock size={64} className="mb-6 animate-pulse" />
+        <div className="text-2xl font-black mb-2">ACCESSING SECURE MAINFRAME</div>
+        <div className="w-64 h-1 bg-green-900/30 rounded-full overflow-hidden">
+            <motion.div 
+                initial={{ width: 0 }} 
+                animate={{ width: "100%" }} 
+                transition={{ duration: 2 }}
+                className="h-full bg-green-500"
+            />
+        </div>
+        <div className="mt-4 text-xs opacity-50">verifying credentials...</div>
     </div>
 );
