@@ -5,8 +5,17 @@ import { useUI } from '../../context/UIContext';
 import { useAuth } from '../../context/AuthContext';
 
 // Layouts - الاستيراد من الملف الجديد
-import { HubLayout, ArcadeLayout, ArchiveLayout, FocusLayout } from '../layouts/DistinctLayouts';
-import TerminalLayout from '../layouts/TerminalLayout'; // الأدمن له ملفه الخاص كما اتفقنا
+import { 
+    HubLayout, 
+    ArcadeLayout, 
+    ArchiveLayout, 
+    FocusLayout, 
+    CommsLayout,
+    HoloDeckLayout,
+    ConfigLayout
+} from '../layouts/DistinctLayouts';
+
+import TerminalLayout from '../layouts/TerminalLayout'; // الأدمن له ملفه الخاص
 
 // Views
 import HeroView from './HeroView';
@@ -17,6 +26,7 @@ import LiveView from './LiveView';
 import DataView from './DataView';
 import LeaderboardView from './LeaderboardView';
 import SettingsViewWrapper from './SettingsViewWrapper';
+
 import { CategorySelect } from '../CategorySelect';
 import CommunicationHub from '../CommunicationHub';
 
@@ -33,9 +43,9 @@ export default function ViewManager(props) {
     );
   }
 
-  // --- VIEW ROUTING ---
+  // --- VIEW ROUTING & THEME SELECTION ---
   let Content = null;
-  let LayoutWrapper = HubLayout; // الافتراضي هو الهب
+  let LayoutWrapper = HubLayout; // الافتراضي
 
   switch (currentView) {
     case 'home':
@@ -44,43 +54,43 @@ export default function ViewManager(props) {
         break;
     
     case 'games':
-        Content = <GamesView cards={props.cards} />; // تم استخدام المكون المحدث
-        LayoutWrapper = ArcadeLayout; // <--- لاحظ تغيير القالب
+        Content = <GamesView cards={props.cards} />;
+        LayoutWrapper = ArcadeLayout;
         break;
 
     case 'study':
         Content = <StudyView {...props} />;
-        LayoutWrapper = FocusLayout; // <--- قالب التركيز
+        LayoutWrapper = FocusLayout;
         break;
 
     case 'category':
         Content = <CategorySelect {...props} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
-        LayoutWrapper = FocusLayout; // اختيار الفئة جزء من الدراسة
+        LayoutWrapper = FocusLayout;
         break;
 
     case 'data':
         Content = <DataView {...props} />;
-        LayoutWrapper = ArchiveLayout; // <--- قالب الأرشيف
+        LayoutWrapper = ArchiveLayout;
         break;
 
     case 'leaderboard':
         Content = <LeaderboardView {...props} />;
-        LayoutWrapper = HubLayout;
+        LayoutWrapper = HoloDeckLayout; // <--- القالب الجديد للمتصدرين
         break;
     
     case 'chat':
         Content = <CommunicationHub user={props.user} />;
-        LayoutWrapper = HubLayout; // الشات يناسبه الهب
+        LayoutWrapper = CommsLayout; // <--- القالب الجديد للشات
         break;
 
     case 'live':
         Content = <LiveView />;
-        LayoutWrapper = HubLayout;
+        LayoutWrapper = CommsLayout; // البث المباشر يستخدم نفس قالب الاتصالات
         break;
 
     case 'settings':
         Content = <SettingsViewWrapper {...props} />;
-        LayoutWrapper = ArchiveLayout; // الإعدادات تناسب الأرشيف
+        LayoutWrapper = ConfigLayout; // <--- القالب الجديد للإعدادات
         break;
 
     default:
@@ -92,10 +102,10 @@ export default function ViewManager(props) {
     <AnimatePresence mode="wait">
         <motion.div 
             key={currentView}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.02 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
             className="w-full h-full"
         >
             <LayoutWrapper>
