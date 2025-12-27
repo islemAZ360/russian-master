@@ -345,13 +345,12 @@ import { GridBackground } from '../components/ui/GridBackground';
 import { CyberHUD } from '../components/ui/CyberHUD';
 import { AuthScreen } from '../components/AuthScreen'; 
 
-// Hooks & Libs
 import { useStudySystem } from '../hooks/useStudySystem';
 import { useAudio } from '../hooks/useAudio';
 import { db } from '../lib/firebase';
 import { doc, onSnapshot } from "firebase/firestore";
 
-// المكون الرئيسي الذي يعيش داخل الـ Providers
+// المكون الداخلي للتطبيق
 function MainApp() {
   const { user, loading, isAdmin, isJunior } = useAuth();
   const { 
@@ -364,15 +363,14 @@ function MainApp() {
   const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0 });
   const containerRef = useRef(null);
 
-  // استخدام الهوك للبيانات
+  // استدعاء نظام الدراسة (الذي تم إصلاحه ليعرض البيانات فوراً)
   const { 
     cards, currentCard, stats, handleSwipe, resetProgress, 
-    addCard, deleteCard, updateCard, isBanned 
+    addCard, deleteCard, updateCard 
   } = useStudySystem(user);
 
   const { speak, playSFX } = useAudio();
 
-  // تأثير الماوس
   const handleMouseMove = (e) => {
     if (!containerRef.current) return;
     const { left, top } = containerRef.current.getBoundingClientRect();
@@ -382,7 +380,6 @@ function MainApp() {
     containerRef.current.style.setProperty("--mouse-y", `${y}px`);
   };
 
-  // الاستماع للبث
   useEffect(() => {
     const unsubBroad = onSnapshot(doc(db, "system", "broadcast"), (d) => setBroadcast(d.exists() && d.data().active ? d.data().message : null));
     return () => unsubBroad();
@@ -393,7 +390,6 @@ function MainApp() {
       return [...new Set(cards.map(c => c.category || "General"))];
   }, [cards]);
 
-  // روابط التنقل
   let navLinks = [
     { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
     { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
@@ -408,11 +404,11 @@ function MainApp() {
   if (isJunior) navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin_panel') });
   if (!isAdmin) navLinks.push({ title: "Support", icon: <IconLifebuoy className="w-full text-orange-500" />, onClick: () => setShowSupport(true) });
 
-  // Renders
+  // هنا التغيير الجذري: لا نمنع العرض إذا كان Loading، بل نعرض Intro فقط
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
-  if (isBanned) return <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-red-500 space-y-6 font-mono"><h1 className="text-6xl font-black">ACCESS DENIED</h1><p className="text-white/50">Your Neural Link has been severed.</p></div>;
-  if (loading) return <div className="h-screen bg-black text-cyan-500 flex items-center justify-center font-mono animate-pulse">LOADING NEURAL LINK...</div>;
-  if (!user) return <AuthScreen onLoginSuccess={() => {}} />;
+  
+  // إذا انتهى الـ Loading وما زال لا يوجد مستخدم، اعرض شاشة الدخول
+  if (!loading && !user) return <AuthScreen onLoginSuccess={() => {}} />;
 
   return (
     <div 
@@ -420,7 +416,6 @@ function MainApp() {
       onMouseMove={handleMouseMove}
       className="relative h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black spotlight-bg"
     >
-      {/* Backgrounds - تختفي في وضع الأدمن */}
       {!(isAdmin && currentView === 'admin_panel') && (
           <>
             <GridBackground /> 
@@ -430,13 +425,12 @@ function MainApp() {
           </>
       )}
       
-      {/* Modals & Overlays */}
       {activeOverlayGame === 'time_traveler' && <TimeTraveler onClose={() => setActiveOverlayGame(null)} />}
       {showSupport && <SupportModal user={user} onClose={() => setShowSupport(false)} />}
       
       <AnimatePresence>
         {broadcast && (
-            <motion.div initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} className="fixed top-0 w-full bg-red-900/90 text-white text-center py-3 z-[100] font-bold shadow-[0_0_20px_#ff0000]">
+            <motion.div initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} className="fixed top-0 w-full bg-red-900/90 text-white text-center py-3 z-[100] font-bold">
                 {broadcast}
             </motion.div>
         )}
@@ -460,7 +454,6 @@ function MainApp() {
            />
       </main>
 
-      {/* القائمة السفلية - تختفي في وضع الأدمن */}
       {!(isAdmin && currentView === 'admin_panel') && (
           <div className="fixed bottom-8 left-0 w-full z-50 flex justify-center pointer-events-none">
               <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="pointer-events-auto">
@@ -531,300 +524,345 @@ FILE: components\AdminDashboard.jsx
 ==================================================================
 
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, orderBy, addDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, query, orderBy, deleteDoc } from "firebase/firestore";
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  IconShield, IconUser, IconActivity, IconChartBar, 
-  IconBroadcast, IconSearch, IconCpu, IconMessage2, 
-  IconLock, IconLockOpen, IconTrash, IconEye
+  IconShieldLock, IconUsers, IconActivity, IconLayoutDashboard, 
+  IconBroadcast, IconSearch, IconMessage2, IconLogout, 
+  IconTerminal2, IconCpu, IconServer, IconEye, IconBan, IconCheck, IconTrash
 } from '@tabler/icons-react';
 
 export default function AdminDashboard({ currentUser }) {
-  const [activeView, setActiveView] = useState('overview'); 
+  const [isBooting, setIsBooting] = useState(true);
+  const [activeView, setActiveView] = useState('overview');
   const [users, setUsers] = useState([]);
   const [tickets, setTickets] = useState([]);
   const [broadcastMsg, setBroadcastMsg] = useState("");
-  const [selectedUser, setSelectedUser] = useState(null); // لعرض تفاصيل مستخدم أو مراسلته
+  const [logs, setLogs] = useState([]);
 
-  // 1. جلب المستخدمين
+  // --- محاكاة إقلاع النظام (Boot Sequence) ---
   useEffect(() => {
-    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => 
-      setUsers(snap.docs.map(d => ({id: d.id, ...d.data()})))
-    );
-    return () => unsubUsers();
+    // إضافة سجلات وهمية لتبدو وكأن النظام يعمل
+    addLog("SYSTEM_INIT_SEQUENCE_STARTED");
+    setTimeout(() => addLog("LOADING_CORE_MODULES..."), 500);
+    setTimeout(() => addLog("CONNECTING_TO_MAINFRAME..."), 1200);
+    setTimeout(() => addLog("ENCRYPTION_KEY_VERIFIED"), 1800);
+    setTimeout(() => {
+        addLog("ACCESS_GRANTED");
+        setIsBooting(false);
+    }, 2500);
   }, []);
 
-  // 2. جلب تذاكر الدعم
+  // --- جلب البيانات من Firebase ---
   useEffect(() => {
-    const q = query(collection(db, "support_tickets"), orderBy("lastUpdate", "desc"));
-    const unsubTickets = onSnapshot(q, (snap) => 
-        setTickets(snap.docs.map(d => ({id: d.id, ...d.data()})))
-    );
-    return () => unsubTickets();
+    // 1. المستخدمين
+    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
+      setUsers(snap.docs.map(d => ({id: d.id, ...d.data()})));
+      addLog(`DATA_SYNC: ${snap.docs.length} USERS LOADED`);
+    });
+
+    // 2. التذاكر
+    const qTickets = query(collection(db, "support_tickets"), orderBy("lastUpdate", "desc"));
+    const unsubTickets = onSnapshot(qTickets, (snap) => {
+        setTickets(snap.docs.map(d => ({id: d.id, ...d.data()})));
+        addLog(`DATA_SYNC: TICKETS UPDATED`);
+    });
+
+    return () => { unsubUsers(); unsubTickets(); };
   }, []);
 
-  // --- ACTIONS ---
-
-  const handleRoleChange = async (targetUid, newRole, targetEmail) => {
-      // قانون التحريم: لا يمكن لمستخدم عادي تعديل الماستر
-      if (targetEmail === 'islamaz@bomba.com') {
-          alert("خطأ: لا يمكن تعديل رتبة القائد الأعلى (Master).");
-          return;
-      }
-      await updateDoc(doc(db, "users", targetUid), { role: newRole });
+  // --- دوال مساعدة ---
+  const addLog = (msg) => {
+      setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 50));
   };
 
-  const toggleBan = async (user) => {
-      if (user.email === 'islamaz@bomba.com') return;
-      await updateDoc(doc(db, "users", user.id), { isBanned: !user.isBanned });
+  const handleRoleChange = async (uid, role, email) => {
+      if (email === 'islamaz@bomba.com') {
+          alert("ACCESS DENIED: CANNOT MODIFY SUPREME COMMANDER.");
+          return;
+      }
+      await updateDoc(doc(db, "users", uid), { role });
+      addLog(`ACTION: ROLE_CHANGE FOR ${email} -> ${role}`);
+  };
+  
+  const toggleBan = async (uid, currentStatus, email) => {
+      if (email === 'islamaz@bomba.com') return;
+      await updateDoc(doc(db, "users", uid), { isBanned: !currentStatus });
+      addLog(`ACTION: BAN_STATUS_CHANGED FOR ${email}`);
+  };
+
+  const deleteTicket = async (id) => {
+      if(confirm("CONFIRM DELETION?")) {
+        await deleteDoc(doc(db, "support_tickets", id));
+        addLog(`ACTION: TICKET ${id} DELETED`);
+      }
   };
 
   const sendBroadcast = async () => {
     if(!broadcastMsg) return;
     await updateDoc(doc(db, "system", "broadcast"), { 
-        message: broadcastMsg, 
-        active: true,
-        sentBy: currentUser.email,
-        timestamp: new Date().toISOString()
+        message: broadcastMsg, active: true, sentBy: currentUser.email, timestamp: new Date().toISOString()
     });
-    alert("تم إرسال الرسالة العامة لجميع الوحدات.");
     setBroadcastMsg("");
+    alert("TRANSMISSION SENT SUCCESSFULLY");
+    addLog("ACTION: GLOBAL_BROADCAST_SENT");
   };
 
-  const replyToTicket = async (ticketId, reply) => {
-      // إضافة رد على تذكرة
-      // ... (يمكن تنفيذها بفتح مودال)
-      alert("خاصية الرد قيد التطوير في النسخة 2.1");
+  const exitSystem = () => {
+      document.body.style.opacity = '0';
+      document.body.style.transition = 'opacity 1s ease';
+      setTimeout(() => window.location.reload(), 1000);
   };
 
+  // --- شاشة الإقلاع ---
+  if (isBooting) return <BootScreen logs={logs} />;
+
+  // --- الواجهة الرئيسية ---
   return (
-    // التصميم: أبيض وأسود صارم (Monochrome Corporate)
-    <div className="w-full h-screen bg-[#f5f5f5] text-black font-mono flex overflow-hidden selection:bg-black selection:text-white">
+    <div className="flex h-screen w-full bg-[#050505] text-[#00ff00] font-mono overflow-hidden selection:bg-[#00ff00] selection:text-black border-4 border-[#003300]">
       
       {/* SIDEBAR */}
-      <div className="w-64 bg-black text-white flex flex-col border-r border-gray-800 shadow-2xl shrink-0">
-        <div className="p-6 border-b border-gray-800">
-            <h1 className="text-2xl font-black tracking-tighter">NEXUS<span className="text-gray-500">ADMIN</span></h1>
-            <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">
-                Level 5 Clearance
-            </p>
+      <nav className="w-20 lg:w-72 border-r border-[#003300] flex flex-col bg-black/90 shrink-0 relative z-20 shadow-[10px_0_50px_rgba(0,50,0,0.1)]">
+        <div className="p-6 border-b border-[#003300] flex items-center gap-3">
+            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_red]"></div>
+            <div>
+                <h1 className="text-xl font-black tracking-[0.2em] text-white">
+                    NEXUS<span className="text-[#00ff00]">OS</span>
+                </h1>
+                <p className="text-[9px] text-[#008800] mt-1">SECURE TERMINAL V4.0</p>
+            </div>
         </div>
-        
-        <nav className="flex-1 p-4 space-y-2">
-            <MenuBtn id="overview" label="لوحة القيادة" icon={IconChartBar} active={activeView} set={setActiveView} />
-            <MenuBtn id="users" label="المستخدمين والرتب" icon={IconUser} active={activeView} set={setActiveView} />
-            <MenuBtn id="support" label="مركز الدعم والشكاوى" icon={IconMessage2} active={activeView} set={setActiveView} badge={tickets.length} />
-            <MenuBtn id="broadcast" label="البث العام" icon={IconBroadcast} active={activeView} set={setActiveView} />
-        </nav>
 
-        <div className="p-4 border-t border-gray-800 text-xs text-gray-500 text-center">
-            SYSTEM V.2.0 <br/> SECURE CONNECTION
+        <div className="flex-1 py-6 space-y-1 px-2">
+            <div className="text-[10px] text-[#004400] mb-2 px-4">/// NAVIGATION MODULES</div>
+            <NavBtn id="overview" label="COMMAND DASHBOARD" icon={IconLayoutDashboard} active={activeView} set={setActiveView} />
+            <NavBtn id="users" label="OPERATIVE ROSTER" icon={IconUsers} active={activeView} set={setActiveView} />
+            <NavBtn id="support" label="COMMUNICATIONS" icon={IconMessage2} active={activeView} set={setActiveView} badge={tickets.length} />
+            <NavBtn id="broadcast" label="GLOBAL BROADCAST" icon={IconBroadcast} active={activeView} set={setActiveView} />
         </div>
-      </div>
+
+        {/* LOG TERMINAL MINI */}
+        <div className="h-32 border-t border-[#003300] bg-black p-2 overflow-hidden text-[9px] text-[#005500] font-mono opacity-50 hidden lg:block">
+            {logs.map((log, i) => <div key={i} className="truncate">{log}</div>)}
+        </div>
+
+        <button onClick={exitSystem} className="p-4 border-t border-[#003300] hover:bg-red-900/20 text-red-500 flex items-center justify-center lg:justify-start gap-3 transition-all font-bold hover:tracking-widest">
+            <IconLogout size={20} />
+            <span className="hidden lg:block">TERMINATE SESSION</span>
+        </button>
+      </nav>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 overflow-y-auto bg-white p-8">
-        
-        {/* OVERVIEW */}
-        {activeView === 'overview' && (
-            <div className="space-y-8 animate-in fade-in duration-500">
-                <h2 className="text-3xl font-black border-b-4 border-black pb-2 mb-6">تقرير الحالة</h2>
-                <div className="grid grid-cols-4 gap-6">
-                    <StatBox title="إجمالي المستخدمين" value={users.length} />
-                    <StatBox title="تذاكر مفتوحة" value={tickets.length} highlight />
-                    <StatBox title="إجمالي XP" value={users.reduce((a,b)=>a+(b.xp||0),0)} />
-                    <StatBox title="حالات الحظر" value={users.filter(u=>u.isBanned).length} />
+      <main className="flex-1 flex flex-col relative overflow-hidden bg-[radial-gradient(circle_at_center,#0a1a0a_0%,#000000_100%)]">
+        {/* Grid Overlay */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,0,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,0,0.03)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none z-0"></div>
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-5 pointer-events-none"></div>
+
+        {/* Top Header */}
+        <header className="h-16 border-b border-[#003300] flex items-center justify-between px-8 bg-black/40 relative z-10 backdrop-blur-sm">
+            <div className="flex gap-8 text-xs text-[#006600] font-bold">
+                <div className="flex items-center gap-2"><IconServer size={14} className="text-[#00ff00]"/> SERVER: ONLINE</div>
+                <div className="flex items-center gap-2"><IconCpu size={14}/> CPU: 4%</div>
+                <div className="flex items-center gap-2"><IconActivity size={14}/> MEM: 64TB</div>
+            </div>
+            <div className="text-right flex items-center gap-4">
+                <div>
+                    <div className="text-xs font-bold text-white tracking-wider">{currentUser.email.toUpperCase()}</div>
+                    <div className="text-[9px] text-[#00ff00]">SUPREME COMMANDER</div>
                 </div>
-                
-                {/* User Growth Chart Placeholder */}
-                <div className="h-64 bg-gray-100 border border-gray-300 flex items-center justify-center rounded-sm">
-                    <p className="text-gray-400 text-sm">[ رسم بياني لنشاط الموقع يظهر هنا ]</p>
+                <div className="w-8 h-8 border border-[#00ff00] flex items-center justify-center bg-[#00ff00]/10">
+                    <IconShieldLock size={16} />
                 </div>
             </div>
-        )}
+        </header>
 
-        {/* USER MANAGEMENT (THE POWER TOOL) */}
-        {activeView === 'users' && (
-            <div className="space-y-6 animate-in fade-in duration-500">
-                <div className="flex justify-between items-center border-b-4 border-black pb-2">
-                    <h2 className="text-3xl font-black">إدارة المستخدمين</h2>
-                    <div className="relative">
-                        <IconSearch className="absolute right-3 top-2.5 text-gray-400" size={18} />
-                        <input placeholder="بحث عن عميل..." className="bg-gray-100 border border-gray-300 rounded-none py-2 pr-10 pl-4 w-64 focus:bg-white focus:border-black outline-none text-sm transition-all" />
-                    </div>
-                </div>
-
-                <div className="overflow-hidden border border-gray-200 shadow-sm">
-                    <table className="w-full text-right text-sm">
-                        <thead className="bg-black text-white uppercase tracking-wider">
-                            <tr>
-                                <th className="p-4">المستخدم</th>
-                                <th className="p-4">البريد الإلكتروني</th>
-                                <th className="p-4">الرتبة الحالية</th>
-                                <th className="p-4">النقاط (XP)</th>
-                                <th className="p-4 text-center">الإجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {users.map(u => {
-                                const isTargetMaster = u.email === 'islamaz@bomba.com';
-                                return (
-                                    <tr key={u.id} className={`hover:bg-gray-50 transition-colors ${u.isBanned ? 'bg-red-50' : ''}`}>
-                                        <td className="p-4 font-bold">{u.id.substring(0,8)}...</td>
-                                        <td className="p-4 font-mono">{u.email}</td>
-                                        <td className="p-4">
-                                            {isTargetMaster ? (
-                                                <span className="bg-black text-white px-2 py-1 text-xs font-bold rounded">MASTER</span>
-                                            ) : (
-                                                <select 
-                                                    value={u.role || 'user'} 
-                                                    onChange={(e) => handleRoleChange(u.id, e.target.value, u.email)}
-                                                    className="bg-white border border-gray-300 px-2 py-1 text-xs focus:border-black outline-none cursor-pointer"
-                                                >
-                                                    <option value="user">مستخدم</option>
-                                                    <option value="junior_admin">أدمن مساعد</option>
-                                                    <option value="admin">أدمن</option>
-                                                </select>
-                                            )}
-                                        </td>
-                                        <td className="p-4">{u.xp}</td>
-                                        <td className="p-4 flex justify-center gap-2">
-                                            <button onClick={() => setSelectedUser(u)} className="p-2 border border-gray-300 hover:bg-black hover:text-white transition-colors" title="عرض الملف">
-                                                <IconEye size={16}/>
-                                            </button>
-                                            {!isTargetMaster && (
-                                                <button 
-                                                    onClick={() => toggleBan(u)} 
-                                                    className={`p-2 border transition-colors ${u.isBanned ? 'bg-red-600 text-white border-red-600' : 'border-gray-300 hover:bg-red-600 hover:text-white'}`}
-                                                    title={u.isBanned ? "إلغاء الحظر" : "حظر المستخدم"}
-                                                >
-                                                    {u.isBanned ? <IconLockOpen size={16}/> : <IconLock size={16}/>}
-                                                </button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        )}
-
-        {/* SUPPORT & TICKETS */}
-        {activeView === 'support' && (
-            <div className="space-y-6 animate-in fade-in duration-500">
-                <h2 className="text-3xl font-black border-b-4 border-black pb-2">مركز الشكاوى</h2>
-                
-                <div className="grid gap-4">
-                    {tickets.length === 0 ? (
-                        <div className="text-center py-10 text-gray-400">لا توجد رسائل جديدة.</div>
-                    ) : (
-                        tickets.map(ticket => (
-                            <div key={ticket.id} className="bg-white border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col md:flex-row gap-4">
-                                <div className="md:w-1/4 border-l border-gray-100 pl-4">
-                                    <div className="font-bold text-lg mb-1">{ticket.userEmail}</div>
-                                    <div className="text-xs text-gray-500 mb-2">UID: {ticket.userId}</div>
-                                    <div className={`text-xs px-2 py-1 inline-block rounded ${ticket.status === 'open' ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
-                                        {ticket.status === 'open' ? 'مفتوح' : 'مغلق'}
-                                    </div>
-                                </div>
-                                <div className="flex-1">
-                                    <div className="bg-gray-50 p-4 rounded-lg text-sm mb-4 max-h-40 overflow-y-auto">
-                                        {ticket.messages && ticket.messages.map((m, i) => (
-                                            <div key={i} className={`mb-2 p-2 rounded ${m.sender === 'user' ? 'bg-white border border-gray-200' : 'bg-black text-white ml-auto w-fit'}`}>
-                                                <p>{m.text}</p>
-                                                <span className="text-[10px] opacity-50 block mt-1">{new Date(m.createdAt).toLocaleString()}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <button onClick={() => alert("سيتم فتح نافذة الرد هنا")} className="bg-black text-white px-4 py-2 text-sm hover:opacity-80">
-                                        فتح المحادثة والرد
-                                    </button>
-                                </div>
+        {/* Content Container */}
+        <div className="flex-1 overflow-y-auto p-8 relative z-10 custom-scrollbar">
+            
+            <AnimatePresence mode="wait">
+                {activeView === 'overview' && (
+                    <motion.div initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-10}} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <KpiCard title="TOTAL OPERATIVES" value={users.length} icon={IconUsers} />
+                            <KpiCard title="OPEN TICKETS" value={tickets.length} icon={IconMessage2} warning={tickets.length > 0} />
+                            <KpiCard title="SYSTEM XP" value={users.reduce((a,b)=>a+(b.xp||0),0)} icon={IconActivity} />
+                            <KpiCard title="BANNED UNITS" value={users.filter(u=>u.isBanned).length} icon={IconBan} danger />
+                        </div>
+                        
+                        <div className="border border-[#003300] bg-black/60 p-6 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-2 opacity-20"><IconTerminal2 size={100}/></div>
+                            <h3 className="text-lg font-bold mb-4 text-white border-b border-[#003300] pb-2 inline-block">LIVE SYSTEM LOGS</h3>
+                            <div className="font-mono text-xs text-[#00aa00] space-y-1 h-64 overflow-y-auto custom-scrollbar">
+                                {logs.map((log, i) => <div key={i} className="border-l-2 border-[#003300] pl-2">{log}</div>)}
                             </div>
-                        ))
-                    )}
-                </div>
-            </div>
-        )}
+                        </div>
+                    </motion.div>
+                )}
 
-        {/* BROADCAST SYSTEM */}
-        {activeView === 'broadcast' && (
-            <div className="max-w-2xl mx-auto mt-10 animate-in fade-in duration-500">
-                <div className="bg-white border-2 border-black p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-                    <h2 className="text-2xl font-black mb-6 flex items-center gap-2">
-                        <IconBroadcast /> بروتوكول البث العام
-                    </h2>
-                    <p className="mb-4 text-sm text-gray-600">
-                        تحذير: هذه الرسالة ستظهر لجميع المستخدمين المتصلين فوراً في أعلى شاشتهم.
-                    </p>
-                    <textarea 
-                        value={broadcastMsg}
-                        onChange={(e) => setBroadcastMsg(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-300 p-4 text-sm focus:border-black outline-none h-32 resize-none mb-4"
-                        placeholder="اكتب رسالة النظام هنا..."
-                    />
-                    <button 
-                        onClick={sendBroadcast}
-                        disabled={!broadcastMsg}
-                        className="w-full bg-black text-white py-4 font-bold text-lg hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                    >
-                        إرسال الإشارة
-                    </button>
-                </div>
-            </div>
-        )}
+                {activeView === 'users' && (
+                    <motion.div initial={{opacity:0}} animate={{opacity:1}} className="space-y-4">
+                        <div className="flex justify-between items-center bg-[#001100] border border-[#003300] p-4">
+                            <h2 className="text-xl font-bold text-white tracking-widest">OPERATIVE DATABASE</h2>
+                            <div className="relative">
+                                <IconSearch className="absolute right-3 top-2.5 text-[#005500]" size={16}/>
+                                <input className="bg-black border border-[#004400] text-[#00ff00] pl-4 pr-10 py-2 w-64 focus:border-[#00ff00] outline-none text-sm placeholder:text-[#004400]" placeholder="SEARCH ID..." />
+                            </div>
+                        </div>
+                        <div className="grid gap-1">
+                            {users.map((u) => (
+                                <div key={u.id} className="flex items-center justify-between p-3 bg-black/80 border-l-2 border-[#003300] hover:border-[#00ff00] hover:bg-[#001a00] transition-all group">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-1.5 h-1.5 ${u.isBanned ? 'bg-red-500 box-shadow-red' : 'bg-[#00ff00] box-shadow-green'}`}></div>
+                                        <div>
+                                            <div className="font-bold text-white text-sm">{u.email}</div>
+                                            <div className="text-[10px] text-[#006600] font-mono">{u.id}</div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-6">
+                                        <span className="text-xs font-mono text-[#008800]">{u.xp} XP</span>
+                                        <select 
+                                            value={u.role || 'user'} 
+                                            onChange={(e) => handleRoleChange(u.id, e.target.value, u.email)}
+                                            className="bg-black border border-[#004400] text-xs py-1 px-2 text-white focus:border-[#00ff00] outline-none uppercase"
+                                            disabled={u.email === 'islamaz@bomba.com'}
+                                        >
+                                            <option value="user">USER</option>
+                                            <option value="admin">ADMIN</option>
+                                            <option value="master">MASTER</option>
+                                        </select>
+                                        
+                                        {u.email !== 'islamaz@bomba.com' && (
+                                            <button 
+                                                onClick={() => toggleBan(u.id, u.isBanned, u.email)}
+                                                className={`p-1.5 border ${u.isBanned ? 'border-green-500 text-green-500' : 'border-red-900 text-red-700 hover:text-red-500 hover:border-red-500'} transition-all`}
+                                                title={u.isBanned ? "REVOKE BAN" : "EXECUTE BAN"}
+                                            >
+                                                {u.isBanned ? <IconCheck size={14} /> : <IconBan size={14} />}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
 
-      </div>
+                {activeView === 'support' && (
+                    <motion.div initial={{opacity:0}} animate={{opacity:1}} className="grid gap-4">
+                        {tickets.length === 0 ? (
+                            <div className="text-center py-20 text-[#004400] text-xl">NO ACTIVE TRANSMISSIONS</div>
+                        ) : (
+                            tickets.map(t => (
+                                <div key={t.id} className="bg-black border border-[#003300] p-4 flex flex-col md:flex-row gap-4 hover:border-[#005500] transition-all">
+                                    <div className="md:w-1/4 border-l-2 border-[#00ff00] pl-3">
+                                        <div className="text-white font-bold">{t.userEmail}</div>
+                                        <div className="text-[10px] text-[#006600]">{new Date(t.lastUpdate).toLocaleString()}</div>
+                                        <div className="mt-2 text-xs bg-[#002200] inline-block px-2 py-0.5 text-[#00ff00] border border-[#004400]">{t.status}</div>
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="bg-[#050505] p-3 text-sm text-[#00dd00] h-32 overflow-y-auto mb-2 font-mono border border-[#002200]">
+                                            {t.messages?.map((m, i) => (
+                                                <div key={i} className={`mb-1 ${m.sender === 'user' ? 'text-white' : 'text-[#00ff00] text-right'}`}>
+                                                    <span className="opacity-50 mr-2">[{m.sender === 'user' ? 'IN' : 'OUT'}]:</span>
+                                                    {m.text}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="flex justify-end gap-2">
+                                            <button onClick={() => deleteTicket(t.id)} className="text-red-700 hover:text-red-500 text-xs flex items-center gap-1"><IconTrash size={12}/> PURGE</button>
+                                            <button onClick={()=>alert('REPLY SYSTEM LOADING...')} className="bg-[#003300] text-white px-4 py-1 text-xs hover:bg-[#005500]">RESPOND</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </motion.div>
+                )}
 
-      {/* USER DETAILS MODAL (Simple overlay) */}
-      {selectedUser && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm" onClick={() => setSelectedUser(null)}>
-              <div className="bg-white p-8 max-w-lg w-full shadow-2xl border-2 border-black" onClick={e => e.stopPropagation()}>
-                  <h3 className="text-2xl font-black mb-4">بيانات العميل</h3>
-                  <div className="space-y-2 text-sm">
-                      <p><strong>ID:</strong> {selectedUser.id}</p>
-                      <p><strong>Email:</strong> {selectedUser.email}</p>
-                      <p><strong>XP:</strong> {selectedUser.xp}</p>
-                      <p><strong>Last Login:</strong> {selectedUser.lastLogin || 'N/A'}</p>
-                  </div>
-                  
-                  <div className="mt-6 border-t pt-4">
-                      <h4 className="font-bold mb-2">تعديل الرصيد (XP)</h4>
-                      <div className="flex gap-2">
-                          <button onClick={async () => { await updateDoc(doc(db, "users", selectedUser.id), { xp: (selectedUser.xp || 0) + 100 }); alert("تمت الزيادة"); }} className="bg-green-600 text-white px-4 py-2 text-xs">+100 XP</button>
-                          <button onClick={async () => { await updateDoc(doc(db, "users", selectedUser.id), { xp: Math.max(0, (selectedUser.xp || 0) - 100) }); alert("تم الخصم"); }} className="bg-red-600 text-white px-4 py-2 text-xs">-100 XP</button>
-                      </div>
-                  </div>
+                {activeView === 'broadcast' && (
+                    <motion.div initial={{opacity:0, scale:0.95}} animate={{opacity:1, scale:1}} className="max-w-2xl mx-auto mt-10">
+                        <div className="bg-black border-2 border-red-900 p-1 relative">
+                            {/* Danger Stripes */}
+                            <div className="absolute top-0 left-0 w-full h-2 bg-[repeating-linear-gradient(45deg,#330000,#330000_10px,#ff0000_10px,#ff0000_20px)] opacity-50"></div>
+                            <div className="absolute bottom-0 left-0 w-full h-2 bg-[repeating-linear-gradient(45deg,#330000,#330000_10px,#ff0000_10px,#ff0000_20px)] opacity-50"></div>
+                            
+                            <div className="p-8 border border-red-900/30 bg-[#050000]">
+                                <h2 className="text-3xl font-black text-red-600 mb-6 flex items-center gap-3 tracking-tighter">
+                                    <IconBroadcast size={32} className="animate-pulse"/> EMERGENCY BROADCAST
+                                </h2>
+                                <p className="text-red-900 text-xs mb-1 uppercase">Transmission Message:</p>
+                                <textarea 
+                                    value={broadcastMsg}
+                                    onChange={(e) => setBroadcastMsg(e.target.value)}
+                                    className="w-full h-40 bg-black border border-red-900/50 p-4 text-red-50 focus:border-red-500 outline-none font-mono mb-6 resize-none"
+                                    placeholder="ENTER SYSTEM-WIDE ALERT..."
+                                />
+                                <button 
+                                    onClick={sendBroadcast}
+                                    disabled={!broadcastMsg}
+                                    className="w-full py-4 bg-red-900/20 border border-red-600 text-red-500 font-black tracking-[0.3em] hover:bg-red-600 hover:text-black transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                    TRANSMIT SIGNAL
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-                  <button onClick={() => setSelectedUser(null)} className="mt-6 w-full border border-black py-2 hover:bg-black hover:text-white transition-colors">إغلاق</button>
-              </div>
-          </div>
-      )}
-
+        </div>
+      </main>
     </div>
   );
 }
 
-const MenuBtn = ({ id, label, icon: Icon, active, set, badge }) => (
+// --- Sub Components ---
+
+const NavBtn = ({ id, label, icon: Icon, active, set, badge }) => (
     <button 
         onClick={() => set(id)}
-        className={`w-full flex items-center justify-between p-3 text-sm font-bold transition-all ${active === id ? 'bg-white text-black translate-x-2' : 'text-gray-400 hover:text-white hover:bg-gray-900'}`}
+        className={`w-full flex items-center gap-4 px-6 py-3 transition-all relative group ${active === id ? 'bg-[#003300] text-white border-l-4 border-[#00ff00]' : 'text-[#005500] hover:text-[#00aa00] hover:bg-[#001100]'}`}
     >
-        <div className="flex items-center gap-3">
-            <Icon size={18} />
-            <span>{label}</span>
-        </div>
-        {badge > 0 && <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full">{badge}</span>}
+        <Icon size={18} className={active === id ? "text-[#00ff00]" : "text-[#004400] group-hover:text-[#008800]"} />
+        <span className="text-[10px] font-bold tracking-[0.2em]">{label}</span>
+        {badge > 0 && <span className="absolute right-4 bg-red-600 text-white text-[9px] w-5 h-5 flex items-center justify-center font-bold">{badge}</span>}
     </button>
 );
 
-const StatBox = ({ title, value, highlight }) => (
-    <div className={`p-6 border ${highlight ? 'bg-black text-white border-black' : 'bg-white border-gray-200'} shadow-sm`}>
-        <div className="text-3xl font-black mb-1">{value}</div>
-        <div className={`text-xs uppercase tracking-widest ${highlight ? 'text-gray-400' : 'text-gray-500'}`}>{title}</div>
+const KpiCard = ({ title, value, icon: Icon, warning, danger }) => (
+    <div className={`p-6 bg-black border relative overflow-hidden group ${danger ? 'border-red-900 text-red-500' : warning ? 'border-yellow-900 text-yellow-500' : 'border-[#003300] text-[#00ff00]'}`}>
+        <div className="flex justify-between items-start mb-2">
+            <Icon size={28} className="opacity-50" />
+            <div className={`text-4xl font-black ${danger ? 'text-red-600' : warning ? 'text-yellow-600' : 'text-white'}`}>{value}</div>
+        </div>
+        <div className="text-[9px] tracking-[0.3em] uppercase opacity-70 border-t border-current pt-2 mt-2">{title}</div>
+        <div className="absolute inset-0 bg-current opacity-0 group-hover:opacity-5 transition-opacity"></div>
+    </div>
+);
+
+const BootScreen = ({ logs }) => (
+    <div className="h-screen w-full bg-black flex flex-col items-center justify-center font-mono text-[#00ff00] p-4">
+        <div className="w-full max-w-2xl border border-[#003300] p-1 bg-[#050505]">
+            <div className="bg-[#001100] p-2 flex justify-between items-center border-b border-[#003300] mb-2">
+                <span className="text-xs font-bold">NEXUS_BOOT_LOADER_V4.0</span>
+                <div className="flex gap-1"><div className="w-2 h-2 bg-[#00ff00]"></div><div className="w-2 h-2 bg-[#00ff00] opacity-50"></div></div>
+            </div>
+            <div className="h-64 overflow-hidden flex flex-col justify-end p-4 space-y-1 text-xs opacity-80">
+                {logs.slice().reverse().map((log, i) => (
+                    <div key={i} className="font-mono">{log}</div>
+                ))}
+            </div>
+            <div className="h-2 w-full bg-[#002200] mt-2 relative overflow-hidden">
+                <motion.div 
+                    initial={{x:"-100%"}} 
+                    animate={{x:"100%"}} 
+                    transition={{duration:1.5, repeat:Infinity, ease:"linear"}} 
+                    className="absolute top-0 left-0 w-1/3 h-full bg-[#00ff00] opacity-50"
+                />
+            </div>
+        </div>
     </div>
 );
 
@@ -3740,6 +3778,249 @@ export default function IntroSequence({ onComplete }) {
 
 
 ==================================================================
+FILE: components\layouts\CyberLayout.jsx
+==================================================================
+
+"use client";
+import React from 'react';
+import { GridBackground } from '../ui/GridBackground';
+import { CyberHUD } from '../ui/CyberHUD';
+import DigitalRain from '../ui/DigitalRain';
+
+export default function CyberLayout({ children }) {
+  return (
+    <div className="relative h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black selection:bg-cyan-500/30">
+      {/* Background Layer */}
+      <div className="fixed inset-0 z-0">
+          <GridBackground />
+          <CyberHUD />
+          <DigitalRain />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40 pointer-events-none"></div>
+      </div>
+
+      {/* Content Layer - Centered Focus */}
+      <main className="relative z-10 w-full h-full flex flex-col">
+          {children}
+      </main>
+    </div>
+  );
+}
+
+
+==================================================================
+FILE: components\layouts\DistinctLayouts.jsx
+==================================================================
+
+"use client";
+import React from "react";
+import { IconDeviceGamepad, IconDatabase, IconCpu, IconWifi, IconTrophy, IconSettings } from "@tabler/icons-react";
+
+// --- Helper Components ---
+const NoiseOverlay = () => (
+  <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-5 pointer-events-none z-0 mix-blend-overlay"></div>
+);
+
+const GridOverlay = ({ color = "rgba(255,255,255,0.03)" }) => (
+  <div className="absolute inset-0 z-0 pointer-events-none" 
+       style={{backgroundImage: `linear-gradient(${color} 1px, transparent 1px), linear-gradient(90deg, ${color} 1px, transparent 1px)`, backgroundSize: '40px 40px'}}>
+  </div>
+);
+
+// 1. HUB LAYOUT (الرئيسية - مركز القيادة)
+export const HubLayout = ({ children }) => (
+  <div className="relative h-full w-full bg-[#030005] overflow-hidden flex flex-col">
+    <NoiseOverlay />
+    <div className="absolute inset-0 bg-gradient-to-b from-blue-900/10 via-transparent to-purple-900/10 pointer-events-none"></div>
+    {/* Abstract UI Elements */}
+    <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent"></div>
+    <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
+    <div className="relative z-10 w-full h-full flex flex-col">
+        {children}
+    </div>
+  </div>
+);
+
+// 2. ARCADE LAYOUT (الألعاب - محاكاة الواقع الافتراضي)
+export const ArcadeLayout = ({ children }) => (
+  <div className="relative h-full w-full bg-[#05010a] overflow-hidden font-mono text-fuchsia-400">
+    <GridOverlay color="rgba(217, 70, 239, 0.05)" />
+    <div className="absolute top-0 w-full h-32 bg-gradient-to-b from-fuchsia-900/20 to-transparent pointer-events-none"></div>
+    
+    {/* Header */}
+    <div className="absolute top-0 w-full p-4 flex justify-between items-center border-b border-fuchsia-500/20 backdrop-blur-md z-40">
+        <div className="flex items-center gap-2 text-fuchsia-500">
+            <IconDeviceGamepad size={18} />
+            <span className="text-sm font-bold tracking-[0.3em]">SIMULATION_MODE</span>
+        </div>
+        <div className="text-[10px] text-fuchsia-500/50">V.9.0.1</div>
+    </div>
+
+    <div className="relative z-10 w-full h-full pt-20 p-6 overflow-y-auto custom-scrollbar">
+        {children}
+    </div>
+  </div>
+);
+
+// 3. ARCHIVE LAYOUT (البيانات - أرشيف رقمي)
+export const ArchiveLayout = ({ children }) => (
+  <div className="relative h-full w-full bg-[#0a0a0a] text-orange-50 font-sans flex flex-col md:flex-row overflow-hidden">
+    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-900/10 via-[#0a0a0a] to-[#0a0a0a]"></div>
+    <GridOverlay color="rgba(249, 115, 22, 0.03)" />
+    
+    {/* Side Indicator */}
+    <div className="w-12 border-r border-orange-500/10 flex flex-col items-center py-6 gap-4 z-20 bg-[#0a0a0a]/80 backdrop-blur-sm">
+        <IconDatabase size={16} className="text-orange-500/50" />
+        <div className="flex-1 w-px bg-orange-500/10"></div>
+    </div>
+
+    <div className="flex-1 relative flex flex-col">
+        <div className="relative z-10 h-full overflow-y-auto custom-scrollbar p-6">
+            {children}
+        </div>
+    </div>
+  </div>
+);
+
+// 4. FOCUS LAYOUT (الدراسة - التركيز العميق)
+export const FocusLayout = ({ children }) => (
+    <div className="relative h-full w-full bg-[#020408] text-cyan-50 flex flex-col items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-cyan-900/10 via-[#020408] to-[#020408]"></div>
+        
+        {/* Focusing Brackets */}
+        <div className="absolute inset-20 border border-cyan-500/5 rounded-[3rem] pointer-events-none"></div>
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-[80vw] h-[1px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent"></div>
+        </div>
+
+        <div className="relative z-10 w-full h-full flex flex-col items-center justify-center">
+            {children}
+        </div>
+    </div>
+);
+
+// 5. COMMS LAYOUT (الشات - اتصالات مشفرة)
+export const CommsLayout = ({ children }) => (
+  <div className="relative h-full w-full bg-[#05080a] overflow-hidden text-emerald-100 flex">
+    <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(0,0,0,0.2)_50%,rgba(16,185,129,0.02)_50%)] bg-[size:100%_4px] pointer-events-none z-0"></div>
+    
+    {/* Header Strip */}
+    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500/0 via-emerald-500/50 to-emerald-500/0 z-50"></div>
+    
+    <div className="relative z-10 w-full h-full flex flex-col">
+        <div className="h-10 border-b border-emerald-500/10 flex items-center justify-between px-4 bg-emerald-950/10 backdrop-blur-md shrink-0">
+             <div className="flex items-center gap-2 text-emerald-500/70 text-[10px] tracking-widest font-mono">
+                 <IconWifi size={12} className="animate-pulse"/> ENCRYPTED_SIGNAL
+             </div>
+        </div>
+        {children}
+    </div>
+  </div>
+);
+
+// 6. HOLODECK LAYOUT (المتصدرين - قاعة الشرف)
+export const HoloDeckLayout = ({ children }) => (
+  <div className="relative h-full w-full bg-[#0b0a14] overflow-hidden text-yellow-100">
+    {/* Spotlight Effect */}
+    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[500px] bg-purple-500/10 blur-[120px] rounded-full pointer-events-none"></div>
+    <div className="absolute top-[-100px] left-1/2 -translate-x-1/2 w-1 h-[400px] bg-gradient-to-b from-yellow-500/0 via-yellow-500/30 to-yellow-500/0 blur-sm"></div>
+    
+    <div className="absolute top-6 left-6 border-l-2 border-t-2 border-yellow-500/30 w-8 h-8"></div>
+    <div className="absolute top-6 right-6 border-r-2 border-t-2 border-yellow-500/30 w-8 h-8"></div>
+
+    <div className="relative z-10 w-full h-full p-6 pt-20 overflow-y-auto custom-scrollbar flex flex-col items-center">
+        <div className="mb-6 flex items-center gap-2 text-yellow-500/60 text-xs font-bold tracking-[0.4em] uppercase border border-yellow-500/20 px-4 py-1 rounded-full">
+            <IconTrophy size={14} /> Hall of Champions
+        </div>
+        {children}
+    </div>
+  </div>
+);
+
+// 7. CONFIG LAYOUT (الإعدادات - لوحة النظام)
+export const ConfigLayout = ({ children }) => (
+  <div className="relative h-full w-full bg-[#080808] overflow-hidden text-gray-200 font-mono">
+    <GridOverlay color="rgba(255,255,255,0.02)" />
+    
+    <div className="absolute left-0 top-0 h-full w-24 border-r border-white/5 bg-white/1 flex flex-col items-center py-10 gap-6 z-20">
+         <IconSettings className="text-white/20 animate-spin-slow" size={24} />
+         <div className="h-full w-px bg-white/5"></div>
+    </div>
+
+    <div className="relative z-10 w-full h-full pl-24 p-8 overflow-y-auto">
+        {children}
+    </div>
+  </div>
+);
+
+
+==================================================================
+FILE: components\layouts\TerminalLayout.jsx
+==================================================================
+
+"use client";
+import React from 'react';
+import { IconShieldLock, IconTerminal2, IconLogout } from '@tabler/icons-react';
+
+export default function TerminalLayout({ children, onExit }) {
+  return (
+    <div className="min-h-screen w-full bg-[#050505] text-[#00ff00] font-mono flex overflow-hidden">
+      {/* طبقة CRT Line Effect */}
+      <div className="fixed inset-0 pointer-events-none z-50 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[size:100%_2px,3px_100%] opacity-20"></div>
+      
+      {/* 1. Sidebar ثابتة وقاسية (Hard Edges) */}
+      <aside className="w-64 border-r-2 border-[#00ff00]/30 bg-black flex flex-col shrink-0 z-40">
+        <div className="h-20 border-b-2 border-[#00ff00]/30 flex items-center px-6 gap-3">
+            <IconTerminal2 size={32} />
+            <div>
+                <h1 className="font-bold text-lg tracking-widest">NEXUS_OS</h1>
+                <p className="text-[10px] opacity-70">ADMIN_KERNEL_V4</p>
+            </div>
+        </div>
+        
+        <div className="flex-1 p-4 overflow-y-auto">
+            <div className="text-[10px] mb-2 opacity-50 uppercase">// Navigation Modules</div>
+            {/* القائمة ستمرر كـ Children لكن الهيكل هنا ثابت */}
+            <div id="admin-sidebar-slot"></div>
+        </div>
+
+        <button onClick={onExit} className="h-16 border-t-2 border-[#00ff00]/30 hover:bg-[#00ff00] hover:text-black transition-colors flex items-center justify-center gap-2 font-bold uppercase tracking-widest">
+            <IconLogout size={20} /> Terminate
+        </button>
+      </aside>
+
+      {/* 2. منطقة المحتوى (Raw Data Container) */}
+      <main className="flex-1 flex flex-col relative bg-[#0a0a0a]">
+        {/* Header */}
+        <header className="h-12 border-b border-[#00ff00]/20 flex items-center justify-between px-6 bg-black/80">
+            <div className="flex items-center gap-4 text-xs">
+                <span>MEM: 64TB</span>
+                <span>|</span>
+                <span>CPU: 4%</span>
+                <span>|</span>
+                <span>NET: SECURE</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+                <div className="w-2 h-2 bg-[#00ff00] animate-pulse"></div>
+                LIVE CONNECTION
+            </div>
+        </header>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6 relative">
+            <div className="absolute top-0 left-0 w-4 h-4 border-l-2 border-t-2 border-[#00ff00]"></div>
+            <div className="absolute top-0 right-0 w-4 h-4 border-r-2 border-t-2 border-[#00ff00]"></div>
+            <div className="absolute bottom-0 left-0 w-4 h-4 border-l-2 border-b-2 border-[#00ff00]"></div>
+            <div className="absolute bottom-0 right-0 w-4 h-4 border-r-2 border-b-2 border-[#00ff00]"></div>
+            
+            {children}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+
+==================================================================
 FILE: components\LeaderboardView.jsx
 ==================================================================
 
@@ -5422,13 +5703,14 @@ export function StudyCard({ card, onResult, speak, sessionStats }) {
   const [flipped, setFlipped] = useState(false);
   const [typingMode, setTypingMode] = useState(false);
   const [inputVal, setInputVal] = useState("");
-
-  // إعادة ضبط البطاقة عند تغيير البيانات
+  
+  // إعادة تعيين البطاقة عند تغيير المحتوى
   useEffect(() => {
     setFlipped(false);
     setInputVal("");
   }, [card]);
 
+  // إعدادات الحركة ثلاثية الأبعاد (3D Tilt)
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotateX = useTransform(y, [-100, 100], [10, -10]);
@@ -5443,7 +5725,7 @@ export function StudyCard({ card, onResult, speak, sessionStats }) {
   const checkAnswer = (e) => {
       e.preventDefault();
       if(inputVal.trim().toLowerCase() === card.russian.toLowerCase()){
-          confetti();
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
           setFlipped(true);
       } else {
           const form = document.getElementById('typing-form');
@@ -5452,39 +5734,36 @@ export function StudyCard({ card, onResult, speak, sessionStats }) {
       }
   };
 
-  // --- دالة ذكية لحجم الخط (Fix Font Size) ---
-  const getFontSize = (text) => {
-      if (!text) return "text-4xl";
+  /**
+   * دالة ذكية لتحديد حجم الخط بناءً على طول النص
+   * تضمن عدم خروج النص عن حدود البطاقة
+   */
+  const getDynamicFontSize = (text) => {
+      if (!text) return "text-3xl";
       const len = text.length;
-      // إذا الكلمة طويلة جداً (مثل: Достопримечательности) صغر الخط جداً
-      if (len > 14) return "text-2xl md:text-3xl"; 
-      // متوسطة
-      if (len > 9) return "text-3xl md:text-4xl"; 
-      // قصيرة
-      return "text-5xl md:text-6xl"; 
+
+      if (len > 150) return "text-sm leading-relaxed";    // فقرات طويلة جداً
+      if (len > 100) return "text-base leading-relaxed";  // جمل طويلة جداً
+      if (len > 60) return "text-lg leading-normal";      // جمل طويلة
+      if (len > 30) return "text-xl leading-normal";      // جمل متوسطة
+      if (len > 15) return "text-2xl font-bold";          // كلمات طويلة
+      return "text-4xl md:text-5xl font-black";           // كلمات قصيرة
   };
 
   return (
-    <div className="perspective-1000 w-full h-[600px] flex flex-col items-center justify-center relative overflow-visible p-4">
+    <div className="perspective-1000 w-full h-[600px] flex flex-col items-center justify-center relative p-4">
       
-      {/* --- شريط العداد (Session Stats) --- */}
-      <div className="flex gap-6 mb-6 z-20 shrink-0 bg-black/60 border border-white/10 px-6 py-3 rounded-full backdrop-blur-md shadow-lg animate-in fade-in slide-in-from-top-4">
-         <div className="flex items-center gap-3 text-emerald-400 font-mono font-bold text-lg">
-            <IconCheck size={20} stroke={3} />
+      {/* شريط الإحصائيات العائم (HUD) */}
+      <div className="absolute top-0 flex gap-6 z-20 bg-black/60 border border-white/10 px-6 py-2 rounded-full backdrop-blur-md shadow-2xl">
+         <div className="flex items-center gap-2 text-emerald-400 font-mono font-bold text-lg">
+            <IconCheck size={18} stroke={3} />
             <span>{sessionStats?.correct || 0}</span>
          </div>
-         <div className="w-[1px] h-6 bg-white/20"></div>
-         <div className="flex items-center gap-3 text-red-500 font-mono font-bold text-lg">
-            <IconX size={20} stroke={3} />
+         <div className="w-[1px] h-5 bg-white/20 my-auto"></div>
+         <div className="flex items-center gap-2 text-red-500 font-mono font-bold text-lg">
+            <IconX size={18} stroke={3} />
             <span>{sessionStats?.wrong || 0}</span>
          </div>
-      </div>
-
-      {/* --- أزرار التحكم في الوضع --- */}
-      <div className="flex gap-4 mb-4 z-20 shrink-0">
-          <button onClick={() => setTypingMode(!typingMode)} className={`px-4 py-2 rounded-full border text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${typingMode ? 'bg-cyan-600 border-cyan-400 text-white shadow-[0_0_15px_rgba(6,182,212,0.5)]' : 'bg-black/40 border-white/10 text-white/40'}`}>
-              {typingMode ? <><IconKeyboard size={14} /> Hacker Mode</> : <><IconEye size={14} /> Observer Mode</>}
-          </button>
       </div>
 
       <motion.div
@@ -5492,13 +5771,13 @@ export function StudyCard({ card, onResult, speak, sessionStats }) {
         drag
         dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
         dragElastic={0.1}
-        className="relative w-full max-w-sm aspect-[3/4] group shrink-0"
+        className="relative w-full max-w-sm aspect-[3/4] group mt-10"
         onClick={handleFlip}
       >
         <motion.div
           initial={false}
           animate={{ rotateY: flipped ? 180 : 0 }}
-          transition={{ duration: 0.4, type: "spring", stiffness: 260, damping: 20 }}
+          transition={{ duration: 0.6, type: "spring", stiffness: 260, damping: 20 }}
           className="w-full h-full relative"
           style={{ transformStyle: "preserve-3d" }}
         >
@@ -5507,90 +5786,108 @@ export function StudyCard({ card, onResult, speak, sessionStats }) {
           {/* الوجه الأمامي (الروسي) */}
           {/* ========================================================= */}
           <div 
-            className="absolute inset-0 w-full h-full rounded-[2rem] border border-cyan-500/30 bg-[#0a0a0a] shadow-[0_0_60px_-10px_rgba(6,182,212,0.1)] flex flex-col items-center justify-center p-4 overflow-hidden"
+            className="absolute inset-0 w-full h-full rounded-[2rem] border border-cyan-500/30 bg-[#0a0a0a] shadow-[0_0_60px_-15px_rgba(6,182,212,0.2)] flex flex-col items-center justify-between p-6 overflow-hidden"
             style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }} 
           >
-            <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent shadow-[0_0_10px_#06b6d4]"></div>
-            <div className="absolute top-4 right-4 text-[10px] text-cyan-500/50 font-mono tracking-widest">SECURE_DATA</div>
-
-            <div className="flex-1 flex flex-col items-center justify-center w-full z-10 px-2">
-                {/* 
-                    التعديلات هنا:
-                    - whitespace-nowrap: لمنع نزول الكلمة لسطر جديد
-                    - getFontSize: لضبط الحجم
-                */}
-                <h1 className={`${getFontSize(card.russian)} font-black text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.4)] text-center w-full leading-tight font-sans tracking-wide whitespace-nowrap`}>
-                    {card.russian}
-                </h1>
+            {/* طبقات الخلفية والزخرفة */}
+            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none"></div>
+            <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent shadow-[0_0_15px_#06b6d4]"></div>
+            
+            {/* Header */}
+            <div className="w-full flex justify-between items-start z-10 opacity-60">
+                <div className="text-[9px] font-mono text-cyan-400 tracking-widest border border-cyan-500/30 px-2 py-0.5 rounded">RUS</div>
+                <div className="text-[9px] font-mono text-white tracking-widest">SECURE_DATA_PACKET</div>
             </div>
 
-            {typingMode && !flipped ? (
-                 <div className="w-full relative z-30 mt-4 px-4" onClick={e => e.stopPropagation()}>
-                    <form id="typing-form" onSubmit={checkAnswer}>
-                        <input 
-                            autoFocus
-                            type="text" 
-                            placeholder="Type translation..." 
-                            className="w-full bg-cyan-900/10 border border-cyan-500/30 rounded-xl py-3 px-4 text-center text-cyan-400 focus:outline-none focus:border-cyan-400 focus:shadow-[0_0_20px_rgba(6,182,212,0.2)]"
-                            value={inputVal}
-                            onChange={(e) => setInputVal(e.target.value)}
-                        />
-                    </form>
-                 </div>
-            ) : (
-                <div className="mb-8 flex flex-col items-center gap-2 opacity-40 shrink-0">
-                     <IconRotate size={24} className="text-cyan-400 animate-spin-slow" />
-                     <span className="text-[10px] uppercase tracking-[0.2em] text-cyan-400">Tap to Decrypt</span>
+            {/* Content Container (الوسط) */}
+            <div className="flex-1 flex flex-col items-center justify-center w-full z-10 my-4 overflow-hidden">
+                <h1 className={`${getDynamicFontSize(card.russian)} text-white text-center w-full font-sans tracking-wide break-words whitespace-pre-wrap px-2 drop-shadow-lg`}>
+                    {card.russian}
+                </h1>
+
+                {/* وضع الكتابة (Hacker Mode) */}
+                {typingMode && !flipped && (
+                    <div className="w-full mt-6" onClick={e => e.stopPropagation()}>
+                        <form id="typing-form" onSubmit={checkAnswer}>
+                            <input 
+                                autoFocus
+                                type="text" 
+                                placeholder="Decrypt translation..." 
+                                className="w-full bg-cyan-950/30 border border-cyan-500/30 rounded-lg py-3 px-4 text-center text-cyan-400 placeholder:text-cyan-800/50 focus:outline-none focus:border-cyan-400 focus:bg-cyan-900/40 transition-all font-mono text-sm"
+                                value={inputVal}
+                                onChange={(e) => setInputVal(e.target.value)}
+                            />
+                        </form>
+                    </div>
+                )}
+            </div>
+
+            {/* Footer & Controls */}
+            <div className="w-full flex justify-between items-end z-10">
+                <div className="flex flex-col items-center gap-2 opacity-40">
+                     <IconRotate size={20} className="text-cyan-400 animate-spin-slow" />
+                     <span className="text-[8px] uppercase tracking-[0.2em] text-cyan-400 font-bold">Flip Card</span>
                 </div>
-            )}
-            
-            <button onClick={(e) => { e.stopPropagation(); speak(card.russian); }} className="absolute bottom-6 right-6 p-3 rounded-full bg-white/5 hover:bg-cyan-500 hover:text-black transition-all border border-white/10 z-20">
-                <IconVolume size={20} />
-            </button>
+                
+                <button 
+                    onClick={(e) => { e.stopPropagation(); speak(card.russian); }} 
+                    className="p-3 rounded-full bg-cyan-900/20 hover:bg-cyan-500 hover:text-black transition-all border border-cyan-500/30 group"
+                >
+                    <IconVolume size={20} className="group-hover:scale-110 transition-transform" />
+                </button>
+            </div>
           </div>
 
           {/* ========================================================= */}
           {/* الوجه الخلفي (العربي) */}
           {/* ========================================================= */}
           <div 
-            className="absolute inset-0 w-full h-full rounded-[2rem] border border-purple-500/30 bg-[#0a0510] shadow-[0_0_60px_-10px_rgba(168,85,247,0.15)] flex flex-col items-center justify-center p-4 overflow-hidden" 
+            className="absolute inset-0 w-full h-full rounded-[2rem] border border-purple-500/30 bg-[#0a0510] shadow-[0_0_60px_-15px_rgba(168,85,247,0.2)] flex flex-col items-center justify-between overflow-hidden" 
             style={{ 
                 transform: "rotateY(180deg)", 
                 backfaceVisibility: "hidden", 
                 WebkitBackfaceVisibility: "hidden" 
             }}
           >
-             <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent shadow-[0_0_10px_#a855f7]"></div>
-             <div className="absolute top-4 left-4 text-[10px] text-purple-500/50 font-mono tracking-widest">TRANSLATION_MATRIX</div>
+             {/* طبقات الخلفية */}
+             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none"></div>
+             <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-purple-500 to-transparent shadow-[0_0_15px_#a855f7]"></div>
              
-             <div className="flex-1 flex items-center justify-center w-full z-10 px-2">
-                <h1 className={`${getFontSize(card.arabic)} font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-300 text-center dir-rtl leading-normal w-full font-cairo tracking-normal`}>
+             {/* Header */}
+             <div className="w-full p-6 pb-0 flex justify-between items-start z-10 opacity-60">
+                 <div className="text-[9px] font-mono text-purple-400 tracking-widest border border-purple-500/30 px-2 py-0.5 rounded">ARA</div>
+                 <div className="text-[9px] font-mono text-white tracking-widest">DECRYPTED</div>
+             </div>
+
+             {/* Content Container (الوسط) */}
+             <div className="flex-1 flex items-center justify-center w-full z-10 px-6 overflow-hidden">
+                <h1 className={`${getDynamicFontSize(card.arabic)} font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-purple-300 text-center dir-rtl leading-normal w-full font-cairo tracking-normal break-words whitespace-pre-wrap`}>
                     {card.arabic}
                 </h1>
              </div>
 
-             {/* أزرار الإجابة - تم التأكد من stopPropagation */}
-             <div className="absolute bottom-0 left-0 w-full flex h-20 border-t border-white/10 shrink-0 z-50 bg-black/20 backdrop-blur-sm">
+             {/* Action Bar (Buttons) */}
+             <div className="w-full flex h-20 border-t border-white/10 shrink-0 z-50 bg-black/40 backdrop-blur-md">
                  <button 
                     onClick={(e) => {
-                        e.stopPropagation(); // منع قلب البطاقة
-                        onResult(card.id, false); // استدعاء دالة الخطأ
+                        e.stopPropagation();
+                        onResult(card.id, false);
                     }} 
-                    className="flex-1 text-red-500 hover:bg-red-500/10 font-bold tracking-widest transition-all flex items-center justify-center gap-2 group text-sm"
+                    className="flex-1 text-red-500 hover:bg-red-500/10 hover:text-red-400 font-bold tracking-widest transition-all flex flex-col items-center justify-center gap-1 group text-[10px] border-r border-white/5 uppercase"
                  >
-                    <IconX size={20} className="group-hover:scale-125 transition-transform" /> FAIL
+                    <IconX size={24} className="group-hover:scale-125 transition-transform mb-1" />
+                    Needs Review
                  </button>
                  
-                 <div className="w-[1px] bg-white/10"></div>
-                 
                  <button 
                     onClick={(e) => {
-                        e.stopPropagation(); // منع قلب البطاقة
-                        onResult(card.id, true); // استدعاء دالة الصح
+                        e.stopPropagation();
+                        onResult(card.id, true);
                     }} 
-                    className="flex-1 text-emerald-500 hover:bg-emerald-500/10 font-bold tracking-widest transition-all flex items-center justify-center gap-2 group text-sm"
+                    className="flex-1 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-400 font-bold tracking-widest transition-all flex flex-col items-center justify-center gap-1 group text-[10px] uppercase"
                  >
-                    <IconCheck size={20} className="group-hover:scale-125 transition-transform" /> SUCCESS
+                    <IconCheck size={24} className="group-hover:scale-125 transition-transform mb-1" />
+                    Mastered
                  </button>
              </div>
           </div>
@@ -6116,6 +6413,79 @@ export const NebulaBackground = ({ children }) => {
 
 
 ==================================================================
+FILE: components\ui\PageThemes.jsx
+==================================================================
+
+"use client";
+import React from "react";
+import { motion } from "framer-motion";
+
+// 1. ثيم الألعاب (Synthwave / Retro Arcade)
+export const GamesTheme = ({ children }) => (
+  <div className="relative w-full h-full bg-[#1a0b2e] overflow-hidden text-fuchsia-200 selection:bg-fuchsia-500/30">
+    {/* شبكة أرضية متحركة */}
+    <div className="absolute inset-0 bg-[linear-gradient(rgba(24,0,32,0.9),rgba(24,0,32,0.9)),url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
+    <div className="absolute bottom-0 w-full h-1/2 bg-gradient-to-t from-fuchsia-900/40 to-transparent z-0 pointer-events-none"></div>
+    
+    {/* Grid Floor Effect */}
+    <div className="absolute inset-0 z-0 [mask-image:linear-gradient(to_bottom,transparent,black)]">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ff00ff20_1px,transparent_1px),linear-gradient(to_bottom,#ff00ff20_1px,transparent_1px)] bg-[size:4rem_4rem] [transform:perspective(500px)_rotateX(60deg)_translateY(-100px)_translateZ(-200px)] h-[200vh]"></div>
+    </div>
+
+    {/* Sun */}
+    <div className="absolute top-10 left-1/2 -translate-x-1/2 w-64 h-64 bg-gradient-to-t from-yellow-400 to-fuchsia-600 rounded-full blur-[80px] opacity-20 pointer-events-none"></div>
+
+    <div className="relative z-10 w-full h-full">{children}</div>
+  </div>
+);
+
+// 2. ثيم الدراسة (Deep Focus / Zen Tech)
+export const StudyTheme = ({ children }) => (
+  <div className="relative w-full h-full bg-[#020617] overflow-hidden text-cyan-100 selection:bg-cyan-500/30">
+    {/* جزيئات هادئة */}
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#0f172a,transparent)] z-0"></div>
+    <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
+    
+    {/* إضاءة محيطة */}
+    <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-cyan-900/20 rounded-full blur-[120px]"></div>
+    <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-900/20 rounded-full blur-[120px]"></div>
+
+    <div className="relative z-10 w-full h-full">{children}</div>
+  </div>
+);
+
+// 3. ثيم الأدمن (Black Ops / Command Terminal)
+export const AdminTheme = ({ children }) => (
+  <div className="relative w-full h-full bg-black font-mono text-green-500 selection:bg-green-500 selection:text-black overflow-hidden">
+    {/* خطوط المسح (Scanlines) */}
+    <div className="fixed inset-0 pointer-events-none z-50 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.1)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%] opacity-20"></div>
+    
+    {/* Grid خفيفة جداً */}
+    <div className="absolute inset-0 bg-[linear-gradient(to_right,#00ff0010_1px,transparent_1px),linear-gradient(to_bottom,#00ff0010_1px,transparent_1px)] bg-[size:20px_20px] opacity-10"></div>
+
+    <div className="relative z-10 w-full h-full">{children}</div>
+  </div>
+);
+
+// 4. ثيم البيانات (Archive / Library)
+export const DataTheme = ({ children }) => (
+  <div className="relative w-full h-full bg-[#1c1917] overflow-hidden text-orange-100 selection:bg-orange-500/30">
+    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
+    <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-orange-500/50 to-transparent"></div>
+    <div className="relative z-10 w-full h-full">{children}</div>
+  </div>
+);
+
+// 5. الثيم الافتراضي (Nexus Base)
+export const DefaultTheme = ({ children }) => (
+    <div className="relative w-full h-full bg-[#050505] text-white">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/80 pointer-events-none z-0"></div>
+        <div className="relative z-10 w-full h-full">{children}</div>
+    </div>
+);
+
+
+==================================================================
 FILE: components\ui\text-generate-effect.jsx
 ==================================================================
 
@@ -6205,12 +6575,55 @@ FILE: components\views\GamesView.jsx
 
 "use client";
 import React from 'react';
-import GamesHub from '../GamesHub';
+import { motion } from 'framer-motion';
 import { useUI } from '../../context/UIContext';
+import { 
+  IconBolt, IconPuzzle, IconCode, IconRadioactive, IconClock, 
+  IconAbc, IconEar 
+} from "@tabler/icons-react";
 
 export default function GamesView({ cards }) {
   const { setActiveOverlayGame } = useUI();
-  return <GamesHub cards={cards} onOpenGame={(gameId) => setActiveOverlayGame(gameId)} />;
+
+  const GAMES = [
+    { id: 'time_traveler', title: 'CHRONO_TRIGGER', desc: 'Master Time', color: 'text-yellow-400', border: 'border-yellow-500', icon: <IconClock size={40}/>, isOverlay: true },
+    { id: 'flash', title: 'FLASH_PROTOCOL', desc: 'Speed Binary', color: 'text-cyan-400', border: 'border-cyan-500', icon: <IconBolt size={40}/> },
+    { id: 'reactor', title: 'CORE_MELTDOWN', desc: 'Critical Thinking', color: 'text-red-400', border: 'border-red-500', icon: <IconRadioactive size={40}/> },
+    { id: 'syntax', title: 'SYNTAX_HACK', desc: 'Code Breaker', color: 'text-purple-400', border: 'border-purple-500', icon: <IconCode size={40}/> },
+    { id: 'scramble', title: 'CIPHER_DECODE', desc: 'Reconstruct Data', color: 'text-blue-400', border: 'border-blue-500', icon: <IconAbc size={40}/> },
+    { id: 'audio', title: 'AUDIO_INTERCEPT', desc: 'Signal Analysis', color: 'text-green-400', border: 'border-green-500', icon: <IconEar size={40}/> },
+    { id: 'logic', title: 'LOGIC_GATE', desc: 'Pattern Match', color: 'text-orange-400', border: 'border-orange-500', icon: <IconPuzzle size={40}/> },
+  ];
+
+  return (
+    <div className="w-full h-full flex flex-col items-center">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-6xl">
+            {GAMES.map((game, i) => (
+                <motion.div
+                    key={game.id}
+                    initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                    onClick={() => setActiveOverlayGame(game.id)} // استخدام نفس المنطق الأصلي
+                    className={`relative h-40 cursor-pointer bg-black/40 border-2 ${game.border} rounded-lg overflow-hidden group hover:bg-white/5 transition-all`}
+                >
+                    {/* Scanline overlay for card */}
+                    <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.5)_50%)] bg-[size:100%_4px] opacity-20 pointer-events-none"></div>
+                    
+                    <div className="absolute inset-0 flex flex-col items-center justify-center z-10 group-hover:scale-105 transition-transform duration-300">
+                        <div className={`mb-2 ${game.color} drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]`}>{game.icon}</div>
+                        <h3 className={`font-black tracking-[0.2em] text-lg ${game.color} drop-shadow-md`}>{game.title}</h3>
+                        <p className="text-[10px] text-white/50 font-mono mt-1 uppercase">{game.desc}</p>
+                    </div>
+
+                    {/* Corner accents */}
+                    <div className={`absolute top-0 left-0 w-2 h-2 ${game.border.replace('border', 'bg')}`}></div>
+                    <div className={`absolute bottom-0 right-0 w-2 h-2 ${game.border.replace('border', 'bg')}`}></div>
+                </motion.div>
+            ))}
+        </div>
+    </div>
+  );
 }
 
 
@@ -6245,13 +6658,75 @@ FILE: components\views\LeaderboardView.jsx
 ==================================================================
 
 "use client";
-import React from 'react';
-import CyberDeck from '../CyberDeck';
-import { useAuth } from '../../context/AuthContext';
+import React, { useState, useEffect } from 'react';
+import { db } from '../../lib/firebase';
+import { collection, query, orderBy, limit, getDocs } from "firebase/firestore";
+import { motion } from 'framer-motion';
+import { IconTrophy, IconMedal, IconCrown } from '@tabler/icons-react';
 
-export default function LeaderboardView({ cards, stats }) {
-  const { user } = useAuth();
-  return <CyberDeck user={user} stats={stats || { xp: 0, streak: 0, avatar: '👤' }} cards={cards || []} />;
+export default function LeaderboardView({ currentUserEmail }) {
+  const [leaders, setLeaders] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLeaders = async () => {
+        try {
+            const q = query(collection(db, "users"), orderBy("xp", "desc"), limit(10));
+            const snapshot = await getDocs(q);
+            setLeaders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        } catch (error) { console.error(error); } 
+        finally { setLoading(false); }
+    };
+    fetchLeaders();
+  }, []);
+
+  if (loading) return <div className="text-yellow-500/50 text-center p-20 animate-pulse tracking-widest text-sm">CALCULATING RANKINGS...</div>;
+
+  return (
+    <div className="w-full max-w-3xl mx-auto pb-32">
+      <div className="flex flex-col gap-3">
+        {leaders.map((user, index) => {
+            const isMe = user.email === currentUserEmail;
+            
+            // تصميم خاص للمراكز الثلاثة الأولى
+            let rankStyle = "bg-white/5 border-white/10 text-white/70";
+            let scale = 1;
+            
+            if (index === 0) { rankStyle = "bg-yellow-500/20 border-yellow-500/50 text-yellow-100 shadow-[0_0_30px_rgba(234,179,8,0.15)]"; scale = 1.05; }
+            else if (index === 1) { rankStyle = "bg-slate-400/20 border-slate-400/50 text-slate-200"; }
+            else if (index === 2) { rankStyle = "bg-orange-700/20 border-orange-700/50 text-orange-200"; }
+
+            return (
+                <motion.div 
+                    key={user.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className={`relative flex items-center p-4 rounded-xl border backdrop-blur-md transition-all ${rankStyle} ${isMe ? 'ring-1 ring-white/50' : ''}`}
+                    style={{ scale }}
+                >
+                    <div className="w-10 text-xl font-black italic opacity-50">#{index + 1}</div>
+                    
+                    <div className="flex-1">
+                        <h3 className="font-bold text-sm tracking-wide">
+                            {user.email ? user.email.split('@')[0] : 'Unknown'}
+                            {isMe && <span className="ml-2 text-[8px] bg-white/20 px-2 py-0.5 rounded-full uppercase tracking-widest">You</span>}
+                        </h3>
+                        {index === 0 && <span className="text-[9px] text-yellow-400 uppercase tracking-widest">Current Champion</span>}
+                    </div>
+
+                    <div className="text-right">
+                        <div className="text-xl font-black font-mono">{user.xp || 0}</div>
+                        <div className="text-[8px] opacity-40 uppercase tracking-wider">Total XP</div>
+                    </div>
+                    
+                    {index === 0 && <div className="absolute -right-2 -top-2 text-yellow-400 animate-bounce"><IconCrown size={24}/></div>}
+                </motion.div>
+            );
+        })}
+      </div>
+    </div>
+  );
 }
 
 
@@ -6371,7 +6846,20 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUI } from '../../context/UIContext';
 import { useAuth } from '../../context/AuthContext';
 
-// Views Imports
+// Layouts - الاستيراد من الملف الجديد
+import { 
+    HubLayout, 
+    ArcadeLayout, 
+    ArchiveLayout, 
+    FocusLayout, 
+    CommsLayout,
+    HoloDeckLayout,
+    ConfigLayout
+} from '../layouts/DistinctLayouts';
+
+import TerminalLayout from '../layouts/TerminalLayout'; // الأدمن له ملفه الخاص
+
+// Views
 import HeroView from './HeroView';
 import AdminView from './AdminView';
 import StudyView from './StudyView';
@@ -6381,72 +6869,90 @@ import DataView from './DataView';
 import LeaderboardView from './LeaderboardView';
 import SettingsViewWrapper from './SettingsViewWrapper';
 
-// Components
 import { CategorySelect } from '../CategorySelect';
 import CommunicationHub from '../CommunicationHub';
 
-export default function ViewManager({ 
-  cards, currentCard, sessionStats, setSessionStats, 
-  handleSwipe, playSFX, speak, 
-  addCard, deleteCard, updateCard, stats, categories, 
-  resetProgress 
-}) {
+export default function ViewManager(props) {
   const { currentView, setCurrentView, activeCategory, setActiveCategory } = useUI();
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
 
-  // تحويل فوري للأدمن
+  // --- ADMIN OVERRIDE ---
   if (currentView === 'admin_panel' && isAdmin) {
-    return <AdminView />;
+    return (
+        <TerminalLayout onExit={() => window.location.reload()}>
+            <AdminView />
+        </TerminalLayout>
+    );
   }
 
-  const renderContent = () => {
-    switch (currentView) {
-      case 'home': return <HeroView />;
-      case 'games': return <GamesView cards={cards} />;
-      case 'live': return <LiveView />;
-      case 'chat': return <CommunicationHub user={user} />;
-      
-      case 'category': 
-        return <CategorySelect 
-                  categories={categories} 
-                  activeCategory={activeCategory} 
-                  onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} 
-               />;
-      
-      case 'study':
-        return <StudyView 
-                  currentCard={currentCard}
-                  sessionStats={sessionStats}
-                  handleSwipe={handleSwipe}
-                  setSessionStats={setSessionStats}
-                  playSFX={playSFX}
-                  speak={speak}
-               />;
+  // --- VIEW ROUTING & THEME SELECTION ---
+  let Content = null;
+  let LayoutWrapper = HubLayout; // الافتراضي
 
-      case 'data': 
-        return <DataView cards={cards} addCard={addCard} deleteCard={deleteCard} updateCard={updateCard} />; 
-      
-      case 'leaderboard': 
-        return <LeaderboardView cards={cards} stats={stats} />;
-      
-      case 'settings': 
-        return <SettingsViewWrapper resetProgress={resetProgress} />;
-      
-      default: return <HeroView />;
-    }
-  };
+  switch (currentView) {
+    case 'home':
+        Content = <HeroView />;
+        LayoutWrapper = HubLayout;
+        break;
+    
+    case 'games':
+        Content = <GamesView cards={props.cards} />;
+        LayoutWrapper = ArcadeLayout;
+        break;
+
+    case 'study':
+        Content = <StudyView {...props} />;
+        LayoutWrapper = FocusLayout;
+        break;
+
+    case 'category':
+        Content = <CategorySelect {...props} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
+        LayoutWrapper = FocusLayout;
+        break;
+
+    case 'data':
+        Content = <DataView {...props} />;
+        LayoutWrapper = ArchiveLayout;
+        break;
+
+    case 'leaderboard':
+        Content = <LeaderboardView {...props} />;
+        LayoutWrapper = HoloDeckLayout; // <--- القالب الجديد للمتصدرين
+        break;
+    
+    case 'chat':
+        Content = <CommunicationHub user={props.user} />;
+        LayoutWrapper = CommsLayout; // <--- القالب الجديد للشات
+        break;
+
+    case 'live':
+        Content = <LiveView />;
+        LayoutWrapper = CommsLayout; // البث المباشر يستخدم نفس قالب الاتصالات
+        break;
+
+    case 'settings':
+        Content = <SettingsViewWrapper {...props} />;
+        LayoutWrapper = ConfigLayout; // <--- القالب الجديد للإعدادات
+        break;
+
+    default:
+        Content = <HeroView />;
+        LayoutWrapper = HubLayout;
+  }
 
   return (
     <AnimatePresence mode="wait">
         <motion.div 
-        key={currentView} 
-        initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }} 
-        animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }} 
-        exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }} 
-        transition={{ duration: 0.3 }} 
-        className="w-full h-full flex justify-center"
+            key={currentView}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.02 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="w-full h-full"
         >
-        {renderContent()}
+            <LayoutWrapper>
+                {Content}
+            </LayoutWrapper>
         </motion.div>
     </AnimatePresence>
   );
@@ -6472,39 +6978,59 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      if (u) {
-        setUser(u);
-        const userRef = doc(db, "users", u.uid);
-        const snap = await getDoc(userRef);
-        
-        if (u.email === MASTER_EMAIL) {
-            if (!snap.exists()) await setDoc(userRef, { email: u.email, role: 'master', xp: 0, createdAt: new Date().toISOString() });
-            else if (snap.data().role !== 'master') await updateDoc(userRef, { role: 'master' });
-        } else if (!snap.exists()) {
-            await setDoc(userRef, { email: u.email, role: 'user', xp: 0, createdAt: new Date().toISOString() });
-        }
+    // 1. صمام أمان: إذا تأخر Firebase، افتح الموقع بالقوة بعد 3 ثواني
+    const safetyTimer = setTimeout(() => {
+        console.warn("⚠️ Firebase took too long. Forcing app load.");
+        setLoading(false);
+    }, 3000);
 
-        const unsubDoc = onSnapshot(userRef, (docSnap) => {
-          if (docSnap.exists()) {
-             const data = docSnap.data();
-             setUserData(data);
-             if (data.isBanned && u.email !== MASTER_EMAIL) {
-                auth.signOut();
-                window.location.reload();
-             }
-          }
-        });
-        return () => unsubDoc();
-      } else {
-        setUser(null);
-        setUserData(null);
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      try {
+        if (u) {
+            setUser(u);
+            const userRef = doc(db, "users", u.uid);
+            
+            // محاولة جلب البيانات (مع معالجة الأخطاء)
+            try {
+                const snap = await getDoc(userRef);
+                if (!snap.exists()) {
+                    // إنشاء مستخدم جديد إذا لم يوجد
+                    await setDoc(userRef, { 
+                        email: u.email, 
+                        role: u.email === MASTER_EMAIL ? 'master' : 'user', 
+                        xp: 0, 
+                        createdAt: new Date().toISOString() 
+                    });
+                }
+                
+                // الاستماع للتحديثات
+                onSnapshot(userRef, (docSnap) => {
+                    if (docSnap.exists()) setUserData(docSnap.data());
+                }, (error) => console.log("User stream error (ignorable):", error));
+
+            } catch (err) {
+                console.error("Firestore access error:", err);
+            }
+        } else {
+            setUser(null);
+            setUserData(null);
+        }
+      } catch (e) {
+          console.error("Auth Error:", e);
+      } finally {
+          // في كل الحالات، أوقف التحميل
+          setLoading(false);
+          clearTimeout(safetyTimer);
       }
-      setLoading(false);
     });
-    return () => unsubscribe();
+
+    return () => {
+        unsubscribe();
+        clearTimeout(safetyTimer);
+    };
   }, []);
 
+  // تحديد الصلاحيات بناءً على الإيميل لضمان العمل حتى لو فشلت قاعدة البيانات
   const isMaster = user?.email === MASTER_EMAIL;
   const isAdmin = userData?.role === 'admin' || userData?.role === 'master' || isMaster;
   const isJunior = userData?.role === 'junior' || isAdmin;
@@ -8160,143 +8686,130 @@ FILE: hooks\useStudySystem.js
 ==================================================================
 
 import { useState, useEffect } from 'react';
-import { fullDatabase } from '../data/fullDatabase'; // تأكد أن هذا الملف موجود وفيه البيانات
+import { fullDatabase } from '../data/fullDatabase'; // هذا الملف يحتوي على بياناتك الأصلية (1424 كلمة)
 import { db } from '../lib/firebase';
-import { doc, setDoc, collection, getDocs, updateDoc, deleteDoc, onSnapshot, writeBatch, getDoc } from "firebase/firestore";
+import { doc, setDoc, collection, getDocs, updateDoc, deleteDoc, writeBatch, getDoc } from "firebase/firestore";
 
 export const useStudySystem = (user) => {
-  // نبدأ بالبيانات الكاملة افتراضياً حتى لا يظهر الموقع فارغاً
+  // هام جداً: نبدأ بـ fullDatabase فوراً لضمان عدم اختفاء البيانات
   const [cards, setCards] = useState(fullDatabase); 
   const [stats, setStats] = useState({ xp: 0, streak: 0, role: 'user' });
   const [loading, setLoading] = useState(true);
   const [currentCard, setCurrentCard] = useState(null);
   
-  // بيانات النظام
-  const [isMaster, setIsMaster] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isBanned, setIsBanned] = useState(false);
+  // دالة لاختيار بطاقة للمراجعة
+  const updateCurrentCard = (list) => {
+      if (!list || list.length === 0) return;
+      // نختار بطاقة لم يحن موعد مراجعتها، أو عشوائية إذا كان الكل مراجع
+      const due = list.filter(c => c.level < 5 && (!c.nextReview || c.nextReview <= Date.now()));
+      setCurrentCard(due.length > 0 ? due[0] : list[Math.floor(Math.random() * list.length)]);
+  };
 
   useEffect(() => {
-    if (!user) {
-        setLoading(false);
-        return;
-    }
+    // تعيين البطاقة الأولية فوراً من البيانات الأصلية
+    updateCurrentCard(fullDatabase);
+    setLoading(false);
 
-    // 1. إعداد المستخدم والصلاحيات
-    const setupUser = async () => {
-        const userRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(userRef);
+    if (!user) return;
 
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            setStats(data);
-            const isMasterEmail = user.email === 'islamaz@bomba.com';
-            setIsMaster(isMasterEmail);
-            // التحقق من الصلاحية
-            setIsAdmin(data.role === 'admin' || data.role === 'master' || isMasterEmail);
-            setIsBanned(data.isBanned === true);
+    // محاولة جلب بيانات مخصصة من السيرفر (بدون تعطيل العرض الحالي)
+    const syncUserData = async () => {
+        try {
+            // جلب الإحصائيات
+            const userRef = doc(db, "users", user.uid);
+            const userSnap = await getDoc(userRef);
+            if (userSnap.exists()) setStats(userSnap.data());
+
+            // جلب البطاقات الشخصية
+            const cardsCollection = collection(db, "users", user.uid, "personal_cards");
+            const snapshot = await getDocs(cardsCollection);
             
-            // إصلاح تلقائي للماستر إذا لم تكن رتبته مضبوطة
-            if (isMasterEmail && data.role !== 'master') {
-                await updateDoc(userRef, { role: 'master' });
+            if (!snapshot.empty) {
+                // إذا وجدنا بيانات مخصصة، ندمجها
+                const userCardsMap = new Map(snapshot.docs.map(d => [d.id, d.data()]));
+                
+                // دمج البيانات الأصلية مع تقدم المستخدم
+                const mergedCards = fullDatabase.map(card => {
+                    const userProgress = userCardsMap.get(String(card.id));
+                    return userProgress ? { ...card, ...userProgress } : card;
+                });
+                
+                setCards(mergedCards);
+                updateCurrentCard(mergedCards);
+            } else {
+                // إذا لم توجد بيانات، نستخدم الأصلية وننسخها في الخلفية (بصمت)
+                initializeUserDb(user.uid);
             }
-        } else {
-            // مستخدم جديد
-            const isMasterEmail = user.email === 'islamaz@bomba.com';
-            await setDoc(userRef, { 
-                email: user.email, 
-                xp: 0, 
-                role: isMasterEmail ? 'master' : 'user',
-                createdAt: new Date().toISOString() 
-            });
-            setIsMaster(isMasterEmail);
-            setIsAdmin(isMasterEmail);
+        } catch (e) {
+            console.error("Sync error, using local data:", e);
         }
     };
 
-    setupUser();
-
-    // 2. تحميل البطاقات الخاصة
-    const loadUserCards = async () => {
-        const cardsCollection = collection(db, "users", user.uid, "personal_cards");
-        const snapshot = await getDocs(cardsCollection);
-        
-        if (snapshot.empty) {
-            // إذا لم يكن لديه بطاقات خاصة، نستخدم قاعدة البيانات الكاملة ونبدأ النسخ
-            console.log("No personal cards found. Using default database & initializing copy...");
-            setCards(fullDatabase); // عرض البيانات فوراً
-            updateCurrentCard(fullDatabase);
-            
-            // نسخ البيانات في الخلفية (أول 50 كلمة لتسريع العملية)
-            const batch = writeBatch(db);
-            fullDatabase.slice(0, 50).forEach(card => {
-                const newDocRef = doc(cardsCollection, String(card.id));
-                batch.set(newDocRef, { ...card, level: 0, nextReview: Date.now() });
-            });
-            await batch.commit().catch(console.error);
-        } else {
-            // إذا كان لديه بطاقات، نعرضها
-            const userCards = snapshot.docs.map(d => d.data());
-            setCards(userCards);
-            updateCurrentCard(userCards);
-        }
-        setLoading(false);
-    };
-
-    loadUserCards();
-
+    syncUserData();
   }, [user]);
 
-  const updateCurrentCard = (list) => {
-      const due = list.filter(c => c.level < 5 && (c.nextReview || 0) <= Date.now());
-      setCurrentCard(due.length > 0 ? due[0] : null);
+  // نسخ البيانات في الخلفية للمستخدم الجديد
+  const initializeUserDb = async (uid) => {
+      console.log("Initializing user database in background...");
+      const batch = writeBatch(db);
+      const cardsCollection = collection(db, "users", uid, "personal_cards");
+      // ننسخ أول 20 كلمة فقط لتسريع العملية مبدئياً
+      fullDatabase.slice(0, 20).forEach(card => {
+          const docRef = doc(cardsCollection, String(card.id));
+          batch.set(docRef, { ...card, level: 0, nextReview: Date.now() });
+      });
+      await batch.commit().catch(e => console.log("Batch error:", e));
   };
 
   const handleSwipe = async (direction) => {
       if (!currentCard || !user) return;
+      
       const known = direction === 'right';
-      const nextLevel = known ? Math.min(currentCard.level + 1, 5) : 0;
+      const nextLevel = known ? Math.min((currentCard.level || 0) + 1, 5) : 0;
       const nextReview = Date.now() + (known ? (Math.pow(2, nextLevel) * 86400000) : 60000); 
 
       const updatedCard = { ...currentCard, level: nextLevel, nextReview };
       
-      setCards(prev => prev.map(c => c.id === currentCard.id ? updatedCard : c));
-      updateCurrentCard(cards.map(c => c.id === currentCard.id ? updatedCard : c));
+      // تحديث الواجهة فوراً
+      const newCards = cards.map(c => c.id === currentCard.id ? updatedCard : c);
+      setCards(newCards);
+      updateCurrentCard(newCards);
 
-      // حفظ التقدم
-      const cardRef = doc(db, "users", user.uid, "personal_cards", String(currentCard.id));
-      // نستخدم setDoc مع merge لضمان إنشاء المستند إذا لم يكن موجوداً (في حالة استخدام البيانات الافتراضية)
-      await setDoc(cardRef, { ...currentCard, level: nextLevel, nextReview }, { merge: true });
-
-      if (known) {
-          await updateDoc(doc(db, "users", user.uid), { xp: (stats.xp || 0) + 10 });
-      }
+      // حفظ في الخلفية
+      try {
+          const cardRef = doc(db, "users", user.uid, "personal_cards", String(currentCard.id));
+          await setDoc(cardRef, { ...updatedCard }, { merge: true });
+          
+          if (known) {
+              await updateDoc(doc(db, "users", user.uid), { xp: (stats.xp || 0) + 10 });
+          }
+      } catch (e) { console.error("Save failed:", e); }
   };
 
-  // CRUD Operations
+  // دوال الإضافة والحذف والتعديل
   const addCard = async (cardData) => {
-      const newId = Date.now().toString();
-      const newCard = { ...cardData, id: newId, level: 0, nextReview: Date.now() };
+      const newCard = { ...cardData, id: Date.now(), level: 0 };
       setCards(prev => [...prev, newCard]);
-      await setDoc(doc(db, "users", user.uid, "personal_cards", newId), newCard);
+      if(user) await setDoc(doc(db, "users", user.uid, "personal_cards", String(newCard.id)), newCard);
   };
 
   const deleteCard = async (cardId) => {
       setCards(prev => prev.filter(c => c.id !== cardId));
-      await deleteDoc(doc(db, "users", user.uid, "personal_cards", String(cardId)));
+      if(user) await deleteDoc(doc(db, "users", user.uid, "personal_cards", String(cardId)));
   };
 
   const updateCard = async (cardId, newData) => {
       setCards(prev => prev.map(c => c.id === cardId ? { ...c, ...newData } : c));
-      await updateDoc(doc(db, "users", user.uid, "personal_cards", String(cardId)), newData);
+      if(user) await updateDoc(doc(db, "users", user.uid, "personal_cards", String(cardId)), newData);
   };
-
-  const resetProgress = async () => { /* ... */ };
 
   return { 
       cards, currentCard, stats, handleSwipe, 
-      loading, addCard, deleteCard, updateCard, resetProgress,
-      isAdmin, isMaster, isBanned
+      loading, addCard, deleteCard, updateCard, 
+      resetProgress: () => {},
+      isAdmin: stats.role === 'admin' || stats.role === 'master',
+      isMaster: stats.role === 'master',
+      isBanned: false 
   };
 };
 

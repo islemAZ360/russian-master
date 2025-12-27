@@ -1,25 +1,14 @@
 "use client";
-import React, { useState } from "react";
+import React from "react";
 import { motion } from "framer-motion";
-import { 
-  IconAbc, IconPlayerPlay, IconDeviceGamepad, 
-  IconEar, IconBolt, IconPuzzle, IconCode, IconRadioactive, IconClock 
-} from "@tabler/icons-react";
+import { IconClock, IconDeviceGamepad } from "@tabler/icons-react";
 
-// استيراد الألعاب الداخلية (التي تفتح داخل المربع)
-import FlashProtocol from "./games/FlashProtocol";
-import ReactorCore from "./games/ReactorCore";
-import SyntaxHack from "./games/SyntaxHack";
-import ScrambleGame from "./ScrambleGame";
-import AudioIntercept from "./games/AudioIntercept";
-import RapidProtocol from "./games/RapidProtocol";
-import LogicGate from "./games/LogicGate";
+// تم حذف استيراد الألعاب الأخرى لأننا قمنا بحذف ملفاتها
 
-export default function GamesHub({ cards, onOpenGame }) {
-  const [activeGame, setActiveGame] = useState(null);
-
+export default function GamesHub({ onOpenGame }) {
+  
+  // القائمة تحتوي الآن فقط على لعبة الساعة
   const GAMES = [
-    // اللعبة الجديدة الفخمة (تفتح في وضع ملء الشاشة عبر onOpenGame)
     { 
         id: 'time_traveler', 
         title: 'THE TIME TRAVELER', 
@@ -27,41 +16,17 @@ export default function GamesHub({ cards, onOpenGame }) {
         color: 'text-[#cfb53b]', 
         bg: 'bg-[#cfb53b]/10', 
         icon: <IconClock size={32}/>,
-        isOverlay: true // علامة لتمييزها
-    },
-
-    // باقي الألعاب
-    { id: 'flash', title: 'FLASH PROTOCOL', desc: 'Speed binary decisions.', color: 'text-yellow-500', bg: 'bg-yellow-500/10', icon: <IconBolt size={32}/> },
-    { id: 'reactor', title: 'REACTOR CORE', desc: 'Multiple choice overload.', color: 'text-cyan-500', bg: 'bg-cyan-500/10', icon: <IconRadioactive size={32}/> },
-    { id: 'syntax', title: 'SYNTAX HACK', desc: 'Reconstruct corrupted data.', color: 'text-purple-500', bg: 'bg-purple-500/10', icon: <IconCode size={32}/> },
-    { id: 'scramble', title: 'CRYPTIC CIPHER', desc: 'Reconstruct data.', color: 'text-blue-500', bg: 'bg-blue-500/10', icon: <IconAbc size={32}/> },
-    { id: 'audio', title: 'AUDIO INTERCEPT', desc: 'Listen & decode.', color: 'text-emerald-500', bg: 'bg-emerald-500/10', icon: <IconEar size={32}/> },
-    { id: 'rapid', title: 'RAPID PROTOCOL', desc: 'True/False speed run.', color: 'text-red-500', bg: 'bg-red-500/10', icon: <IconBolt size={32}/> },
-    { id: 'logic', title: 'LOGIC GATE', desc: 'Multiple choice exam.', color: 'text-orange-500', bg: 'bg-orange-500/10', icon: <IconPuzzle size={32}/> },
+        isOverlay: true 
+    }
   ];
 
-  // التعامل مع النقر على اللعبة
   const handleGameClick = (game) => {
-      if (game.isOverlay) {
-          // إذا كانت لعبة كبيرة (مثل الساعة)، اطلب من الصفحة الرئيسية فتحها
-          if (onOpenGame) onOpenGame(game.id);
-      } else {
-          // وإلا افتحها محلياً
-          setActiveGame(game.id);
-      }
+      // بما أن اللعبة الوحيدة المتبقية هي من نوع Overlay
+      // نقوم بإرسال الأمر للصفحة الرئيسية لفتحها
+      if (onOpenGame) onOpenGame(game.id);
   };
 
-  // شروط العرض للألعاب الداخلية
-  if (activeGame === 'flash') return <FlashProtocol cards={cards} onClose={() => setActiveGame(null)} />;
-  if (activeGame === 'reactor') return <ReactorCore cards={cards} onClose={() => setActiveGame(null)} />;
-  if (activeGame === 'syntax') return <SyntaxHack cards={cards} onClose={() => setActiveGame(null)} />;
-  if (activeGame === 'scramble') return <ScrambleGame cards={cards} onClose={() => setActiveGame(null)} />;
-  if (activeGame === 'audio') return <AudioIntercept cards={cards} onClose={() => setActiveGame(null)} />;
-  if (activeGame === 'rapid') return <RapidProtocol cards={cards} onClose={() => setActiveGame(null)} />;
-  if (activeGame === 'logic') return <LogicGate cards={cards} onClose={() => setActiveGame(null)} />;
-
   return (
-    // التعديل: إعطاء ارتفاع كامل والسماح بالسكرول، مع مسافة في الأسفل للدُوك
     <div className="w-full h-full flex flex-col p-6 overflow-y-auto custom-scrollbar pb-32">
       <div className="mb-10 text-center relative z-10 shrink-0 mt-10 md:mt-0">
           <div className="w-20 h-20 mx-auto bg-gradient-to-br from-gray-900 to-black rounded-full border-2 border-white/20 flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(255,255,255,0.1)]">
@@ -85,7 +50,6 @@ export default function GamesHub({ cards, onOpenGame }) {
                   <div className="absolute inset-0 p-6 flex flex-col justify-between z-20">
                       <div className="flex justify-between items-start">
                           <div className={`p-3 rounded-2xl w-fit ${game.bg} ${game.color} border border-white/10`}>{game.icon}</div>
-                          <IconPlayerPlay className={`opacity-0 group-hover:opacity-100 transition-opacity ${game.color}`}/>
                       </div>
                       <div>
                           <h3 className={`text-xl font-black ${game.color} tracking-widest mb-1`}>{game.title}</h3>
