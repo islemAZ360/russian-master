@@ -1,13 +1,20 @@
 "use client";
 import React from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useUI } from '../../context/UIContext';
 import { useAuth } from '../../context/AuthContext';
 
-// Themes
-import { GamesTheme, StudyTheme, AdminTheme, DataTheme, DefaultTheme } from '../ui/PageThemes';
+// 1. استيراد الثيمات (العوالم المختلفة لكل صفحة)
+// تأكد من أنك قمت بإنشاء ملف PageThemes.jsx كما اتفقنا سابقاً
+import { 
+  GamesTheme, 
+  StudyTheme, 
+  AdminTheme, 
+  DataTheme, 
+  DefaultTheme 
+} from '../ui/PageThemes';
 
-// Views
+// 2. استيراد المشاهد (Views)
 import HeroView from './HeroView';
 import AdminView from './AdminView';
 import StudyView from './StudyView';
@@ -17,14 +24,16 @@ import DataView from './DataView';
 import LeaderboardView from './LeaderboardView';
 import SettingsViewWrapper from './SettingsViewWrapper';
 
+// 3. استيراد مكونات إضافية (تستخدم كـ Views مباشرة)
 import { CategorySelect } from '../CategorySelect';
 import CommunicationHub from '../CommunicationHub';
 
 export default function ViewManager(props) {
-  const { currentView } = useUI();
+  const { currentView, setCurrentView, activeCategory, setActiveCategory } = useUI();
   const { isAdmin } = useAuth();
 
-  // تحويل فوري للأدمن
+  // --- منطق توجيه الأدمن ---
+  // إذا كان المستخدم أدمن واختار لوحة التحكم، نستخدم ثيم الأدمن الخاص
   if (currentView === 'admin_panel' && isAdmin) {
     return (
         <AdminTheme>
@@ -33,9 +42,9 @@ export default function ViewManager(props) {
     );
   }
 
-  // تحديد المحتوى والثيم
+  // --- تحديد المحتوى والثيم بناءً على الصفحة ---
   let Content = null;
-  let ThemeWrapper = DefaultTheme; // الافتراضي
+  let ThemeWrapper = DefaultTheme; // الثيم الافتراضي (الرئيسي)
 
   switch (currentView) {
     case 'home':
@@ -44,32 +53,44 @@ export default function ViewManager(props) {
         break;
     
     case 'games':
+        // نمرر الـ cards للعبة
         Content = <GamesView cards={props.cards} />;
-        ThemeWrapper = GamesTheme; // ثيم الأركيد
+        ThemeWrapper = GamesTheme; // تطبيق ثيم الأركيد/النيون
         break;
 
     case 'study':
+        // نمرر جميع props الخاصة بالدراسة
         Content = <StudyView {...props} />;
-        ThemeWrapper = StudyTheme; // ثيم التركيز
+        ThemeWrapper = StudyTheme; // تطبيق ثيم التركيز العميق
         break;
 
     case 'category':
-        Content = <CategorySelect {...props} />;
+        Content = <CategorySelect 
+                    categories={props.categories} 
+                    activeCategory={activeCategory} 
+                    onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} 
+                  />;
         ThemeWrapper = DefaultTheme;
         break;
 
     case 'data':
-        Content = <DataView {...props} />;
-        ThemeWrapper = DataTheme; // ثيم الأرشيف
+        // صفحة البيانات
+        Content = <DataView 
+                    cards={props.cards} 
+                    addCard={props.addCard} 
+                    deleteCard={props.deleteCard} 
+                    updateCard={props.updateCard} 
+                  />;
+        ThemeWrapper = DataTheme; // تطبيق ثيم الأرشيف/البيانات
         break;
 
     case 'leaderboard':
-        Content = <LeaderboardView {...props} />;
+        Content = <LeaderboardView cards={props.cards} stats={props.stats} />;
         ThemeWrapper = DefaultTheme;
         break;
     
     case 'chat':
-        Content = <CommunicationHub {...props} />;
+        Content = <CommunicationHub user={props.user} />;
         ThemeWrapper = DefaultTheme;
         break;
 
@@ -79,7 +100,7 @@ export default function ViewManager(props) {
         break;
 
     case 'settings':
-        Content = <SettingsViewWrapper {...props} />;
+        Content = <SettingsViewWrapper resetProgress={props.resetProgress} />;
         ThemeWrapper = DefaultTheme;
         break;
 
@@ -88,16 +109,18 @@ export default function ViewManager(props) {
         ThemeWrapper = DefaultTheme;
   }
 
+  // --- العرض النهائي ---
   return (
     <AnimatePresence mode="wait">
         <motion.div 
             key={currentView}
-            initial={{ opacity: 0, filter: "blur(20px)" }}
+            initial={{ opacity: 0, filter: "blur(10px)" }}
             animate={{ opacity: 1, filter: "blur(0px)" }}
-            exit={{ opacity: 0, filter: "blur(20px)" }}
-            transition={{ duration: 0.4 }}
+            exit={{ opacity: 0, filter: "blur(10px)" }}
+            transition={{ duration: 0.4, ease: "easeInOut" }}
             className="w-full h-full"
         >
+            {/* تغليف المحتوى بالثيم المحدد */}
             <ThemeWrapper>
                 {Content}
             </ThemeWrapper>
