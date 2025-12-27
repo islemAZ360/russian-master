@@ -323,32 +323,24 @@ FILE: app\page.js
 
 "use client";
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { 
   IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
-  IconShield, IconMessageCircle, IconDeviceGamepad, IconBroadcast, IconInfinity
+  IconShield, IconMessageCircle, IconDeviceGamepad, IconBroadcast, IconLifebuoy
 } from '@tabler/icons-react';
 
-// --- استيراد المكونات ---
-import { HeroSection } from '../components/HeroSection';
-import { CategorySelect } from '../components/CategorySelect';
-import { StudyCard } from '../components/StudyCard';
-import { AuthScreen } from '../components/AuthScreen';
-import { DataManager } from '../components/DataManager'; 
-import CyberDeck from '../components/CyberDeck'; 
-import CommunicationHub from '../components/CommunicationHub'; 
-import SettingsView from '../components/SettingsView'; 
-import AdminDashboard from '../components/AdminDashboard'; 
-import GamesHub from '../components/GamesHub';
+// استيراد مدير المشاهد الجديد (الذي أنشأناه للتو)
+import ViewManager from '../components/views/ViewManager';
+
+// استيراد المكونات العائمة والثابتة
 import { FloatingDock } from '../components/ui/floating-dock';
 import DigitalRain from '../components/ui/DigitalRain'; 
 import IntroSequence from '../components/IntroSequence'; 
-// تم إزالة استيراد DailyReward من هنا
-import RealLiveStream from '../components/live/RealLiveStream';
 import TimeTraveler from '../components/games/TimeTraveler';
+import SupportModal from '../components/SupportModal';
 import { GridBackground } from '../components/ui/GridBackground'; 
 import { CyberHUD } from '../components/ui/CyberHUD';
-import { DecryptText } from '../components/ui/DecryptText';
+import { AuthScreen } from '../components/AuthScreen'; // Auth نحتاجه هنا
 
 import { useStudySystem } from '../hooks/useStudySystem';
 import { useAudio } from '../hooks/useAudio';
@@ -359,23 +351,21 @@ import { doc, onSnapshot, updateDoc, setDoc, getDoc } from "firebase/firestore";
 const MASTER_EMAIL = "islamaz@bomba.com";
 
 export default function RussianApp() {
+  // --- States (الحالات) ---
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null); 
   const [currentView, setCurrentView] = useState('home');
   const [activeCategory, setActiveCategory] = useState("All");
   const [showIntro, setShowIntro] = useState(true); 
   const [broadcast, setBroadcast] = useState(null);
-  // تم إزالة حالة showDailyReward من هنا
   const [loadingAuth, setLoadingAuth] = useState(true);
-
-  // حالة لتشغيل اللعبة بملء الشاشة
+  const [showSupport, setShowSupport] = useState(false);
   const [activeOverlayGame, setActiveOverlayGame] = useState(null);
-
-  // --- عداد الجلسة (جديد) ---
   const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0 });
 
   const containerRef = useRef(null);
 
+  // --- Custom Hooks ---
   const { 
     cards, currentCard, stats, handleSwipe, resetProgress, 
     addCard, deleteCard, updateCard 
@@ -383,6 +373,7 @@ export default function RussianApp() {
 
   const { speak, playSFX } = useAudio();
 
+  // --- Effects ---
   const handleMouseMove = (e) => {
     if (!containerRef.current) return;
     const { left, top } = containerRef.current.getBoundingClientRect();
@@ -397,26 +388,24 @@ export default function RussianApp() {
         if (u) {
             setUser(u);
             const userRef = doc(db, "users", u.uid);
+            const snap = await getDoc(userRef);
             
             if (u.email === MASTER_EMAIL) {
-                const snap = await getDoc(userRef);
-                if (!snap.exists()) {
-                    await setDoc(userRef, { email: u.email, role: 'admin', xp: 0, createdAt: new Date().toISOString() });
-                } else if (snap.data().role !== 'admin') {
-                    await updateDoc(userRef, { role: 'admin' });
-                }
+                if (!snap.exists()) await setDoc(userRef, { email: u.email, role: 'master', xp: 0, createdAt: new Date().toISOString() });
+                else if (snap.data().role !== 'master') await updateDoc(userRef, { role: 'master' });
+            } else if (!snap.exists()) {
+                await setDoc(userRef, { email: u.email, role: 'user', xp: 0, createdAt: new Date().toISOString() });
             }
 
             onSnapshot(userRef, (docSnap) => {
                 if (docSnap.exists()) {
                     setUserData(docSnap.data());
-                    if (docSnap.data().forceLogout) {
+                    if (docSnap.data().isBanned && u.email !== MASTER_EMAIL) {
                         auth.signOut();
                         window.location.reload();
                     }
                 }
             });
-            // تم إزالة تفعيل setShowDailyReward(true) من هنا
         } else {
             setUser(null);
             setUserData(null);
@@ -431,6 +420,7 @@ export default function RussianApp() {
     return () => unsubBroad();
   }, []);
 
+  // --- Logic Helpers ---
   const handleLogout = () => auth.signOut().then(() => window.location.reload());
 
   const categories = useMemo(() => {
@@ -439,23 +429,11 @@ export default function RussianApp() {
   }, [cards]);
 
   const isMaster = user?.email === MASTER_EMAIL;
-  const isAdmin = userData?.role === 'admin' || isMaster;
+  const isAdmin = userData?.role === 'admin' || userData?.role === 'master' || isMaster;
   const isJunior = userData?.role === 'junior' || isAdmin;
   const isBanned = userData?.isBanned && !isMaster;
 
-  if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
-
-  if (isBanned) return (
-    <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-red-500 space-y-6 font-mono relative overflow-hidden">
-        <h1 className="text-6xl font-black tracking-widest text-center glitch-text" data-text="ACCESS DENIED">ACCESS DENIED</h1>
-        <button onClick={handleLogout} className="px-8 py-3 border border-red-500 rounded hover:bg-red-900/20 transition-colors">LOGOUT</button>
-    </div>
-  );
-
-  if (loadingAuth) return <div className="h-screen bg-black text-cyan-500 flex items-center justify-center font-mono animate-pulse">LOADING NEURAL LINK...</div>;
-  
-  if (!user) return <AuthScreen onLoginSuccess={setUser} />;
-
+  // --- القائمة السفلية ---
   let navLinks = [
     { title: "Base", icon: <IconHome className="w-full text-cyan-400" />, onClick: () => setCurrentView('home') },
     { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
@@ -467,125 +445,88 @@ export default function RussianApp() {
     { title: "Config", icon: <IconSettings className="w-full text-neutral-400" />, onClick: () => setCurrentView('settings') },
   ];
   
-  if (isJunior) {
-      navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin') });
-  }
+  if (isJunior) navLinks.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-500" />, onClick: () => setCurrentView('admin_panel') });
+  if (!isAdmin) navLinks.push({ title: "Support", icon: <IconLifebuoy className="w-full text-orange-500" />, onClick: () => setShowSupport(true) });
 
-  const renderContent = () => {
-    if (currentView === 'admin' && !isJunior) return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
+  // --- Render (العرض) ---
+  if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
+  
+  if (isBanned) return (
+    <div className="h-screen w-screen bg-black flex flex-col items-center justify-center text-red-500 space-y-6 font-mono">
+        <h1 className="text-6xl font-black">ACCESS DENIED</h1>
+        <button onClick={handleLogout} className="px-8 py-3 border border-red-500 text-white hover:bg-red-900/50">LOGOUT</button>
+    </div>
+  );
 
-    switch (currentView) {
-      case 'home': return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
-      case 'games': return <GamesHub cards={cards} onOpenGame={(gameId) => setActiveOverlayGame(gameId)} />;
-      case 'live': return <RealLiveStream user={user} onClose={() => setCurrentView('home')} />;
-      case 'chat': return <CommunicationHub user={user} />;
-      case 'category': return <CategorySelect categories={categories} activeCategory={activeCategory} onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} />;
-      case 'study':
-        return (
-            <div className="flex flex-col items-center justify-center h-full w-full relative pb-32">
-                
-                {currentCard ? (
-                    <motion.div 
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="relative z-10 flex flex-col items-center"
-                    >
-                        {/* Header بسيط */}
-                        <div className="mb-2 flex items-center gap-2 text-cyan-500/50">
-                            <IconInfinity size={20} />
-                            <span className="text-xs font-mono tracking-[0.3em]">UNLIMITED_LEARNING_PROTOCOL</span>
-                        </div>
-
-                        {/* البطاقة مع العداد الجديد */}
-                        <StudyCard 
-                            card={currentCard} 
-                            sessionStats={sessionStats} // تمرير العداد هنا
-                            onResult={(id, known) => {
-                                 // تحديث العداد
-                                 if (known) {
-                                    setSessionStats(prev => ({ ...prev, correct: prev.correct + 1 }));
-                                    playSFX('success');
-                                 } else {
-                                    setSessionStats(prev => ({ ...prev, wrong: prev.wrong + 1 }));
-                                    playSFX('error');
-                                 }
-                                 
-                                 // الانتقال للبطاقة التالية
-                                 setTimeout(() => {
-                                    handleSwipe(known ? 'right' : 'left');
-                                 }, 300); // تقليل الانتظار قليلاً للاستجابة الأسرع
-                            }} 
-                            speak={speak}
-                        />
-                        
-                    </motion.div>
-                ) : (
-                    <div className="text-center p-10 glass-card-pro rounded-2xl backdrop-blur-md">
-                        <IconCpu size={64} className="text-cyan-500 mx-auto mb-4 animate-pulse" />
-                        <h2 className="text-3xl font-black text-cyan-400 mb-2 glitch-text" data-text="ALL DATA PROCESSED">ALL DATA PROCESSED</h2>
-                        <p className="text-white/50 text-sm mb-6">Neural link synced. No more cards due.</p>
-                        
-                        <div className="flex gap-6 justify-center mb-8 text-lg font-mono border border-white/10 p-4 rounded-xl bg-black/40">
-                            <div className="text-green-500 font-bold">✓ {sessionStats.correct} Correct</div>
-                            <div className="text-red-500 font-bold">✕ {sessionStats.wrong} Wrong</div>
-                        </div>
-
-                        <button onClick={() => setCurrentView('home')} className="px-8 py-3 bg-cyan-600 text-white font-bold rounded-full hover:bg-cyan-500 shadow-[0_0_20px_#06b6d4]">RETURN TO BASE</button>
-                    </div>
-                )}
-            </div>
-        );
-      case 'data': return <DataManager cards={cards} onAdd={addCard} onDelete={deleteCard} onUpdate={updateCard} isJunior={isJunior} />;
-      case 'leaderboard': return <CyberDeck user={user} stats={stats || { xp: 0, streak: 0, avatar: '👤' }} cards={cards || []} />;
-      case 'settings': return <SettingsView user={user} resetProgress={resetProgress} onLogout={handleLogout} />;
-      case 'admin': return <AdminDashboard currentUser={user} userData={userData} />;
-      default: return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
-    }
-  };
+  if (loadingAuth) return <div className="h-screen bg-black text-cyan-500 flex items-center justify-center font-mono animate-pulse">LOADING...</div>;
+  if (!user) return <AuthScreen onLoginSuccess={setUser} />;
 
   return (
     <div 
       ref={containerRef} 
       onMouseMove={handleMouseMove}
-      className="relative h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black selection:bg-cyan-500/30 selection:text-cyan-200 spotlight-bg"
+      className="relative h-screen w-full overflow-hidden font-sans text-neutral-200 bg-black spotlight-bg"
     >
-      <GridBackground /> 
-      <CyberHUD /> 
-      <div className="crt-overlay"></div>
-      <DigitalRain />
+      {/* Backgrounds - تظهر فقط اذا لم نكن في وضع الادمن */}
+      {!(isAdmin && currentView === 'admin_panel') && (
+          <>
+            <GridBackground /> 
+            <CyberHUD /> 
+            <div className="crt-overlay"></div>
+            <DigitalRain />
+          </>
+      )}
       
+      {/* Modals */}
       {activeOverlayGame === 'time_traveler' && <TimeTraveler onClose={() => setActiveOverlayGame(null)} />}
-      
-      {/* تم حذف مكون DailyReward من هنا */}
+      {showSupport && <SupportModal user={user} onClose={() => setShowSupport(false)} />}
       
       <AnimatePresence>
         {broadcast && (
-            <motion.div initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} className="fixed top-0 w-full bg-red-900/90 border-b border-red-500 text-white text-center py-3 z-[100] font-bold shadow-[0_0_30px_rgba(220,38,38,0.5)] flex justify-center items-center gap-3 backdrop-blur-xl">
-                <span className="tracking-widest uppercase text-sm md:text-base">{broadcast}</span>
+            <motion.div initial={{ y: -100 }} animate={{ y: 0 }} exit={{ y: -100 }} className="fixed top-0 w-full bg-red-900/90 text-white text-center py-3 z-[100] font-bold">
+                {broadcast}
             </motion.div>
         )}
       </AnimatePresence>
 
       <main className="relative z-10 flex flex-col items-center justify-start h-full w-full pt-10 md:pt-0">
-           <AnimatePresence mode="wait">
-             <motion.div 
-                key={currentView} 
-                initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }} 
-                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }} 
-                exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }} 
-                transition={{ duration: 0.3 }} 
-                className="w-full h-full flex justify-center"
-             >
-                {renderContent()}
-             </motion.div>
-           </AnimatePresence>
+           {/* هنا نستدعي المدير الجديد بدلاً من كتابة كل شيء هنا */}
+           <ViewManager 
+              currentView={currentView}
+              setCurrentView={setCurrentView}
+              user={user}
+              userData={userData}
+              isAdmin={isAdmin}
+              // تمرير البيانات
+              cards={cards}
+              currentCard={currentCard}
+              sessionStats={sessionStats}
+              setSessionStats={setSessionStats}
+              handleSwipe={handleSwipe}
+              playSFX={playSFX}
+              speak={speak}
+              addCard={addCard}
+              deleteCard={deleteCard}
+              updateCard={updateCard}
+              stats={stats}
+              categories={categories}
+              activeCategory={activeCategory}
+              setActiveCategory={setActiveCategory}
+              handleLogout={handleLogout}
+              resetProgress={resetProgress}
+              onOpenGame={(id) => setActiveOverlayGame(id)}
+              setShowSupport={setShowSupport}
+           />
       </main>
 
-      <div className="fixed bottom-8 left-0 w-full z-50 flex justify-center pointer-events-none">
-          <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="pointer-events-auto">
-              <FloatingDock items={navLinks} />
-          </motion.div>
-      </div>
+      {/* Dock يختفي في وضع الادمن */}
+      {!(isAdmin && currentView === 'admin_panel') && (
+          <div className="fixed bottom-8 left-0 w-full z-50 flex justify-center pointer-events-none">
+              <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="pointer-events-auto">
+                  <FloatingDock items={navLinks} />
+              </motion.div>
+          </div>
+      )}
     </div>
   );
 }
@@ -639,144 +580,298 @@ FILE: components\AdminDashboard.jsx
 "use client";
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, onSnapshot, query, orderBy, limit, doc, updateDoc, addDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc, query, orderBy, addDoc } from "firebase/firestore";
 import { 
   IconShield, IconUser, IconActivity, IconChartBar, 
-  IconBroadcast, IconSearch, IconCpu 
+  IconBroadcast, IconSearch, IconCpu, IconMessage2, 
+  IconLock, IconLockOpen, IconTrash, IconEye
 } from '@tabler/icons-react';
 
 export default function AdminDashboard({ currentUser }) {
-  const [activeView, setActiveView] = useState('overview'); // overview, users, system
+  const [activeView, setActiveView] = useState('overview'); 
   const [users, setUsers] = useState([]);
+  const [tickets, setTickets] = useState([]);
   const [broadcastMsg, setBroadcastMsg] = useState("");
+  const [selectedUser, setSelectedUser] = useState(null); // لعرض تفاصيل مستخدم أو مراسلته
 
-  // جلب البيانات
+  // 1. جلب المستخدمين
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "users"), (snap) => 
+    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => 
       setUsers(snap.docs.map(d => ({id: d.id, ...d.data()})))
     );
-    return () => unsub();
+    return () => unsubUsers();
   }, []);
 
-  // دالة إرسال البث
+  // 2. جلب تذاكر الدعم
+  useEffect(() => {
+    const q = query(collection(db, "support_tickets"), orderBy("lastUpdate", "desc"));
+    const unsubTickets = onSnapshot(q, (snap) => 
+        setTickets(snap.docs.map(d => ({id: d.id, ...d.data()})))
+    );
+    return () => unsubTickets();
+  }, []);
+
+  // --- ACTIONS ---
+
+  const handleRoleChange = async (targetUid, newRole, targetEmail) => {
+      // قانون التحريم: لا يمكن لمستخدم عادي تعديل الماستر
+      if (targetEmail === 'islamaz@bomba.com') {
+          alert("خطأ: لا يمكن تعديل رتبة القائد الأعلى (Master).");
+          return;
+      }
+      await updateDoc(doc(db, "users", targetUid), { role: newRole });
+  };
+
+  const toggleBan = async (user) => {
+      if (user.email === 'islamaz@bomba.com') return;
+      await updateDoc(doc(db, "users", user.id), { isBanned: !user.isBanned });
+  };
+
   const sendBroadcast = async () => {
     if(!broadcastMsg) return;
-    await updateDoc(doc(db, "system", "broadcast"), { message: broadcastMsg, active: true });
-    alert("Signal Transmitted!");
+    await updateDoc(doc(db, "system", "broadcast"), { 
+        message: broadcastMsg, 
+        active: true,
+        sentBy: currentUser.email,
+        timestamp: new Date().toISOString()
+    });
+    alert("تم إرسال الرسالة العامة لجميع الوحدات.");
     setBroadcastMsg("");
   };
 
-  // --- مكونات الرسوم البيانية البسيطة (SVG) ---
-  const ActivityChart = () => (
-    <div className="h-40 flex items-end gap-2 mt-4 pb-2 border-b border-white/10">
-      {[40, 70, 30, 80, 50, 90, 60, 40, 70, 95].map((h, i) => (
-        <div key={i} className="flex-1 bg-[var(--neon-primary)]/20 hover:bg-[var(--neon-primary)] transition-all rounded-t-sm relative group" style={{height: `${h}%`}}>
-            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black border border-white/20 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">{h}%</div>
-        </div>
-      ))}
-    </div>
-  );
+  const replyToTicket = async (ticketId, reply) => {
+      // إضافة رد على تذكرة
+      // ... (يمكن تنفيذها بفتح مودال)
+      alert("خاصية الرد قيد التطوير في النسخة 2.1");
+  };
 
   return (
-    <div className="w-full h-full flex flex-col md:flex-row bg-[var(--bg-deep)] text-white overflow-hidden font-sans">
+    // التصميم: أبيض وأسود صارم (Monochrome Corporate)
+    <div className="w-full h-screen bg-[#f5f5f5] text-black font-mono flex overflow-hidden selection:bg-black selection:text-white">
       
-      {/* Sidebar */}
-      <div className="w-full md:w-64 bg-white/5 border-r border-white/10 flex flex-col p-4 gap-2">
-        <div className="p-4 mb-4 border-b border-white/10">
-            <h2 className="font-black text-xl tracking-widest text-[var(--neon-primary)]">OVERWATCH</h2>
-            <p className="text-[10px] text-white/40 uppercase">Admin Console v2.0</p>
+      {/* SIDEBAR */}
+      <div className="w-64 bg-black text-white flex flex-col border-r border-gray-800 shadow-2xl shrink-0">
+        <div className="p-6 border-b border-gray-800">
+            <h1 className="text-2xl font-black tracking-tighter">NEXUS<span className="text-gray-500">ADMIN</span></h1>
+            <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest">
+                Level 5 Clearance
+            </p>
         </div>
-        <MenuBtn id="overview" icon={IconChartBar} label="Analytics" active={activeView} set={setActiveView} />
-        <MenuBtn id="users" icon={IconUser} label="Operatives" active={activeView} set={setActiveView} />
-        <MenuBtn id="system" icon={IconBroadcast} label="Comms" active={activeView} set={setActiveView} />
+        
+        <nav className="flex-1 p-4 space-y-2">
+            <MenuBtn id="overview" label="لوحة القيادة" icon={IconChartBar} active={activeView} set={setActiveView} />
+            <MenuBtn id="users" label="المستخدمين والرتب" icon={IconUser} active={activeView} set={setActiveView} />
+            <MenuBtn id="support" label="مركز الدعم والشكاوى" icon={IconMessage2} active={activeView} set={setActiveView} badge={tickets.length} />
+            <MenuBtn id="broadcast" label="البث العام" icon={IconBroadcast} active={activeView} set={setActiveView} />
+        </nav>
+
+        <div className="p-4 border-t border-gray-800 text-xs text-gray-500 text-center">
+            SYSTEM V.2.0 <br/> SECURE CONNECTION
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
+      {/* MAIN CONTENT */}
+      <div className="flex-1 overflow-y-auto bg-white p-8">
         
+        {/* OVERVIEW */}
         {activeView === 'overview' && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-                <h1 className="text-3xl font-black">SYSTEM METRICS</h1>
-                
-                {/* Cards */}
-                <div className="grid grid-cols-3 gap-6">
-                    <StatCard title="Active Users" value={users.length} icon={IconUser} color="text-blue-400" />
-                    <StatCard title="Total XP" value={users.reduce((a,b) => a + (b.xp||0), 0)} icon={IconActivity} color="text-green-400" />
-                    <StatCard title="System Load" value="12%" icon={IconCpu} color="text-red-400" />
+            <div className="space-y-8 animate-in fade-in duration-500">
+                <h2 className="text-3xl font-black border-b-4 border-black pb-2 mb-6">تقرير الحالة</h2>
+                <div className="grid grid-cols-4 gap-6">
+                    <StatBox title="إجمالي المستخدمين" value={users.length} />
+                    <StatBox title="تذاكر مفتوحة" value={tickets.length} highlight />
+                    <StatBox title="إجمالي XP" value={users.reduce((a,b)=>a+(b.xp||0),0)} />
+                    <StatBox title="حالات الحظر" value={users.filter(u=>u.isBanned).length} />
                 </div>
-
-                {/* Chart Section */}
-                <div className="p-6 glass-card rounded-2xl border border-white/10">
-                    <h3 className="font-bold text-white mb-2">Network Traffic</h3>
-                    <ActivityChart />
+                
+                {/* User Growth Chart Placeholder */}
+                <div className="h-64 bg-gray-100 border border-gray-300 flex items-center justify-center rounded-sm">
+                    <p className="text-gray-400 text-sm">[ رسم بياني لنشاط الموقع يظهر هنا ]</p>
                 </div>
             </div>
         )}
 
+        {/* USER MANAGEMENT (THE POWER TOOL) */}
         {activeView === 'users' && (
-            <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                    <h1 className="text-3xl font-black">OPERATIVE LIST</h1>
+            <div className="space-y-6 animate-in fade-in duration-500">
+                <div className="flex justify-between items-center border-b-4 border-black pb-2">
+                    <h2 className="text-3xl font-black">إدارة المستخدمين</h2>
                     <div className="relative">
-                        <IconSearch className="absolute left-3 top-2.5 text-white/30" size={18} />
-                        <input placeholder="Search ID..." className="bg-white/5 border border-white/10 rounded-full py-2 pl-10 pr-4 outline-none focus:border-[var(--neon-primary)]" />
+                        <IconSearch className="absolute right-3 top-2.5 text-gray-400" size={18} />
+                        <input placeholder="بحث عن عميل..." className="bg-gray-100 border border-gray-300 rounded-none py-2 pr-10 pl-4 w-64 focus:bg-white focus:border-black outline-none text-sm transition-all" />
                     </div>
                 </div>
-                <div className="glass-card rounded-xl overflow-hidden">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-white/5 text-white/40 uppercase font-mono text-xs">
-                            <tr><th className="p-4">User</th><th className="p-4">Rank</th><th className="p-4">XP</th><th className="p-4 text-right">Status</th></tr>
+
+                <div className="overflow-hidden border border-gray-200 shadow-sm">
+                    <table className="w-full text-right text-sm">
+                        <thead className="bg-black text-white uppercase tracking-wider">
+                            <tr>
+                                <th className="p-4">المستخدم</th>
+                                <th className="p-4">البريد الإلكتروني</th>
+                                <th className="p-4">الرتبة الحالية</th>
+                                <th className="p-4">النقاط (XP)</th>
+                                <th className="p-4 text-center">الإجراءات</th>
+                            </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
-                            {users.map(u => (
-                                <tr key={u.id} className="hover:bg-white/5">
-                                    <td className="p-4 font-bold">{u.email}</td>
-                                    <td className="p-4 text-[var(--neon-secondary)]">{u.role || 'Agent'}</td>
-                                    <td className="p-4 font-mono">{u.xp || 0}</td>
-                                    <td className="p-4 text-right"><span className="px-2 py-1 bg-green-900/30 text-green-400 rounded text-xs">ONLINE</span></td>
-                                </tr>
-                            ))}
+                        <tbody className="divide-y divide-gray-200">
+                            {users.map(u => {
+                                const isTargetMaster = u.email === 'islamaz@bomba.com';
+                                return (
+                                    <tr key={u.id} className={`hover:bg-gray-50 transition-colors ${u.isBanned ? 'bg-red-50' : ''}`}>
+                                        <td className="p-4 font-bold">{u.id.substring(0,8)}...</td>
+                                        <td className="p-4 font-mono">{u.email}</td>
+                                        <td className="p-4">
+                                            {isTargetMaster ? (
+                                                <span className="bg-black text-white px-2 py-1 text-xs font-bold rounded">MASTER</span>
+                                            ) : (
+                                                <select 
+                                                    value={u.role || 'user'} 
+                                                    onChange={(e) => handleRoleChange(u.id, e.target.value, u.email)}
+                                                    className="bg-white border border-gray-300 px-2 py-1 text-xs focus:border-black outline-none cursor-pointer"
+                                                >
+                                                    <option value="user">مستخدم</option>
+                                                    <option value="junior_admin">أدمن مساعد</option>
+                                                    <option value="admin">أدمن</option>
+                                                </select>
+                                            )}
+                                        </td>
+                                        <td className="p-4">{u.xp}</td>
+                                        <td className="p-4 flex justify-center gap-2">
+                                            <button onClick={() => setSelectedUser(u)} className="p-2 border border-gray-300 hover:bg-black hover:text-white transition-colors" title="عرض الملف">
+                                                <IconEye size={16}/>
+                                            </button>
+                                            {!isTargetMaster && (
+                                                <button 
+                                                    onClick={() => toggleBan(u)} 
+                                                    className={`p-2 border transition-colors ${u.isBanned ? 'bg-red-600 text-white border-red-600' : 'border-gray-300 hover:bg-red-600 hover:text-white'}`}
+                                                    title={u.isBanned ? "إلغاء الحظر" : "حظر المستخدم"}
+                                                >
+                                                    {u.isBanned ? <IconLockOpen size={16}/> : <IconLock size={16}/>}
+                                                </button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                )
+                            })}
                         </tbody>
                     </table>
                 </div>
             </div>
         )}
 
-        {activeView === 'system' && (
-            <div className="max-w-2xl space-y-6">
-                <h1 className="text-3xl font-black text-red-500">GLOBAL BROADCAST</h1>
-                <div className="p-6 glass-card rounded-2xl border border-red-500/30 bg-red-900/5">
+        {/* SUPPORT & TICKETS */}
+        {activeView === 'support' && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+                <h2 className="text-3xl font-black border-b-4 border-black pb-2">مركز الشكاوى</h2>
+                
+                <div className="grid gap-4">
+                    {tickets.length === 0 ? (
+                        <div className="text-center py-10 text-gray-400">لا توجد رسائل جديدة.</div>
+                    ) : (
+                        tickets.map(ticket => (
+                            <div key={ticket.id} className="bg-white border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col md:flex-row gap-4">
+                                <div className="md:w-1/4 border-l border-gray-100 pl-4">
+                                    <div className="font-bold text-lg mb-1">{ticket.userEmail}</div>
+                                    <div className="text-xs text-gray-500 mb-2">UID: {ticket.userId}</div>
+                                    <div className={`text-xs px-2 py-1 inline-block rounded ${ticket.status === 'open' ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
+                                        {ticket.status === 'open' ? 'مفتوح' : 'مغلق'}
+                                    </div>
+                                </div>
+                                <div className="flex-1">
+                                    <div className="bg-gray-50 p-4 rounded-lg text-sm mb-4 max-h-40 overflow-y-auto">
+                                        {ticket.messages && ticket.messages.map((m, i) => (
+                                            <div key={i} className={`mb-2 p-2 rounded ${m.sender === 'user' ? 'bg-white border border-gray-200' : 'bg-black text-white ml-auto w-fit'}`}>
+                                                <p>{m.text}</p>
+                                                <span className="text-[10px] opacity-50 block mt-1">{new Date(m.createdAt).toLocaleString()}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button onClick={() => alert("سيتم فتح نافذة الرد هنا")} className="bg-black text-white px-4 py-2 text-sm hover:opacity-80">
+                                        فتح المحادثة والرد
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+        )}
+
+        {/* BROADCAST SYSTEM */}
+        {activeView === 'broadcast' && (
+            <div className="max-w-2xl mx-auto mt-10 animate-in fade-in duration-500">
+                <div className="bg-white border-2 border-black p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                    <h2 className="text-2xl font-black mb-6 flex items-center gap-2">
+                        <IconBroadcast /> بروتوكول البث العام
+                    </h2>
+                    <p className="mb-4 text-sm text-gray-600">
+                        تحذير: هذه الرسالة ستظهر لجميع المستخدمين المتصلين فوراً في أعلى شاشتهم.
+                    </p>
                     <textarea 
                         value={broadcastMsg}
-                        onChange={e => setBroadcastMsg(e.target.value)}
-                        className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white h-32 mb-4 focus:border-red-500 outline-none"
-                        placeholder="ENTER SYSTEM ALERT MESSAGE..."
+                        onChange={(e) => setBroadcastMsg(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-300 p-4 text-sm focus:border-black outline-none h-32 resize-none mb-4"
+                        placeholder="اكتب رسالة النظام هنا..."
                     />
-                    <button onClick={sendBroadcast} className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(220,38,38,0.4)] transition-all">
-                        TRANSMIT SIGNAL
+                    <button 
+                        onClick={sendBroadcast}
+                        disabled={!broadcastMsg}
+                        className="w-full bg-black text-white py-4 font-bold text-lg hover:bg-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                        إرسال الإشارة
                     </button>
                 </div>
             </div>
         )}
 
       </div>
+
+      {/* USER DETAILS MODAL (Simple overlay) */}
+      {selectedUser && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm" onClick={() => setSelectedUser(null)}>
+              <div className="bg-white p-8 max-w-lg w-full shadow-2xl border-2 border-black" onClick={e => e.stopPropagation()}>
+                  <h3 className="text-2xl font-black mb-4">بيانات العميل</h3>
+                  <div className="space-y-2 text-sm">
+                      <p><strong>ID:</strong> {selectedUser.id}</p>
+                      <p><strong>Email:</strong> {selectedUser.email}</p>
+                      <p><strong>XP:</strong> {selectedUser.xp}</p>
+                      <p><strong>Last Login:</strong> {selectedUser.lastLogin || 'N/A'}</p>
+                  </div>
+                  
+                  <div className="mt-6 border-t pt-4">
+                      <h4 className="font-bold mb-2">تعديل الرصيد (XP)</h4>
+                      <div className="flex gap-2">
+                          <button onClick={async () => { await updateDoc(doc(db, "users", selectedUser.id), { xp: (selectedUser.xp || 0) + 100 }); alert("تمت الزيادة"); }} className="bg-green-600 text-white px-4 py-2 text-xs">+100 XP</button>
+                          <button onClick={async () => { await updateDoc(doc(db, "users", selectedUser.id), { xp: Math.max(0, (selectedUser.xp || 0) - 100) }); alert("تم الخصم"); }} className="bg-red-600 text-white px-4 py-2 text-xs">-100 XP</button>
+                      </div>
+                  </div>
+
+                  <button onClick={() => setSelectedUser(null)} className="mt-6 w-full border border-black py-2 hover:bg-black hover:text-white transition-colors">إغلاق</button>
+              </div>
+          </div>
+      )}
+
     </div>
   );
 }
 
-const MenuBtn = ({ id, icon: Icon, label, active, set }) => (
-    <button onClick={() => set(id)} className={`flex items-center gap-3 p-3 rounded-lg transition-all ${active === id ? 'bg-[var(--neon-primary)] text-black font-bold' : 'text-white/60 hover:bg-white/10'}`}>
-        <Icon size={20} /> <span>{label}</span>
+const MenuBtn = ({ id, label, icon: Icon, active, set, badge }) => (
+    <button 
+        onClick={() => set(id)}
+        className={`w-full flex items-center justify-between p-3 text-sm font-bold transition-all ${active === id ? 'bg-white text-black translate-x-2' : 'text-gray-400 hover:text-white hover:bg-gray-900'}`}
+    >
+        <div className="flex items-center gap-3">
+            <Icon size={18} />
+            <span>{label}</span>
+        </div>
+        {badge > 0 && <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full">{badge}</span>}
     </button>
 );
 
-const StatCard = ({ title, value, icon: Icon, color }) => (
-    <div className="p-6 glass-card rounded-2xl border border-white/10 flex items-center gap-4">
-        <div className={`p-4 rounded-xl bg-white/5 ${color}`}><Icon size={32}/></div>
-        <div>
-            <div className="text-2xl font-black text-white">{value}</div>
-            <div className="text-xs text-white/40 uppercase tracking-wider">{title}</div>
-        </div>
+const StatBox = ({ title, value, highlight }) => (
+    <div className={`p-6 border ${highlight ? 'bg-black text-white border-black' : 'bg-white border-gray-200'} shadow-sm`}>
+        <div className="text-3xl font-black mb-1">{value}</div>
+        <div className={`text-xs uppercase tracking-widest ${highlight ? 'text-gray-400' : 'text-gray-500'}`}>{title}</div>
     </div>
 );
 
@@ -5559,83 +5654,52 @@ FILE: components\SupportModal.jsx
 ==================================================================
 
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot } from "firebase/firestore";
+import { doc, updateDoc, arrayUnion, setDoc, getDoc, onSnapshot } from "firebase/firestore";
 import { IconX, IconSend, IconMessage2 } from '@tabler/icons-react';
 
 export default function SupportModal({ user, onClose }) {
-  const [message, setMessage] = useState("");
-  const [chatHistory, setChatHistory] = useState([]);
-  const scrollRef = useRef(null);
+  const [msg, setMsg] = useState("");
+  const [history, setHistory] = useState([]);
 
   useEffect(() => {
-    // جلب أو إنشاء تذكرة الدعم الخاصة بالمستخدم
-    const ticketRef = doc(db, "support_tickets", user.uid);
-    
-    const unsubscribe = onSnapshot(ticketRef, (docSnap) => {
-        if (docSnap.exists()) {
-            setChatHistory(docSnap.data().messages || []);
-        } else {
-            // إنشاء تذكرة فارغة إذا لم تكن موجودة
-            setDoc(ticketRef, {
-                userId: user.uid,
-                userEmail: user.email,
-                messages: [],
-                status: 'open',
-                lastUpdate: new Date().toISOString()
-            });
-        }
-    });
-    return () => unsubscribe();
+      const ticketRef = doc(db, "support_tickets", user.uid);
+      const unsub = onSnapshot(ticketRef, (snap) => {
+          if(snap.exists()) setHistory(snap.data().messages || []);
+          else setDoc(ticketRef, { userId: user.uid, userEmail: user.email, messages: [], status: 'open', lastUpdate: Date.now() });
+      });
+      return () => unsub();
   }, [user]);
 
-  useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatHistory]);
-
-  const sendMessage = async () => {
-      if(!message.trim()) return;
+  const send = async () => {
+      if(!msg.trim()) return;
       const ticketRef = doc(db, "support_tickets", user.uid);
-      const msgObj = { text: message, sender: 'user', createdAt: new Date().toISOString() };
-      
       await updateDoc(ticketRef, {
-          messages: arrayUnion(msgObj),
-          lastUpdate: new Date().toISOString(),
+          messages: arrayUnion({ text: msg, sender: 'user', createdAt: new Date().toISOString() }),
+          lastUpdate: Date.now(),
           status: 'open'
       });
-      setMessage("");
+      setMsg("");
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-[#111] border border-purple-500 rounded-2xl flex flex-col h-[600px] shadow-[0_0_50px_rgba(168,85,247,0.2)]">
-            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-purple-900/20">
-                <h3 className="font-bold text-purple-400 flex items-center gap-2"><IconMessage2/> SUPPORT LINE</h3>
-                <button onClick={onClose} className="text-white/50 hover:text-white"><IconX/></button>
+    <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div className="w-full max-w-md bg-[#111] border border-cyan-500 rounded-xl overflow-hidden flex flex-col h-[500px]">
+            <div className="p-4 bg-cyan-900/20 border-b border-cyan-500/30 flex justify-between items-center">
+                <h3 className="text-cyan-400 font-bold flex gap-2"><IconMessage2/> الدعم الفني</h3>
+                <button onClick={onClose}><IconX className="text-white/50 hover:text-white"/></button>
             </div>
-            
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar bg-black">
-                {chatHistory.length === 0 && <div className="text-center text-white/30 text-sm mt-10">Send a message to Admins...</div>}
-                {chatHistory.map((msg, i) => (
-                    <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[80%] p-3 rounded-xl text-sm ${msg.sender === 'user' ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-300'}`}>
-                            {msg.text}
-                        </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-black/50">
+                {history.map((m, i) => (
+                    <div key={i} className={`p-3 rounded-lg text-sm max-w-[80%] ${m.sender === 'user' ? 'bg-cyan-900/40 text-cyan-100 ml-auto rounded-tr-none' : 'bg-gray-800 text-white mr-auto rounded-tl-none'}`}>
+                        {m.text}
                     </div>
                 ))}
-                <div ref={scrollRef}></div>
             </div>
-
-            <div className="p-4 border-t border-white/10 flex gap-2">
-                <input 
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                    placeholder="Describe your issue..." 
-                    className="flex-1 bg-[#222] border border-white/10 rounded-lg px-3 py-2 text-white outline-none focus:border-purple-500"
-                />
-                <button onClick={sendMessage} className="bg-purple-600 p-2 rounded-lg text-white hover:bg-purple-500"><IconSend size={20}/></button>
+            <div className="p-3 border-t border-white/10 flex gap-2">
+                <input value={msg} onChange={e=>setMsg(e.target.value)} className="flex-1 bg-black border border-white/20 rounded px-3 text-white outline-none focus:border-cyan-500" placeholder="اكتب مشكلتك..." />
+                <button onClick={send} className="bg-cyan-600 p-2 rounded text-white"><IconSend size={18}/></button>
             </div>
         </div>
     </div>
@@ -6149,6 +6213,169 @@ export const TextGenerateEffect = ({ words, className }) => {
     </motion.div>
   );
 };
+
+
+==================================================================
+FILE: components\views\ViewManager.jsx
+==================================================================
+
+"use client";
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// استيراد جميع الشاشات هنا
+import { HeroSection } from '../HeroSection';
+import { CategorySelect } from '../CategorySelect';
+import { StudyCard } from '../StudyCard';
+import { DataManager } from '../DataManager'; 
+import CyberDeck from '../CyberDeck'; 
+import CommunicationHub from '../CommunicationHub'; 
+import SettingsView from '../SettingsView'; 
+import AdminDashboard from '../AdminDashboard'; 
+import GamesHub from '../GamesHub';
+import RealLiveStream from '../live/RealLiveStream';
+import { IconCpu, IconInfinity } from '@tabler/icons-react';
+
+export default function ViewManager({ 
+  currentView, 
+  setCurrentView, 
+  user, 
+  userData,
+  isAdmin, 
+  // props للدراسة
+  cards,
+  currentCard,
+  sessionStats,
+  setSessionStats,
+  handleSwipe,
+  playSFX,
+  speak,
+  // props للبيانات
+  addCard,
+  deleteCard,
+  updateCard,
+  stats,
+  categories,
+  activeCategory,
+  setActiveCategory,
+  // props للأدمن
+  handleLogout,
+  resetProgress,
+  onOpenGame,
+  setShowSupport
+}) {
+
+  // إذا كان أدمن وفي وضع اللوحة، اعرض لوحة الأدمن فوراً (بدون أنيميشن الثيم)
+  if (currentView === 'admin_panel' && isAdmin) {
+      return <AdminDashboard currentUser={user} userData={userData} />;
+  }
+
+  // محتوى الشاشات العادية
+  const renderContent = () => {
+    switch (currentView) {
+      case 'home': 
+        return <HeroSection 
+                  onStart={() => setCurrentView('category')} 
+                  onOpenGame={() => setCurrentView('games')} 
+                  user={user} 
+                  isAdmin={isAdmin}
+                  onOpenAdmin={() => setCurrentView('admin_panel')}
+               />;
+      
+      case 'games': 
+        return <GamesHub cards={cards} onOpenGame={onOpenGame} />;
+      
+      case 'live': 
+        return <RealLiveStream user={user} onClose={() => setCurrentView('home')} />;
+      
+      case 'chat': 
+        return <CommunicationHub user={user} />;
+      
+      case 'category': 
+        return <CategorySelect 
+                  categories={categories} 
+                  activeCategory={activeCategory} 
+                  onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} 
+               />;
+      
+      case 'study':
+        return (
+            <div className="flex flex-col items-center justify-center h-full w-full relative pb-32">
+                {currentCard ? (
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="relative z-10 flex flex-col items-center"
+                    >
+                        <div className="mb-2 flex items-center gap-2 text-cyan-500/50">
+                            <IconInfinity size={20} />
+                            <span className="text-xs font-mono tracking-[0.3em]">UNLIMITED_LEARNING_PROTOCOL</span>
+                        </div>
+
+                        <StudyCard 
+                            card={currentCard} 
+                            sessionStats={sessionStats}
+                            onResult={(id, known) => {
+                                 if (known) {
+                                    setSessionStats(prev => ({ ...prev, correct: prev.correct + 1 }));
+                                    playSFX('success');
+                                 } else {
+                                    setSessionStats(prev => ({ ...prev, wrong: prev.wrong + 1 }));
+                                    playSFX('error');
+                                 }
+                                 setTimeout(() => {
+                                    handleSwipe(known ? 'right' : 'left');
+                                 }, 300);
+                            }} 
+                            speak={speak}
+                        />
+                    </motion.div>
+                ) : (
+                    <div className="text-center p-10 glass-card-pro rounded-2xl backdrop-blur-md">
+                        <IconCpu size={64} className="text-cyan-500 mx-auto mb-4 animate-pulse" />
+                        <h2 className="text-3xl font-black text-cyan-400 mb-2 glitch-text" data-text="ALL DATA PROCESSED">ALL DATA PROCESSED</h2>
+                        <p className="text-white/50 text-sm mb-6">Neural link synced. No more cards due.</p>
+                        
+                        <div className="flex gap-6 justify-center mb-8 text-lg font-mono border border-white/10 p-4 rounded-xl bg-black/40">
+                            <div className="text-green-500 font-bold">✓ {sessionStats.correct} Correct</div>
+                            <div className="text-red-500 font-bold">✕ {sessionStats.wrong} Wrong</div>
+                        </div>
+
+                        <button onClick={() => setCurrentView('home')} className="px-8 py-3 bg-cyan-600 text-white font-bold rounded-full hover:bg-cyan-500 shadow-[0_0_20px_#06b6d4]">RETURN TO BASE</button>
+                    </div>
+                )}
+            </div>
+        );
+
+      case 'data': 
+        return <DataManager cards={cards} onAdd={addCard} onDelete={deleteCard} onUpdate={updateCard} isJunior={true} />; 
+      
+      case 'leaderboard': 
+        return <CyberDeck user={user} stats={stats || { xp: 0, streak: 0, avatar: '👤' }} cards={cards || []} />;
+      
+      case 'settings': 
+        return <SettingsView user={user} resetProgress={resetProgress} onLogout={handleLogout} />;
+      
+      default: 
+        return <HeroSection onStart={() => setCurrentView('category')} onOpenGame={() => setCurrentView('games')} user={user} />;
+    }
+  };
+
+  return (
+    <AnimatePresence mode="wait">
+        <motion.div 
+        key={currentView} 
+        initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }} 
+        animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }} 
+        exit={{ opacity: 0, scale: 1.05, filter: "blur(10px)" }} 
+        transition={{ duration: 0.3 }} 
+        className="w-full h-full flex justify-center"
+        >
+        {renderContent()}
+        </motion.div>
+    </AnimatePresence>
+  );
+}
 
 
 ==================================================================
@@ -7764,16 +7991,18 @@ FILE: hooks\useStudySystem.js
 import { useState, useEffect } from 'react';
 import { fullDatabase } from '../data/fullDatabase';
 import { db } from '../lib/firebase';
-import { doc, getDoc, setDoc, collection, getDocs, updateDoc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteDoc, onSnapshot, writeBatch } from "firebase/firestore";
 
 export const useStudySystem = (user) => {
   const [cards, setCards] = useState([]);
-  const [stats, setStats] = useState({ xp: 0, streak: 0, avatar: "👤" });
+  const [stats, setStats] = useState({ xp: 0, streak: 0, role: 'user' });
   const [loading, setLoading] = useState(true);
   const [currentCard, setCurrentCard] = useState(null);
+  
+  // بيانات النظام
+  const [isMaster, setIsMaster] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isBanned, setIsBanned] = useState(false);
-  const [broadcast, setBroadcast] = useState(null); // رسالة الأدمن
 
   useEffect(() => {
     if (!user) {
@@ -7782,91 +8011,119 @@ export const useStudySystem = (user) => {
         return;
     }
 
-    // 1. مراقبة المستخدم
-    const unsubUser = onSnapshot(doc(db, "users", user.uid), (docSnap) => {
+    // 1. مزامنة بيانات المستخدم والصلاحيات
+    const userRef = doc(db, "users", user.uid);
+    const unsubUser = onSnapshot(userRef, async (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data();
             setStats(data);
-            setIsAdmin(data.isAdmin === true);
+            
+            const isMasterEmail = user.email === 'islamaz@bomba.com';
+            setIsMaster(isMasterEmail);
+            setIsAdmin(data.role === 'admin' || data.role === 'master' || isMasterEmail);
             setIsBanned(data.isBanned === true);
+
+            // إصلاح الصلاحيات تلقائياً للماستر
+            if (isMasterEmail && data.role !== 'master') {
+                await updateDoc(userRef, { role: 'master' });
+            }
         } else {
-            const isAdm = user.email.toLowerCase() === 'islamaz@bomba.com';
-            setDoc(doc(db, "users", user.uid), { email: user.email, xp: 0, streak: 0, avatar: "👤", isAdmin: isAdm, isBanned: false, createdAt: new Date().toISOString() });
-        }
-    });
-
-    // 2. مراقبة رسائل النظام (البث المباشر)
-    const unsubSystem = onSnapshot(doc(db, "system", "broadcast"), (docSnap) => {
-        if (docSnap.exists() && docSnap.data().active) {
-            setBroadcast(docSnap.data().message);
-        } else {
-            setBroadcast(null);
-        }
-    });
-
-    // 3. تحميل البطاقات
-    const loadCards = async () => {
-        try {
-            const progressRef = collection(db, "users", user.uid, "progress");
-            const progressSnap = await getDocs(progressRef);
-            const progressMap = {};
-            progressSnap.forEach(doc => { progressMap[doc.id] = doc.data(); });
-
-            const merged = fullDatabase.map(card => {
-                const p = progressMap[card.id];
-                return p ? { ...card, ...p } : { ...card, level: 0, steps: 0, nextReview: Date.now() };
+            // إنشاء ملف مستخدم جديد
+            await setDoc(userRef, { 
+                email: user.email, 
+                xp: 0, 
+                role: user.email === 'islamaz@bomba.com' ? 'master' : 'user',
+                createdAt: new Date().toISOString() 
             });
+        }
+    });
 
-            setCards(merged);
-            updateCurrentCard(merged);
-        } catch (e) { console.error(e); } 
-        finally { setLoading(false); }
+    // 2. تحميل البطاقات الخاصة (Personalized Data)
+    const cardsCollection = collection(db, "users", user.uid, "personal_cards");
+    
+    const loadUserCards = async () => {
+        const snapshot = await getDocs(cardsCollection);
+        
+        if (snapshot.empty) {
+            // مستخدم جديد: نسخ قاعدة البيانات الافتراضية له
+            console.log("Initializing user database...");
+            const batch = writeBatch(db);
+            // نأخذ أول 50 كلمة فقط لتسريع العملية في البداية (يمكنك زيادة العدد)
+            fullDatabase.slice(0, 50).forEach(card => {
+                const newDocRef = doc(cardsCollection, String(card.id));
+                batch.set(newDocRef, { ...card, level: 0, nextReview: Date.now() });
+            });
+            await batch.commit();
+            // إعادة التحميل
+            loadUserCards(); 
+        } else {
+            const userCards = snapshot.docs.map(d => d.data());
+            setCards(userCards);
+            updateCurrentCard(userCards);
+            setLoading(false);
+        }
     };
 
-    loadCards();
-    return () => { unsubUser(); unsubSystem(); };
+    loadUserCards();
+
+    return () => unsubUser();
   }, [user]);
 
+  // تحديث البطاقة الحالية للمراجعة
   const updateCurrentCard = (list) => {
-      const due = list.filter(c => c.level < 5 && c.nextReview <= Date.now());
+      const due = list.filter(c => c.level < 5 && (c.nextReview || 0) <= Date.now());
       setCurrentCard(due.length > 0 ? due[0] : null);
   };
 
+  // منطق Swipe (المراجعة)
   const handleSwipe = async (direction) => {
-      if (!currentCard || !user || isBanned) return;
+      if (!currentCard || !user) return;
+      
       const known = direction === 'right';
       const nextLevel = known ? Math.min(currentCard.level + 1, 5) : 0;
-      const nextReview = Date.now() + (known ? (nextLevel * 86400000) + 60000 : 30000);
+      // خوارزمية التكرار المتباعد البسيطة
+      const nextReview = Date.now() + (known ? (Math.pow(2, nextLevel) * 86400000) : 60000); 
 
-      const updated = { ...currentCard, level: nextLevel, nextReview };
-      const newCards = cards.map(c => c.id === currentCard.id ? updated : c);
+      const updatedCard = { ...currentCard, level: nextLevel, nextReview };
       
+      // تحديث الحالة المحلية فوراً
+      const newCards = cards.map(c => c.id === currentCard.id ? updatedCard : c);
       setCards(newCards);
       updateCurrentCard(newCards);
 
-      const cardRef = doc(db, "users", user.uid, "progress", String(currentCard.id));
-      await setDoc(cardRef, { card_id: currentCard.id, level: nextLevel, next_review: nextReview });
-      
+      // تحديث قاعدة البيانات الخاصة بالمستخدم
+      const cardRef = doc(db, "users", user.uid, "personal_cards", String(currentCard.id));
+      await updateDoc(cardRef, { level: nextLevel, nextReview });
+
+      // زيادة XP
       if (known) {
           await updateDoc(doc(db, "users", user.uid), { xp: (stats.xp || 0) + 10 });
       }
   };
 
-  // دالة تغيير الأفاتار
-  const setAvatar = async (emoji) => {
-      if (user) await updateDoc(doc(db, "users", user.uid), { avatar: emoji });
+  // CRUD OPERATIONS (تعديل خاص بالمستخدم فقط)
+  
+  const addCard = async (cardData) => {
+      const newId = Date.now().toString();
+      const newCard = { ...cardData, id: newId, level: 0, nextReview: Date.now() };
+      await setDoc(doc(db, "users", user.uid, "personal_cards", newId), newCard);
+      setCards(prev => [...prev, newCard]);
   };
 
-  // دوال مساعدة
-  const addCard = () => {}; 
-  const deleteCard = () => {}; 
-  const updateCard = () => {};
-  const resetProgress = async () => { if(confirm("Reset?")) window.location.reload(); };
+  const deleteCard = async (cardId) => {
+      await deleteDoc(doc(db, "users", user.uid, "personal_cards", String(cardId)));
+      setCards(prev => prev.filter(c => c.id !== cardId));
+  };
+
+  const updateCard = async (cardId, newData) => {
+      await updateDoc(doc(db, "users", user.uid, "personal_cards", String(cardId)), newData);
+      setCards(prev => prev.map(c => c.id === cardId ? { ...c, ...newData } : c));
+  };
 
   return { 
       cards, currentCard, stats, handleSwipe, 
-      resetProgress, loading, addCard, deleteCard, updateCard, 
-      isAdmin, isBanned, broadcast, setAvatar 
+      loading, addCard, deleteCard, updateCard,
+      isAdmin, isMaster, isBanned
   };
 };
 
