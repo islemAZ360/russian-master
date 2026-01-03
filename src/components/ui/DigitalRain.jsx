@@ -1,102 +1,83 @@
 "use client";
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 const DigitalRain = React.memo(() => {
   const canvasRef = useRef(null);
   const animationRef = useRef(null);
-  const lastTimeRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
-    const ctx = canvas.getContext('2d', { alpha: true });
+    const ctx = canvas.getContext('2d', { alpha: false }); // alpha: false يحسن الأداء
+    
+    let width, height, columns;
     let drops = [];
-    let columns = 0;
     
-    // حروف روسية وأرقام (مُصححة)
-    const chars = "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЭЮЯ01";
+    // حروف المصفوفة
+    const chars = "XY01"; 
 
-    // ضبط حجم الشاشة بكفاءة
     const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      // تقليل عدد الأعمدة للأداء (كل 30 بكسل بدلاً من 20)
-      columns = Math.floor(canvas.width / 30);
-      drops = new Array(columns).fill(0).map(() => Math.random() * -50);
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+      // زيادة المسافة بين الأعمدة لتقليل عدد العناصر المرسومة (الأداء++)
+      columns = Math.ceil(width / 40); 
+      drops = new Array(columns).fill(0).map(() => Math.random() * -100);
     };
-    
-    // استخدام debounce للـ resize
-    let resizeTimeout;
-    const handleResize = () => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(resize, 100);
-    };
-    
-    window.addEventListener('resize', handleResize);
+
+    window.addEventListener('resize', resize);
     resize();
 
-    // Frame rate محدود (30 FPS للأداء)
-    const targetFPS = 30;
-    const frameInterval = 1000 / targetFPS;
+    // التحكم في سرعة الإطارات (Throttling FPS)
+    let lastTime = 0;
+    const fps = 24; // تقليل السرعة لتبدو سينمائية وأخف
+    const interval = 1000 / fps;
 
-    const draw = (timestamp) => {
-      // حساب الوقت للتحكم في FPS
-      if (timestamp - lastTimeRef.current < frameInterval) {
-        animationRef.current = requestAnimationFrame(draw);
-        return;
-      }
-      lastTimeRef.current = timestamp;
+    const draw = (currentTime) => {
+      animationRef.current = requestAnimationFrame(draw);
 
-      // تعتيم الخلفية تدريجياً
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (currentTime - lastTime < interval) return;
+      lastTime = currentTime;
 
-      ctx.font = '16px monospace';
+      // تأثير الذيل المتلاشي
+      ctx.fillStyle = 'rgba(5, 5, 5, 0.1)'; // خلفية شبه شفافة للمسح التدريجي
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = '#0F0'; // لون مبدئي
+      ctx.font = '14px monospace';
 
       for (let i = 0; i < drops.length; i++) {
-        // اختيار حرف عشوائي
         const text = chars[Math.floor(Math.random() * chars.length)];
         
-        // لون متدرج بناءً على موقع القطرة
-        const alpha = Math.min(1, drops[i] / 20);
-        ctx.fillStyle = Math.random() > 0.97 
-          ? `rgba(255, 255, 255, ${alpha})` 
-          : `rgba(6, 182, 212, ${alpha * 0.8})`;
+        // تلوين عشوائي جميل (سماوي و بنفسجي)
+        ctx.fillStyle = Math.random() > 0.5 ? '#6366f1' : '#06b6d4'; 
         
-        ctx.fillText(text, i * 30, drops[i] * 22);
+        // رسم الحرف
+        ctx.fillText(text, i * 40, drops[i] * 20);
 
-        // إعادة تعيين القطرة عند وصولها للأسفل
-        if (drops[i] * 22 > canvas.height && Math.random() > 0.98) {
+        // إعادة تدوير القطرة
+        if (drops[i] * 20 > height && Math.random() > 0.98) {
           drops[i] = 0;
         }
-        drops[i] += 0.5; // سرعة أبطأ للنعومة
+        drops[i]++;
       }
-
-      animationRef.current = requestAnimationFrame(draw);
     };
 
-    // بدء الأنيميشن
     animationRef.current = requestAnimationFrame(draw);
 
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-      clearTimeout(resizeTimeout);
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', resize);
+      cancelAnimationFrame(animationRef.current);
     };
   }, []);
 
   return (
     <canvas 
       ref={canvasRef} 
-      className="fixed inset-0 w-full h-full pointer-events-none opacity-15 z-0 digital-rain"
-      style={{ willChange: 'transform' }}
+      className="fixed inset-0 w-full h-full pointer-events-none opacity-20 z-0 mix-blend-screen"
     />
   );
 });
 
 DigitalRain.displayName = 'DigitalRain';
-
 export default DigitalRain;

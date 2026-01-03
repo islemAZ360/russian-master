@@ -3,44 +3,28 @@ const { default: flattenColorPalette } = require("tailwindcss/lib/util/flattenCo
 
 module.exports = {
   content: [
-    "./src/**/*.{js,ts,jsx,tsx,mdx}", // هذا السطر الشامل يغطي كل شيء داخل src
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   darkMode: ['class', '[data-theme="dark"]'],
   theme: {
     extend: {
       colors: {
-        theme: {
-          bg: "var(--bg-main)",
-          card: "var(--bg-card)",
-          border: "var(--border-color)",
-          text: "var(--text-main)",
-          muted: "var(--text-muted)",
-          accent: "var(--accent-color)"
-        }
+        background: "var(--bg-main)",
+        foreground: "var(--text-main)",
       },
       fontFamily: {
         sans: ['var(--font-cairo)', 'sans-serif'],
         mono: ['var(--font-mono)', 'monospace'],
       },
       animation: {
-        "meteor-effect": "meteor 5s linear infinite",
-        "shimmer": "shimmer 2s linear infinite",
-        "pulse-slow": "pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-        "border-beam": "border-beam calc(var(--duration)*1s) infinite linear",
+        "pulse-slow": "pulse 8s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "float": "float 20s ease-in-out infinite",
       },
       keyframes: {
-        meteor: {
-          "0%": { transform: "rotate(215deg) translateX(0)", opacity: "1" },
-          "70%": { opacity: "1" },
-          "100%": { transform: "rotate(215deg) translateX(-500px)", opacity: "0" },
-        },
-        shimmer: {
-          from: { backgroundPosition: "0 0" },
-          to: { backgroundPosition: "-200% 0" },
-        },
-        "border-beam": {
-          "100%": { "offset-distance": "100%" },
-        },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-20px)" },
+        }
       },
     },
   },

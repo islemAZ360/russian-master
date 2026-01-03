@@ -5,81 +5,78 @@
 @tailwind utilities;
 
 :root {
-  /* الألوان الأساسية */
-  --bg-main: #030014;
+  /* ألوان جديدة أكثر حيوية وجمالاً */
+  --bg-main: #050505;
   --text-main: #ffffff;
-  --accent-color: #7c3aed;
+  --accent-color: #6366f1; /* Indigo vibrant */
+  --accent-secondary: #ec4899; /* Pink vibrant */
   
-  /* متغيرات الشريط السفلي الذكية */
-  --dock-bg: rgba(23, 23, 23, 0.7); /* لون زجاجي افتراضي */
-  --dock-border: rgba(255, 255, 255, 0.1);
-  --dock-blur: 16px;
-}
-
-/* === إعدادات وضع توفير الطاقة (Eco Mode) === */
-/* عندما يضاف هذا الكلاس للـ body، تتغير المتغيرات فوراً */
-body.quality-low {
-  --dock-bg: #1a1a1a; /* لون ثابت وقوي ليظهر الشريط */
-  --dock-border: #333333;
-  --dock-blur: 0px; /* إلغاء التغبيش */
-}
-
-/* في الوضع الفاتح مع Eco */
-[data-theme='light'] body.quality-low {
-  --bg-main: #ffffff;
-  --text-main: #0f172a;
-  --dock-bg: #ffffff;
-  --dock-border: #e2e8f0;
+  /* تحسين أداء الشريط السفلي */
+  --dock-bg: rgba(10, 10, 10, 0.6);
+  --dock-border: rgba(255, 255, 255, 0.08);
+  --dock-blur: 12px;
 }
 
 body {
   background-color: var(--bg-main);
   color: var(--text-main);
-  transition: background-color 0.3s ease;
+  /* خاصية مهمة جداً لمنع اللاق عند السكرول */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
 }
 
-/* === تحسين الأداء الجبار (Ultra Performance Fix) === */
-@keyframes aurora-drift {
-  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
-  50% { transform: translate3d(20px, -20px, 0) rotate(2deg); }
-  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
-}
-
-.aurora-blob {
-  position: absolute;
-  /* السر: تقليل البلور من 100 إلى 45 يجعل الأداء طيارة */
-  filter: blur(45px); 
-  opacity: 0.3;
-  /* تفعيل كرت الشاشة GPU */
+/* === تحسينات الأداء القصوى (GPU Optimization) === */
+.gpu-accelerated {
   transform: translateZ(0);
   backface-visibility: hidden;
   perspective: 1000px;
-  will-change: transform;
-  animation: aurora-drift 20s infinite linear alternate;
+  will-change: transform, opacity;
+}
+
+/* تقليل الضغط على المتصفح بإخفاء الـ Scrollbar المزعج */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+
+/* === خلفية المش (Mesh Gradient) الجديدة === */
+/* هذه الخلفية تعتمد على CSS نقي خفيف جداً بدلاً من الصور الثقيلة */
+.mesh-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  background-color: #000000;
+  background-image: 
+    radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+    radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
+    radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
+}
+
+/* تأثير التوهج الخفيف المتحرك بدون لاق */
+.mesh-blob {
+  position: absolute;
+  filter: blur(80px); /* تقليل البلور قليلاً للأداء */
+  opacity: 0.4;
+  animation: float 20s infinite ease-in-out;
   border-radius: 50%;
   z-index: -1;
-  pointer-events: none;
 }
 
-/* إخفاء التأثيرات تماماً في وضع Eco */
-body.quality-low .aurora-blob,
-body.quality-low .backdrop-blur-xl,
-body.quality-low .animate-pulse {
-  display: none !important;
+@keyframes float {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  33% { transform: translate(30px, -50px) rotate(10deg); }
+  66% { transform: translate(-20px, 20px) rotate(-5deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
 }
 
-/* === كلاس الشريط السفلي الموحد === */
-/* هذا الكلاس سيستخدم المتغيرات التي عرفناها في الأعلى */
+/* Smart Dock Class */
 .smart-dock {
   background-color: var(--dock-bg) !important;
   backdrop-filter: blur(var(--dock-blur)) !important;
   -webkit-backdrop-filter: blur(var(--dock-blur)) !important;
   border: 1px solid var(--dock-border) !important;
-  transition: all 0.3s ease-in-out;
+  transition: transform 0.2s ease-out;
 }
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
