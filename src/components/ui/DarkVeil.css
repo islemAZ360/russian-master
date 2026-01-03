@@ -1,16 +1,14 @@
-.aurora-container {
+.darkveil-container {
     width: 100%;
     height: 100%;
     position: fixed;
     top: 0;
     left: 0;
     z-index: -1;
-    pointer-events: none;
-    background-color: #000; /* لون خلفية احتياطي */
+    overflow: hidden;
+    background-color: #000;
 }
 
-.aurora-container canvas {
+.darkveil-container canvas {
     display: block;
-    width: 100%;
-    height: 100%;
 }
