@@ -2,10 +2,14 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { IconRocket, IconActivity, IconBrain, IconTerminal, IconSkull, IconSparkles } from "@tabler/icons-react";
-import { BorderBeam } from "../ui/BorderBeam";
-import { DecryptText } from "../ui/DecryptText";
-import { MagneticButton } from "../ui/MagneticButton";
-import { useSettings } from "../../context/SettingsContext";
+
+// FIX: استخدام @ للوصول لمكونات الـ UI
+import { BorderBeam } from "@/components/ui/BorderBeam";
+import { DecryptText } from "@/components/ui/DecryptText";
+import { MagneticButton } from "@/components/ui/MagneticButton";
+
+// FIX: استخدام @ للوصول للـ Context
+import { useSettings } from "@/context/SettingsContext";
 
 export function HeroSection({ onStart, onOpenGame, user }) {
   const userName = user?.email?.split('@')[0].toUpperCase() || "OPERATIVE";
@@ -19,7 +23,6 @@ export function HeroSection({ onStart, onOpenGame, user }) {
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="flex-1 space-y-8"
       >
-        {/* Status Badge */}
         <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-mono tracking-widest ${
           isDark 
             ? 'border-cyan-500/30 bg-cyan-950/20 text-cyan-400' 
@@ -29,7 +32,6 @@ export function HeroSection({ onStart, onOpenGame, user }) {
             SYSTEM STATUS: ONLINE
         </div>
         
-        {/* Main Title */}
         <div>
             <h1 className={`text-4xl md:text-6xl lg:text-7xl font-black leading-tight mb-2 ${
               isDark ? 'text-white' : 'text-slate-800'
@@ -44,7 +46,6 @@ export function HeroSection({ onStart, onOpenGame, user }) {
                 </span>
             </h1>
             
-            {/* Subtitle */}
             <div className={`font-mono text-sm md:text-base border-l-2 pl-4 mt-4 ${
               isDark 
                 ? 'text-white/40 border-purple-500' 
@@ -55,7 +56,6 @@ export function HeroSection({ onStart, onOpenGame, user }) {
             </div>
         </div>
 
-        {/* Additional Info for Light Mode */}
         {!isDark && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -79,14 +79,12 @@ export function HeroSection({ onStart, onOpenGame, user }) {
         )}
       </motion.div>
 
-      {/* Right Side - Buttons */}
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }} 
         animate={{ opacity: 1, scale: 1 }} 
         transition={{ duration: 0.5, delay: 0.2 }}
         className="flex-1 flex flex-col items-center justify-center gap-8 relative"
       >
-        {/* Main Start Button */}
         <MagneticButton onClick={onStart} className="group relative w-56 h-56 md:w-64 md:h-64 flex items-center justify-center focus:outline-none">
             <div className={`absolute inset-0 rounded-full border-2 border-dashed animate-[spin_10s_linear_infinite] ${
               isDark ? 'border-cyan-500/30' : 'border-blue-400/40'
@@ -109,7 +107,6 @@ export function HeroSection({ onStart, onOpenGame, user }) {
             </div>
         </MagneticButton>
 
-        {/* Game Button */}
         <MagneticButton 
           onClick={onOpenGame} 
           className={`relative group w-full max-w-sm overflow-hidden rounded-xl border px-6 py-4 transition-all ${
@@ -140,7 +137,6 @@ export function HeroSection({ onStart, onOpenGame, user }) {
             </div>
         </MagneticButton>
 
-        {/* Light mode decorative element */}
         {!isDark && (
           <motion.div 
             initial={{ opacity: 0 }}

@@ -1,8 +1,9 @@
 "use client";
 import React from 'react';
-import RealLiveStream from '../live/RealLiveStream';
-import { useUI } from '../../context/UIContext';
-import { useAuth } from '../../context/AuthContext';
+// FIX: استخدام @ للمسار الصحيح
+import RealLiveStream from '@/components/features/live/RealLiveStream';
+import { useUI } from '@/context/UIContext';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LiveView() {
   const { setCurrentView } = useUI();
