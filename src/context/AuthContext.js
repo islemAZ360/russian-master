@@ -1,10 +1,9 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { auth, db, MASTER_EMAIL } from '../lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { auth, db, MASTER_EMAIL } from '@/lib/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 
-// FIX: إضافة export هنا
 export const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
@@ -13,12 +12,13 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   
   const initializeUserProfile = useCallback(async (firebaseUser) => {
+    if (!firebaseUser) return;
     try {
       const userRef = doc(db, "users", firebaseUser.uid);
       const snap = await getDoc(userRef);
       
       if (!snap.exists()) {
-        const initialRole = firebaseUser.email?.toLowerCase() === MASTER_EMAIL.toLowerCase() ? 'master' : 'user';
+        const initialRole = firebaseUser.email?.toLowerCase() === MASTER_EMAIL?.toLowerCase() ? 'master' : 'user';
         const newProfile = {
           email: firebaseUser.email,
           displayName: firebaseUser.displayName || 'User',
@@ -37,12 +37,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    const safetyTimer = setTimeout(() => {
-        if(loading) setLoading(false);
-    }, 3000);
-
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      clearTimeout(safetyTimer);
       try {
         if (firebaseUser) {
           setUser(firebaseUser);
@@ -53,27 +48,25 @@ export const AuthProvider = ({ children }) => {
               if (docSnap.exists()) {
                 const data = docSnap.data();
                 setUserData(data);
-                if (data.isBanned && firebaseUser.email !== MASTER_EMAIL) auth.signOut();
+                if (data.isBanned && firebaseUser.email !== MASTER_EMAIL) signOut(auth);
               }
             });
         } else {
           setUser(null);
           setUserData(null);
         }
+      } catch (error) {
+        console.error("Auth Error:", error);
       } finally {
         setLoading(false);
       }
     });
 
-    return () => {
-        clearTimeout(safetyTimer);
-        unsubscribe();
-    };
-  }, []);
+    return () => unsubscribe();
+  }, [initializeUserProfile]);
 
   const logout = async () => {
-    await auth.signOut();
-    setUser(null);
+    await signOut(auth);
     window.location.reload();
   };
 
@@ -88,4 +81,9 @@ export const AuthProvider = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// لا نحتاج لتصدير useAuth من هنا لأننا أنشأناها كملف منفصل
+// تعريف الـ Hook هنا لتجنب المشاكل
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  return context;
+};

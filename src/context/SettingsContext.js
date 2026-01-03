@@ -1,7 +1,6 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-// FIX: إضافة export هنا
 export const SettingsContext = createContext(null);
 
 const DEFAULT_SETTINGS = {
@@ -70,4 +69,11 @@ export const SettingsProvider = ({ children }) => {
       {children}
     </SettingsContext.Provider>
   );
+};
+
+// تعريف الـ Hook هنا
+export const useSettings = () => {
+  const context = useContext(SettingsContext);
+  if (!context) throw new Error('useSettings must be used within a SettingsProvider');
+  return context;
 };

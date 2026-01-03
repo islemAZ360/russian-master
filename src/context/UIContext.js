@@ -1,12 +1,15 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { db, auth } from '../lib/firebase';
+import { db, MASTER_EMAIL } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, orderBy, doc, deleteDoc } from 'firebase/firestore';
+// استيراد useAuth من ملف الكونتكست مباشرة لتجنب الدوران
+import { useAuth } from './AuthContext'; 
 
-// FIX: إضافة export هنا
 export const UIContext = createContext(null);
 
 export const UIProvider = ({ children }) => {
+  const { user } = useAuth();
+  
   const [currentView, setCurrentView] = useState('home');
   const [activeCategory, setActiveCategory] = useState('All');
   const [showSupport, setShowSupport] = useState(false);
@@ -14,43 +17,54 @@ export const UIProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   
   useEffect(() => {
-    if (!auth.currentUser) return;
+    if (!user) {
+        setNotifications([]);
+        return;
+    }
     
-    const email = auth.currentUser.email;
-    
+    // 1. إشعاراتي
     const myNotifsQuery = query(
         collection(db, "notifications"),
-        where("userId", "==", auth.currentUser.uid),
+        where("userId", "==", user.uid),
         orderBy("createdAt", "desc")
     );
 
-    const unsub = onSnapshot(myNotifsQuery, (snap) => {
-        const myNotifs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        setNotifications(myNotifs);
-    });
+    const unsubMy = onSnapshot(myNotifsQuery, (snap) => {
+        const myData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setNotifications(prev => {
+            // دمج ذكي
+            const others = prev.filter(n => n.userId !== user.uid && n.target === 'admin');
+            const all = [...others, ...myData];
+            // إزالة التكرار
+            const unique = Array.from(new Map(all.map(item => [item.id, item])).values());
+            return unique.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        });
+    }, (e) => console.log("Notif error:", e));
 
+    // 2. إشعارات الأدمن
     let unsubAdmin = () => {};
-    if (email === 'islamaz@bomba.com') {
+    if (user.email === MASTER_EMAIL) {
         const adminQuery = query(
             collection(db, "notifications"),
             where("target", "==", "admin"),
             orderBy("createdAt", "desc")
         );
         unsubAdmin = onSnapshot(adminQuery, (snap) => {
-            const adminNotifs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            const adminData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             setNotifications(prev => {
-                const combined = [...prev, ...adminNotifs];
-                const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
-                return unique.sort((a,b) => b.createdAt - a.createdAt);
+                const myOwn = prev.filter(n => n.target !== 'admin');
+                const all = [...myOwn, ...adminData];
+                const unique = Array.from(new Map(all.map(item => [item.id, item])).values());
+                return unique.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             });
         });
     }
 
     return () => {
-        unsub();
+        unsubMy();
         unsubAdmin();
     };
-  }, []); // إزالة التبعية لـ auth.currentUser لتجنب الدخول في حلقة
+  }, [user]);
 
   const removeNotification = async (id) => {
     try {
@@ -70,4 +84,11 @@ export const UIProvider = ({ children }) => {
       {children}
     </UIContext.Provider>
   );
+};
+
+// تعريف الـ Hook هنا
+export const useUI = () => {
+  const context = useContext(UIContext);
+  if (!context) throw new Error('useUI must be used within a UIProvider');
+  return context;
 };
