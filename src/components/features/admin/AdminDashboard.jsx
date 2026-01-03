@@ -1,60 +1,33 @@
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
-// FIX: استخدام @
+import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { 
   collection, onSnapshot, doc, updateDoc, query, orderBy, 
-  deleteDoc, arrayUnion, addDoc, serverTimestamp, where 
+  deleteDoc, addDoc, serverTimestamp 
 } from "firebase/firestore";
-import { motion, AnimatePresence } from 'framer-motion';
 import { 
   IconShieldLock, IconUsers, IconLayoutDashboard, 
-  IconBroadcast, IconMessage2, IconBan, IconCheck, 
-  IconTrash, IconSend, IconSearch, IconX,
-  IconArrowLeft, IconHome
+  IconBroadcast, IconMessage2, IconBan, 
+  IconTrash, IconSearch, IconArrowLeft, IconHome
 } from '@tabler/icons-react';
-// FIX: استخدام @
 import { useUI } from '@/context/UIContext';
 
 export default function AdminDashboard({ currentUser }) {
-  // ... (نفس الكود السابق، فقط تأكد من تصحيح مسارات الاستيراد في الأعلى)
-  // سأكتب الكود كاملاً للتأكد
   const { setCurrentView } = useUI();
   const [activeView, setActiveView] = useState('overview');
   const [users, setUsers] = useState([]);
   const [tickets, setTickets] = useState([]);
   const [broadcastMsg, setBroadcastMsg] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-
+  
   useEffect(() => {
-    setLoading(true);
     const unsubUsers = onSnapshot(query(collection(db, "users"), orderBy("createdAt", "desc")), (snap) => {
         setUsers(snap.docs.map(d => ({id: d.id, ...d.data()})));
     });
     const unsubTickets = onSnapshot(query(collection(db, "support_tickets"), orderBy("lastUpdate", "desc")), (snap) => {
         setTickets(snap.docs.map(d => ({id: d.id, ...d.data()})));
-        setLoading(false);
     });
     return () => { unsubUsers(); unsubTickets(); };
   }, []);
-
-  const handleRoleChange = async (uid, newRole) => {
-      if(!confirm(`Change role to ${newRole}?`)) return;
-      await updateDoc(doc(db, "users", uid), { role: newRole });
-      await addDoc(collection(db, "notifications"), {
-          userId: uid,
-          title: "SYSTEM UPDATE",
-          message: `Your rank has been updated to: ${newRole.toUpperCase()}`,
-          type: "rank",
-          createdAt: serverTimestamp()
-      });
-  };
-
-  const toggleBan = async (uid, currentStatus) => {
-      if(!confirm(currentStatus ? "Unban User?" : "BAN USER?")) return;
-      await updateDoc(doc(db, "users", uid), { isBanned: !currentStatus });
-  };
 
   const sendBroadcast = async () => {
     if(!broadcastMsg.trim()) return;
@@ -65,133 +38,151 @@ export default function AdminDashboard({ currentUser }) {
         timestamp: new Date().toISOString() 
     });
     setBroadcastMsg("");
-    alert("Broadcast Sent Globally");
+    alert("تم إرسال البث للجميع");
   };
 
-  const stopBroadcast = async () => {
-    await updateDoc(doc(db, "system", "broadcast"), { active: false });
+  const toggleBan = async (uid, currentStatus) => {
+      if(!confirm(currentStatus ? "رفع الحظر؟" : "حظر المستخدم؟")) return;
+      await updateDoc(doc(db, "users", uid), { isBanned: !currentStatus });
   };
 
-  // Components (OverviewStats, UsersTable, SupportSystem, BroadcastSystem)
-  // ... (نفس الكود الداخلي للمكونات الفرعية، لا يحتاج تغيير)
-  // سأختصر الكود هنا لتوفير المساحة، انسخ المنطق الداخلي من الملف السابق
-  // الأهم هو تصحيح الـ Imports في الأعلى.
-  
-  // يرجى نسخ محتوى الدوال الفرعية (OverviewStats, UsersTable, SupportSystem, BroadcastSystem) 
-  // من الكود الموجود لديك حالياً، فهي لا تحتوي على imports خارجية تحتاج للتعديل.
-  
-  // الهيكل العام للعودة:
-  const OverviewStats = () => (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in">
-          <StatCard title="Total Operatives" value={users.length} icon={<IconUsers/>} color="text-cyan-500" />
-          <StatCard title="Active Threats (Banned)" value={users.filter(u => u.isBanned).length} icon={<IconBan/>} color="text-red-500" />
-          <StatCard title="Support Signals" value={tickets.filter(t => t.status !== 'resolved').length} icon={<IconMessage2/>} color="text-yellow-500" />
-          <StatCard title="Commanders" value={users.filter(u => u.role === 'admin' || u.role === 'master').length} icon={<IconShieldLock/>} color="text-purple-500" />
-      </div>
+  // المكونات الداخلية
+  const StatCard = ({ title, value, icon, color }) => (
+    <div className="p-6 rounded-2xl bg-[#111] border border-white/10 hover:border-white/20 transition-all">
+        <div className="flex justify-between items-start mb-4">
+            <div className={`p-3 rounded-xl bg-white/5 ${color}`}>{icon}</div>
+        </div>
+        <div className="text-3xl font-black text-white mb-1">{value}</div>
+        <div className="text-xs font-bold uppercase text-gray-500 tracking-widest">{title}</div>
+    </div>
   );
 
-  // ... باقي المكونات (UsersTable, SupportSystem, BroadcastSystem)
+  const NavBtn = ({ id, label, icon: Icon }) => (
+    <button 
+        onClick={() => setActiveView(id)} 
+        className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all mb-1 ${
+            activeView === id ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+        }`}
+    >
+        <Icon size={20} />
+        <span className="font-bold text-sm">{label}</span>
+    </button>
+  );
 
   return (
-    <div className="flex h-screen w-full font-sans overflow-hidden bg-[var(--bg-main)] text-[var(--text-main)] transition-colors duration-300">
-        <nav className="w-20 lg:w-64 border-r border-theme bg-theme-card flex flex-col shrink-0 z-20">
-            <div className="p-6 flex items-center gap-4 h-20 border-b border-theme">
-                <div className="w-10 h-10 rounded-xl bg-[var(--accent-color)] flex items-center justify-center text-white shadow-lg">
-                    <IconShieldLock size={20} />
+    // التصحيح هنا: fixed inset-0 z-[100] يضمن ملء الشاشة بالكامل فوق أي شيء
+    <div className="fixed inset-0 z-[100] flex bg-[#050505] text-white font-sans overflow-hidden">
+        
+        {/* Sidebar */}
+        <nav className="w-64 border-r border-white/10 bg-black flex flex-col shrink-0">
+            <div className="p-6 h-20 border-b border-white/10 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-900/20">
+                    <IconShieldLock size={20} className="text-white" />
                 </div>
-                <h1 className="hidden lg:block font-black tracking-widest text-lg">NEXUS<span className="text-[var(--accent-color)]">OS</span></h1>
+                <h1 className="font-black tracking-widest text-lg">NEXUS<span className="text-indigo-500">OS</span></h1>
             </div>
-            <div className="flex-1 py-6 space-y-1 px-3">
-                <NavBtn id="overview" label="Command Deck" icon={IconLayoutDashboard} active={activeView} set={setActiveView} />
-                <NavBtn id="users" label="Operatives" icon={IconUsers} active={activeView} set={setActiveView} />
-                <NavBtn id="support" label="Comms Uplink" icon={IconMessage2} active={activeView} set={setActiveView} badge={tickets.filter(t=>t.status!=='resolved').length} />
-                <NavBtn id="broadcast" label="Global Alert" icon={IconBroadcast} active={activeView} set={setActiveView} />
+            
+            <div className="flex-1 py-6 px-3">
+                <NavBtn id="overview" label="لوحة القيادة" icon={IconLayoutDashboard} />
+                <NavBtn id="users" label="العملاء" icon={IconUsers} />
+                <NavBtn id="support" label="الدعم الفني" icon={IconMessage2} />
+                <NavBtn id="broadcast" label="بث عام" icon={IconBroadcast} />
             </div>
-            <div className="p-4 border-t border-theme space-y-3">
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-theme-hover">
-                    <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center text-white text-xs">AD</div>
-                    <div className="hidden lg:block overflow-hidden">
-                        <div className="font-bold text-xs truncate">{currentUser?.email}</div>
-                        <div className="text-[10px] text-[var(--success-color)] uppercase font-bold">System Admin</div>
-                    </div>
-                </div>
+
+            <div className="p-4 border-t border-white/10">
                 <button 
                     onClick={() => setCurrentView('home')}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[var(--accent-primary)]/10 hover:bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] font-bold text-sm transition-all border border-[var(--accent-primary)]/30"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-gray-400 hover:text-white transition-all text-sm font-bold"
                 >
                     <IconHome size={18} />
-                    <span className="hidden lg:inline">Exit to Main</span>
+                    <span>عودة للرئيسية</span>
                 </button>
             </div>
         </nav>
-        <main className="flex-1 flex flex-col relative overflow-hidden">
-            <header className="h-20 border-b border-theme bg-theme-card/80 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-10">
-                <div className="flex items-center gap-4">
-                    <button 
-                        onClick={() => setCurrentView('home')}
-                        className="lg:hidden p-2 rounded-xl hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-primary)] transition-all"
-                        title="Exit to Main"
-                    >
-                        <IconArrowLeft size={24} />
-                    </button>
-                    <h2 className="text-lg md:text-xl font-bold uppercase tracking-widest text-theme-main">
-                        {activeView === 'overview' && "System Overview"}
-                        {activeView === 'users' && "Operative Database"}
-                        {activeView === 'support' && "Secure Communications"}
-                        {activeView === 'broadcast' && "Emergency Broadcast"}
-                    </h2>
-                </div>
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[var(--success-color)] animate-pulse"></span>
-                        <span className="text-xs font-mono text-[var(--text-muted)] hidden md:inline">SYSTEM ONLINE</span>
-                    </div>
-                    <button 
-                        onClick={() => setCurrentView('home')}
-                        className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--bg-elevated)] hover:bg-[var(--accent-primary)]/10 text-[var(--text-muted)] hover:text-[var(--accent-primary)] font-bold text-xs transition-all border border-[var(--border-color)]"
-                    >
-                        <IconHome size={16} />
-                        Exit Admin
-                    </button>
+
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col relative overflow-hidden bg-[#050505]">
+            <header className="h-20 border-b border-white/10 bg-black/50 backdrop-blur-md flex items-center justify-between px-8">
+                <h2 className="text-xl font-bold uppercase tracking-widest text-white">
+                    {activeView === 'overview' && "نظرة عامة للنظام"}
+                    {activeView === 'users' && "قاعدة بيانات العملاء"}
+                    {activeView === 'support' && "رسائل الدعم"}
+                    {activeView === 'broadcast' && "نظام التنبيهات"}
+                </h2>
+                <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                    <span className="text-xs font-mono text-gray-500">SECURE CONNECTION</span>
                 </div>
             </header>
-            <div className="flex-1 p-6 overflow-hidden relative">
-                {activeView === 'overview' && <OverviewStats />}
-                {/* تأكد من وجود UsersTable و SupportSystem و BroadcastSystem هنا */}
-                {activeView === 'users' && <div>Users Table Placeholder (Copy logic from prev file)</div>} 
-                {activeView === 'support' && <div>Support System Placeholder (Copy logic from prev file)</div>}
-                {activeView === 'broadcast' && <BroadcastSystem />}
+
+            <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
+                {activeView === 'overview' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <StatCard title="إجمالي المستخدمين" value={users.length} icon={<IconUsers/>} color="text-cyan-400" />
+                        <StatCard title="المحظورين" value={users.filter(u => u.isBanned).length} icon={<IconBan/>} color="text-red-500" />
+                        <StatCard title="تذاكر مفتوحة" value={tickets.filter(t => t.status !== 'resolved').length} icon={<IconMessage2/>} color="text-yellow-500" />
+                        <StatCard title="المشرفين" value={users.filter(u => u.role === 'admin' || u.role === 'master').length} icon={<IconShieldLock/>} color="text-purple-500" />
+                    </div>
+                )}
+
+                {activeView === 'users' && (
+                    <div className="bg-[#111] border border-white/10 rounded-2xl overflow-hidden">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-white/5 text-gray-400 font-bold uppercase text-xs">
+                                <tr>
+                                    <th className="p-4">المستخدم</th>
+                                    <th className="p-4">البريد</th>
+                                    <th className="p-4">الرتبة</th>
+                                    <th className="p-4">XP</th>
+                                    <th className="p-4 text-right">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {users.map(u => (
+                                    <tr key={u.id} className="hover:bg-white/5 transition-colors">
+                                        <td className="p-4 font-bold text-white">{u.displayName || "Unknown"}</td>
+                                        <td className="p-4 text-gray-400 font-mono">{u.email}</td>
+                                        <td className="p-4"><span className="px-2 py-1 rounded bg-white/10 text-xs font-bold uppercase">{u.role}</span></td>
+                                        <td className="p-4 text-indigo-400 font-bold">{u.xp}</td>
+                                        <td className="p-4 text-right">
+                                            <button 
+                                                onClick={() => toggleBan(u.id, u.isBanned)}
+                                                className={`px-3 py-1 rounded text-xs font-bold ${u.isBanned ? 'bg-green-900 text-green-400' : 'bg-red-900 text-red-400'}`}
+                                            >
+                                                {u.isBanned ? "UNBAN" : "BAN"}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {activeView === 'broadcast' && (
+                    <div className="max-w-2xl mx-auto bg-[#111] border border-white/10 rounded-2xl p-8">
+                        <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><IconBroadcast className="text-red-500"/> إرسال تنبيه عاجل</h3>
+                        <textarea 
+                            value={broadcastMsg}
+                            onChange={(e) => setBroadcastMsg(e.target.value)}
+                            className="w-full h-32 bg-black border border-white/20 rounded-xl p-4 text-white mb-4 focus:border-indigo-500 outline-none"
+                            placeholder="اكتب الرسالة هنا..."
+                        />
+                        <button 
+                            onClick={sendBroadcast}
+                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all"
+                        >
+                            إرسال للجميع
+                        </button>
+                    </div>
+                )}
+                
+                {/* Support section placeholder - can be copied from previous code if needed */}
+                {activeView === 'support' && (
+                    <div className="text-center text-gray-500 mt-20">نظام الدعم قيد التطوير في هذه الواجهة المبسطة</div>
+                )}
             </div>
         </main>
     </div>
   );
 }
-
-const NavBtn = ({ id, label, icon: Icon, active, set, badge }) => (
-    <button 
-        onClick={() => set(id)} 
-        className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all relative group ${
-            active === id 
-            ? 'bg-[var(--accent-color)] text-white shadow-lg' 
-            : 'text-[var(--text-muted)] hover:bg-theme-hover hover:text-theme-main'
-        }`}
-    >
-        <Icon size={20} />
-        <span className="hidden lg:block font-bold text-sm">{label}</span>
-        {badge > 0 && (
-            <span className="absolute right-2 top-1/2 -translate-y-1/2 bg-red-500 text-white text-[9px] w-5 h-5 flex items-center justify-center font-bold rounded-full shadow-md">
-                {badge}
-            </span>
-        )}
-    </button>
-);
-
-const StatCard = ({ title, value, icon, color }) => (
-    <div className="p-6 rounded-2xl border border-theme bg-theme-card hover:border-[var(--accent-color)] transition-colors group">
-        <div className="flex justify-between items-start mb-4">
-            <div className={`p-3 rounded-xl bg-theme-hover ${color} group-hover:scale-110 transition-transform`}>{icon}</div>
-        </div>
-        <div className="text-3xl font-black text-theme-main mb-1">{value}</div>
-        <div className="text-xs font-bold uppercase text-[var(--text-muted)] tracking-widest">{title}</div>
-    </div>
-);
