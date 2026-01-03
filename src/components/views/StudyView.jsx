@@ -2,8 +2,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IconInfinity, IconCpu } from '@tabler/icons-react';
-import { StudyCard } from '../features/StudyCard';
-import { useUI } from '../../context/UIContext';
+
+// FIX: المسار الصحيح للبطاقة داخل features/study
+import { StudyCard } from '@/components/features/study/StudyCard';
+import { useUI } from '@/context/UIContext'; // استخدام @
 
 export default function StudyView({ 
   currentCard, sessionStats, handleSwipe, setSessionStats, playSFX, speak 

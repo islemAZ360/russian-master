@@ -1,12 +1,14 @@
 import { JetBrains_Mono, Cairo } from "next/font/google";
 import "./globals.css";
 
-// استيراد الـ Providers
-import { AuthProvider } from "../context/AuthContext";
-import { SettingsProvider } from "../context/SettingsContext";
-import { UIProvider } from "../context/UIContext";
-import ServiceWorkerRegister from "../components/ui/ServiceWorkerRegister";
-import ErrorBoundary from "../components/ErrorBoundary";
+// استيراد الـ Providers باستخدام @
+import { AuthProvider } from "@/context/AuthContext";
+import { SettingsProvider } from "@/context/SettingsContext";
+import { UIProvider } from "@/context/UIContext";
+
+// FIX: تصحيح مسارات مكونات UI
+import ServiceWorkerRegister from "@/components/ui/ServiceWorkerRegister";
+import ErrorBoundary from "@/components/ui/ErrorBoundary";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin", "cyrillic"],
@@ -60,13 +62,12 @@ export default function RootLayout({ children }) {
       suppressHydrationWarning
     >
       <head>
-        {/* Optimized theme initialization script */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
-                  const saved = localStorage.getItem('russian_master_config');
+                  const saved = localStorage.getItem('russian_master_config_v2');
                   let themeToApply = 'dark';
 
                   if (saved) {
