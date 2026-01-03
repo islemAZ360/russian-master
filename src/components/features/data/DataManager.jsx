@@ -6,18 +6,22 @@ import {
 } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// 1. فصل مكون البطاقة واستخدام React.memo لتحسين الأداء بشكل هائل
-const MemoryNode = React.memo(({ card, index, isJunior, editingId, editForm, startEdit, saveEdit, cancelEdit, onDelete, setEditForm }) => {
+// --- مكون البطاقة (MemoryNode) ---
+const MemoryNode = React.memo(({ card, index, isJunior, editingId, editForm, startEdit, saveEdit, cancelEdit, onDelete, setEditForm, categories }) => {
+    // التعامل مع تغيير القيم في حقول التعديل
+    const handleChange = (field, value) => {
+        setEditForm(prev => ({ ...prev, [field]: value }));
+    };
+
     return (
         <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: Math.min(index * 0.03, 0.3), duration: 0.3 }} // تسقيف التأخير لمنع البطء
+            transition={{ delay: Math.min(index * 0.03, 0.3), duration: 0.3 }}
             className="relative h-full w-full"
         >
             <div className="group relative h-full w-full bg-white/5 dark:bg-white/5 border border-white/5 rounded-[2rem] overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-[var(--accent-color)]/10 hover:-translate-y-1 hover:border-[var(--accent-color)]/30">
                 
-                {/* خلفية خفيفة جداً بدلاً من البلور الثقيل */}
                 <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent-color)]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                 
                 <div className="relative z-10 p-6 flex flex-col h-full justify-between min-h-[220px]">
@@ -27,9 +31,32 @@ const MemoryNode = React.memo(({ card, index, isJunior, editingId, editForm, sta
                         <div className="flex flex-col gap-3 h-full justify-center">
                             <div className="text-[10px] font-bold text-[var(--accent-color)] uppercase tracking-widest text-center">Editing</div>
                             
-                            <input value={editForm.russian} onChange={(e) => setEditForm(prev => ({...prev, russian: e.target.value}))} className="bg-black/10 dark:bg-white/10 rounded-xl p-2 text-center font-bold text-[var(--text-main)] outline-none focus:ring-1 focus:ring-[var(--accent-color)] text-sm" placeholder="Russian" />
-                            <input value={editForm.arabic} onChange={(e) => setEditForm(prev => ({...prev, arabic: e.target.value}))} className="bg-black/10 dark:bg-white/10 rounded-xl p-2 text-center text-[var(--text-main)] outline-none focus:ring-1 focus:ring-[var(--accent-color)] text-sm" placeholder="Arabic" />
-                            <input value={editForm.category} onChange={(e) => setEditForm(prev => ({...prev, category: e.target.value}))} className="w-full bg-black/10 dark:bg-white/10 rounded-xl p-2 text-[10px] text-center font-mono text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent-color)]" placeholder="Category" />
+                            <input 
+                                value={editForm.russian} 
+                                onChange={(e) => handleChange('russian', e.target.value)} 
+                                className="bg-black/10 dark:bg-white/10 rounded-xl p-2 text-center font-bold text-[var(--text-main)] outline-none focus:ring-1 focus:ring-[var(--accent-color)] text-sm" 
+                                placeholder="Russian" 
+                            />
+                            <input 
+                                value={editForm.arabic} 
+                                onChange={(e) => handleChange('arabic', e.target.value)} 
+                                className="bg-black/10 dark:bg-white/10 rounded-xl p-2 text-center text-[var(--text-main)] outline-none focus:ring-1 focus:ring-[var(--accent-color)] text-sm" 
+                                placeholder="Arabic" 
+                            />
+                            
+                            {/* قائمة منسدلة لتغيير المجموعة */}
+                            <div className="relative">
+                                <input 
+                                    list="category-options"
+                                    value={editForm.category} 
+                                    onChange={(e) => handleChange('category', e.target.value)} 
+                                    className="w-full bg-black/10 dark:bg-white/10 rounded-xl p-2 text-[10px] text-center font-mono text-[var(--text-muted)] outline-none focus:ring-1 focus:ring-[var(--accent-color)]" 
+                                    placeholder="Category" 
+                                />
+                                <datalist id="category-options">
+                                    {categories.map(c => <option key={c} value={c} />)}
+                                </datalist>
+                            </div>
 
                             <div className="flex gap-2 mt-1">
                                 <button onClick={saveEdit} className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-xl font-bold text-xs transition-all">Save</button>
@@ -74,10 +101,10 @@ const MemoryNode = React.memo(({ card, index, isJunior, editingId, editForm, sta
         </motion.div>
     );
 }, (prev, next) => {
-    // تحديث فقط إذا تغيرت البيانات الخاصة بهذه البطاقة
     return prev.card === next.card && 
            prev.editingId === next.editingId && 
            prev.editForm === next.editForm &&
+           prev.categories === next.categories && // التأكد من تحديث الفئات
            prev.index === next.index;
 });
 
@@ -89,12 +116,15 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
   const [filter, setFilter] = useState("All");
   const [displayLimit, setDisplayLimit] = useState(20);
   
+  // States for Adding
   const [newCard, setNewCard] = useState({ russian: "", arabic: "", category: "" });
   const [isNewCategoryMode, setIsNewCategoryMode] = useState(false);
 
+  // States for Editing
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ russian: "", arabic: "", category: "" });
 
+  // States for Category Manager
   const [showCatManager, setShowCatManager] = useState(false);
   const [editingCatName, setEditingCatName] = useState(null);
   const [newCatNameInput, setNewCatNameInput] = useState("");
@@ -104,7 +134,6 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
     return ["All", ...Array.from(cats).sort()];
   }, [cards]);
 
-  // استخدام useMemo للفلترة السريعة
   const filteredCards = useMemo(() => {
       const lowerSearch = search.toLowerCase();
       return cards.filter(c => {
@@ -116,32 +145,37 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
 
   useEffect(() => { setDisplayLimit(20); }, [search, filter]);
 
+  // --- Handlers (تم إصلاحها) ---
+
   const handleAddSubmit = () => {
       if(newCard.russian && newCard.arabic && newCard.category) {
-          onAdd(newCard);
+          // استدعاء دالة الإضافة من الـ props
+          onAdd(newCard); 
+          // إعادة تعيين الحقول
           setNewCard({ russian: "", arabic: "", category: "" });
           setIsNewCategoryMode(false);
+      } else {
+          alert("Please fill in all fields (Russian, Arabic, and Category)");
       }
   };
 
-  // Memoize handlers to prevent re-renders
   const startEdit = useCallback((card) => { 
       setEditingId(card.id); 
       setEditForm({ russian: card.russian, arabic: card.arabic, category: card.category });
   }, []);
 
   const saveEdit = useCallback(() => { 
-      onUpdate(editingId, editForm); 
-      setEditingId(null); 
+      if (editingId && editForm.russian && editForm.arabic) {
+          onUpdate(editingId, editForm); 
+          setEditingId(null); 
+      }
   }, [editingId, editForm, onUpdate]);
 
   const cancelEdit = useCallback(() => {
       setEditingId(null);
   }, []);
 
-  const visibleCards = filteredCards.slice(0, displayLimit);
-
-  // Category Management Handlers (نفس الكود السابق)
+  // Category Management Handlers
   const handleRenameCategory = (oldName) => {
       if (!newCatNameInput.trim() || newCatNameInput === oldName) {
           setEditingCatName(null);
@@ -161,6 +195,9 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
       cardsToDelete.forEach(card => onDelete(card.id));
   };
 
+  const visibleCards = filteredCards.slice(0, displayLimit);
+
+  // --- Category Manager Modal ---
   const CategoryManagerModal = () => (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="bg-[var(--bg-secondary)] border border-[var(--text-muted)]/20 w-full max-w-lg rounded-3xl p-6 shadow-2xl relative overflow-hidden">
@@ -192,7 +229,6 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
                           )}
                       </div>
                   ))}
-                  {categories.length <= 2 && <div className="text-center text-[var(--text-muted)] py-4 text-sm">No custom groups found.</div>}
               </div>
           </div>
       </div>
@@ -220,7 +256,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
           </div>
       </div>
 
-      {/* 2. Floating Command Center */}
+      {/* 2. Floating Command Center (تم إصلاح نظام الإضافة) */}
       <div className="sticky top-4 z-40 mb-8 flex justify-center">
          <div className="w-full max-w-4xl bg-[var(--bg-secondary)]/90 backdrop-blur-2xl border border-white/10 rounded-full p-2 pl-6 shadow-xl flex flex-col md:flex-row gap-4 items-center">
              <div className="flex-1 flex items-center gap-3 w-full">
@@ -228,10 +264,44 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
                 <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search..." className="flex-1 bg-transparent text-[var(--text-main)] placeholder-[var(--text-muted)]/50 outline-none text-base font-medium h-10"/>
              </div>
              {isJunior && (
-                 <div className="hidden md:flex items-center gap-2 pr-2 border-l border-white/10 pl-4">
-                     <input value={newCard.russian} onChange={e => setNewCard({...newCard, russian: e.target.value})} placeholder="Rus" className="w-20 bg-transparent outline-none text-sm text-[var(--text-main)]" />
-                     <input value={newCard.arabic} onChange={e => setNewCard({...newCard, arabic: e.target.value})} placeholder="Ara" className="w-20 bg-transparent outline-none text-sm text-[var(--text-main)] text-right" />
-                     <button onClick={handleAddSubmit} className="bg-[var(--accent-color)] text-white w-8 h-8 rounded-full flex items-center justify-center hover:scale-110 transition-transform"><IconPlus size={16}/></button>
+                 <div className="hidden md:flex items-center gap-2 pr-2 border-l border-white/10 pl-4 py-1">
+                     <div className="flex flex-col gap-1">
+                         <div className="flex gap-2">
+                             <input value={newCard.russian} onChange={e => setNewCard({...newCard, russian: e.target.value})} placeholder="Rus" className="w-24 bg-[var(--bg-primary)]/50 rounded-lg px-3 py-1 text-sm outline-none text-[var(--text-main)] border border-transparent focus:border-[var(--accent-color)] transition-colors" />
+                             <input value={newCard.arabic} onChange={e => setNewCard({...newCard, arabic: e.target.value})} placeholder="Ara" className="w-24 bg-[var(--bg-primary)]/50 rounded-lg px-3 py-1 text-sm outline-none text-[var(--text-main)] text-right border border-transparent focus:border-[var(--accent-color)] transition-colors" />
+                         </div>
+                         <div className="flex gap-2">
+                             {/* Intelligent Category Selector */}
+                             {isNewCategoryMode ? (
+                                <div className="flex items-center gap-1 flex-1">
+                                    <input 
+                                        autoFocus 
+                                        value={newCard.category} 
+                                        onChange={e => setNewCard({...newCard, category: e.target.value})} 
+                                        placeholder="New Group Name" 
+                                        className="flex-1 bg-[var(--bg-primary)]/50 rounded-lg px-3 py-1 text-xs outline-none text-[var(--text-main)] border border-[var(--accent-color)]" 
+                                    />
+                                    <button onClick={() => setIsNewCategoryMode(false)} className="text-[var(--text-muted)] hover:text-red-500"><IconX size={14}/></button>
+                                </div>
+                             ) : (
+                                <select 
+                                    value={newCard.category} 
+                                    onChange={(e) => {
+                                        if (e.target.value === 'NEW_CAT_TRIGGER') setIsNewCategoryMode(true);
+                                        else setNewCard({...newCard, category: e.target.value});
+                                    }}
+                                    className="flex-1 bg-[var(--bg-primary)]/50 rounded-lg px-3 py-1 text-xs outline-none text-[var(--text-main)] cursor-pointer"
+                                >
+                                    <option value="" disabled>Select Group</option>
+                                    {categories.filter(c => c !== "All").map(c => <option key={c} value={c}>{c}</option>)}
+                                    <option value="NEW_CAT_TRIGGER" className="font-bold text-[var(--accent-color)]">+ Create New Group</option>
+                                </select>
+                             )}
+                         </div>
+                     </div>
+                     <button onClick={handleAddSubmit} className="h-10 w-10 bg-[var(--accent-color)] text-white rounded-full flex items-center justify-center hover:scale-110 hover:shadow-lg hover:shadow-[var(--accent-color)]/40 transition-all ml-2">
+                         <IconPlus size={20}/>
+                     </button>
                  </div>
              )}
          </div>
@@ -246,7 +316,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
           ))}
       </div>
 
-      {/* 4. The Grid (Removed AnimatePresence key prop issue) */}
+      {/* 4. The Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20 w-full max-w-7xl mx-auto">
             {visibleCards.map((card, index) => (
                 <MemoryNode 
@@ -261,6 +331,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
                     cancelEdit={cancelEdit}
                     onDelete={onDelete}
                     setEditForm={setEditForm}
+                    categories={categories.filter(c => c !== "All")} // Pass categories for dropdown
                 />
             ))}
       </div>
