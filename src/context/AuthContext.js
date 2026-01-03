@@ -1,11 +1,11 @@
-/* Filename: context/AuthContext.js */
 "use client";
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { auth, db, MASTER_EMAIL } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 
-const AuthContext = createContext(null);
+// FIX: إضافة export هنا
+export const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -37,7 +37,6 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    // Safety timeout: يكسر شاشة التحميل إجبارياً بعد 3 ثواني
     const safetyTimer = setTimeout(() => {
         if(loading) setLoading(false);
     }, 3000);
@@ -47,7 +46,6 @@ export const AuthProvider = ({ children }) => {
       try {
         if (firebaseUser) {
           setUser(firebaseUser);
-          // لا ننتظر الدالة (Fire & Forget) لتسريع العرض
           initializeUserProfile(firebaseUser);
           
           const userRef = doc(db, "users", firebaseUser.uid);
@@ -90,4 +88,4 @@ export const AuthProvider = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuth = () => useContext(AuthContext);
+// لا نحتاج لتصدير useAuth من هنا لأننا أنشأناها كملف منفصل

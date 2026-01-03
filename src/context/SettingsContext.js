@@ -1,8 +1,8 @@
-/* Filename: context/SettingsContext.js */
 "use client";
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
-const SettingsContext = createContext(null);
+// FIX: إضافة export هنا
+export const SettingsContext = createContext(null);
 
 const DEFAULT_SETTINGS = {
   sound: true,
@@ -19,13 +19,11 @@ export const SettingsProvider = ({ children }) => {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [isDark, setIsDark] = useState(true);
 
-  // Apply visual settings (Theme + Quality)
   const applySettings = (newSettings) => {
     if (typeof document === 'undefined') return;
     const root = document.documentElement;
     const body = document.body;
 
-    // 1. Theme Logic
     let theme = newSettings.theme;
     if (theme === 'system') {
       theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -42,7 +40,6 @@ export const SettingsProvider = ({ children }) => {
       root.classList.add('dark');
     }
 
-    // 2. Quality Logic (Performance)
     body.classList.remove('quality-low', 'quality-medium', 'quality-high');
     body.classList.add(`quality-${newSettings.quality}`);
   };
@@ -70,10 +67,7 @@ export const SettingsProvider = ({ children }) => {
 
   return (
     <SettingsContext.Provider value={{ settings, updateSettings, isDark, mounted }}>
-      {/* عرض المحتوى فوراً، النمط سيطبق بسرعة */}
       {children}
     </SettingsContext.Provider>
   );
 };
-
-export const useSettings = () => useContext(SettingsContext);
