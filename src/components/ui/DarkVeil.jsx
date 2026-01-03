@@ -12,14 +12,8 @@ const styles = {
     height: '100vh',
     zIndex: -1,
     pointerEvents: 'none',
-    overflow: 'hidden',
     backgroundColor: '#050505',
   },
-  canvas: {
-    display: 'block',
-    width: '100%',
-    height: '100%',
-  }
 };
 
 const vertex = `
@@ -40,41 +34,32 @@ uniform vec2 uResolution;
 uniform float uHueShift;
 uniform float uIsLight;
 
-// دالة عشوائية محسنة
-float random (in vec2 _st) {
-    return fract(sin(dot(_st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+// دالة عشوائية عالية التردد (للتفاصيل الدقيقة)
+float random(vec2 st) {
+    return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
 }
 
-// دالة ضجيج
-float noise (in vec2 _st) {
-    vec2 i = floor(_st);
-    vec2 f = fract(_st);
-
+// دالة ضجيج ناعمة
+float noise(vec2 st) {
+    vec2 i = floor(st);
+    vec2 f = fract(st);
     float a = random(i);
     float b = random(i + vec2(1.0, 0.0));
     float c = random(i + vec2(0.0, 1.0));
     float d = random(i + vec2(1.0, 1.0));
-
     vec2 u = f * f * (3.0 - 2.0 * f);
-
-    return mix(a, b, u.x) +
-            (c - a)* u.y * (1.0 - u.x) +
-            (d - b) * u.x * u.y;
+    return mix(a, b, u.x) + (c - a)* u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
 }
 
-#define OCTAVES 5
-
-// FBM مع تقليل التردد لخلق ملمس دخاني دقيق
-float fbm ( in vec2 _st) {
+// FBM مع تفاصيل دقيقة جداً
+#define OCTAVES 4
+float fbm(vec2 st) {
     float v = 0.0;
     float a = 0.5;
-    vec2 shift = vec2(100.0);
-    // تدوير لتقليل النمطية
-    mat2 rot = mat2(cos(0.5), sin(0.5),
-                    -sin(0.5), cos(0.50));
+    mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.50));
     for (int i = 0; i < OCTAVES; ++i) {
-        v += a * noise(_st);
-        _st = rot * _st * 2.0 + shift;
+        v += a * noise(st);
+        st = rot * st * 2.0 + 100.0; // مضاعفة التردد في كل طبقة
         a *= 0.5;
     }
     return v;
@@ -87,57 +72,49 @@ vec3 hsv2rgb(vec3 c) {
 }
 
 void main() {
-    // 1. حساب الإحداثيات الأساسية
-    vec2 st = gl_FragCoord.xy / uResolution.xy;
+    // 1. تصحيح الأبعاد
+    vec2 uv = gl_FragCoord.xy / uResolution.xy;
+    uv.x *= uResolution.x / uResolution.y;
+
+    // 2. الحل الجذري: تكبير هائل (Zoom Out)
+    // كلما زاد هذا الرقم، صغرت التفاصيل. كان 3، الآن 15.
+    uv *= 15.0; 
+
+    // حركة بطيئة جداً وانسيابية
+    float time = uTime * 0.1;
     
-    // 2. تصحيح النسبة (Aspect Ratio) لمنع التمدد
-    st.x *= uResolution.x / uResolution.y;
-    
-    // 3. التكبير الجذري (The Fix)
-    // تغيير الرقم من 3.0 إلى 8.0 لتصغير الموجات بشكل كبير جداً
-    st *= 8.0; 
-    
-    // حركة الكاميرا (أبطأ وأكثر تعقيداً)
+    // إنشاء طبقتين من الحركة المتداخلة
     vec2 q = vec2(0.);
-    q.x = fbm( st + 0.01 * uTime);
-    q.y = fbm( st + vec2(1.0));
+    q.x = fbm(uv + 0.00 * time);
+    q.y = fbm(uv + vec2(1.0));
 
     vec2 r = vec2(0.);
-    r.x = fbm( st + 1.0 * q + vec2(1.7, 9.2) + 0.15 * uTime );
-    r.y = fbm( st + 1.0 * q + vec2(8.3, 2.8) + 0.126 * uTime);
+    r.x = fbm(uv + 1.0 * q + vec2(1.7, 9.2) + 0.15 * time);
+    r.y = fbm(uv + 1.0 * q + vec2(8.3, 2.8) + 0.126 * time);
 
-    float f = fbm(st + r);
+    float f = fbm(uv + r);
 
     // الألوان
     float hue = uHueShift / 360.0;
-    vec3 color = vec3(0.0);
     
-    vec3 baseColor = hsv2rgb(vec3(hue, 0.9, 0.5)); // لون أغمق قليلاً
-    vec3 secColor = hsv2rgb(vec3(fract(hue + 0.4), 0.8, 0.4));
+    // تلوين التفاصيل الدقيقة
+    vec3 color = mix(
+        vec3(0.02, 0.02, 0.05), // الخلفية الداكنة
+        hsv2rgb(vec3(hue, 0.8, 0.8)), // لون السديم
+        clamp(f * f * 2.0, 0.0, 1.0)
+    );
 
-    // خلط الألوان لإنتاج تأثير "النيون المظلم"
-    color = mix(vec3(0.02, 0.02, 0.05), // خلفية سوداء تقريباً
-                baseColor,
-                clamp((f*f)*4.0, 0.0, 1.0));
+    // إضافة "نجوم" أو ضجيج دقيق جداً لكسر التموج
+    float star = random(uv * 5.0); // نجوم صغيرة
+    if (star > 0.98) {
+        color += vec3(star * 0.5); // لمعان النجوم
+    }
 
-    color = mix(color,
-                secColor,
-                clamp(length(q), 0.0, 1.0));
-
-    color = mix(color,
-                vec3(0.1, 0.1, 0.1),
-                clamp(length(r.x), 0.0, 1.0));
-
-    // إضافة Vignette (تعتيم الأطراف) لإخفاء أي عيوب في الحواف
-    vec2 uv = gl_FragCoord.xy / uResolution.xy;
-    float vignette = uv.x * uv.y * (1.0 - uv.x) * (1.0 - uv.y);
-    vignette = pow(vignette, 0.2); // قوة التعتيم
-    color *= vignette;
-
+    // الوضع النهاري
     if (uIsLight > 0.5) {
-        color = 1.0 - color;
-        color = mix(color, vec3(0.95), 0.3);
-    } 
+        color = 1.0 - color; // عكس الألوان
+        color = mix(color, vec3(0.95, 0.95, 0.98), 0.5); // تفتيح
+    }
 
     gl_FragColor = vec4(color, 1.0);
 }
@@ -154,10 +131,8 @@ export default function DarkVeil({
     const container = containerRef.current;
     if (!container) return;
 
-    // تنظيف أي canvas قديم فوراً
-    while (container.firstChild) {
-      container.removeChild(container.firstChild);
-    }
+    // تنظيف الحاوية بالكامل قبل البدء
+    container.innerHTML = '';
 
     const renderer = new Renderer({
       alpha: false,
@@ -188,7 +163,6 @@ export default function DarkVeil({
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
-        // تحديث الحجم بدقة
         if (width > 0 && height > 0) {
             renderer.setSize(width, height);
             program.uniforms.uResolution.value.set(gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -203,11 +177,10 @@ export default function DarkVeil({
 
     const update = () => {
       animationId = requestAnimationFrame(update);
-      const time = (performance.now() - start) * 0.0002 * speed; // إبطاء الحركة أكثر
+      const time = (performance.now() - start) * 0.001 * speed;
       program.uniforms.uTime.value = time;
       program.uniforms.uHueShift.value = hueShift;
       program.uniforms.uIsLight.value = isDark ? 0.0 : 1.0;
-
       renderer.render({ scene: mesh });
     };
 
@@ -216,10 +189,10 @@ export default function DarkVeil({
     return () => {
       cancelAnimationFrame(animationId);
       resizeObserver.disconnect();
-      // تنظيف WebGL Context
+      // تنظيف آمن
       const ext = gl.getExtension('WEBGL_lose_context');
       if (ext) ext.loseContext();
-      if (container.contains(gl.canvas)) {
+      if (container && container.contains(gl.canvas)) {
         container.removeChild(gl.canvas);
       }
     };
