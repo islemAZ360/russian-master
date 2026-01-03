@@ -1,7 +1,10 @@
 "use client";
 import React, { useState, useMemo, useEffect } from "react";
-import { IconTrash, IconPencil, IconSearch, IconDatabase, IconArrowDown, IconPlus, IconCpu } from "@tabler/icons-react";
-import { motion } from "framer-motion";
+import { 
+  IconTrash, IconPencil, IconSearch, IconDatabase, IconArrowDown, 
+  IconPlus, IconBinary, IconCpu, IconActivity, IconFolder 
+} from "@tabler/icons-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior }) {
   const [search, setSearch] = useState("");
@@ -36,127 +39,159 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
 
   const visibleCards = filteredCards.slice(0, displayLimit);
 
-  // Tilt Card Component
-  const DataCard = ({ card }) => {
-    return (
-        <div className="group relative perspective-1000">
-            <div className="relative w-full bg-[var(--bg-secondary)] border border-gray-500/10 p-6 rounded-2xl transition-all duration-300 transform group-hover:scale-[1.02] group-hover:shadow-[0_0_30px_rgba(var(--accent-rgb),0.15)] group-hover:border-[var(--accent-color)] overflow-hidden">
-                
-                {/* Glowing Background on Hover */}
-                <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent-color)]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-                
+  // --- مكون البطاقة المتطور (Cyber Card) ---
+  const CyberCard = ({ card, index }) => (
+    <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.05 }}
+        className="group relative h-full"
+    >
+        <div className="relative h-full bg-[var(--bg-secondary)] border border-[var(--text-muted)]/20 p-6 rounded-sm overflow-hidden transition-all duration-300 hover:border-[var(--accent-color)] hover:shadow-[0_0_20px_rgba(var(--accent-rgb),0.15)]">
+            
+            {/* 1. تأثير الماسح الضوئي (Scanner Effect) */}
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[var(--accent-color)]/5 to-transparent translate-y-[-100%] group-hover:translate-y-[100%] transition-transform duration-1000 pointer-events-none z-0"></div>
+            
+            {/* 2. زوايا تقنية (Tech Corners) */}
+            <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-[var(--accent-color)] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-[var(--accent-color)] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+
+            {/* 3. محتوى البطاقة */}
+            <div className="relative z-10">
                 {editingId === card.id ? (
-                    <div className="flex flex-col gap-3 relative z-10">
-                        <input value={editRus} onChange={(e) => setEditRus(e.target.value)} className="bg-[var(--bg-primary)] border border-[var(--accent-color)] p-3 rounded-xl text-[var(--text-main)] w-full outline-none font-bold" />
-                        <input value={editAra} onChange={(e) => setEditAra(e.target.value)} className="bg-[var(--bg-primary)] border border-gray-500/30 p-3 rounded-xl text-[var(--text-main)] text-right w-full outline-none" />
-                        <div className="flex gap-2 mt-2">
-                            <button onClick={saveEdit} className="flex-1 bg-green-600 text-white py-2 rounded-lg text-xs font-black tracking-widest hover:bg-green-500 transition-colors">SAVE</button>
-                            <button onClick={() => setEditingId(null)} className="flex-1 bg-gray-600 text-white py-2 rounded-lg text-xs font-black tracking-widest hover:bg-gray-500 transition-colors">CANCEL</button>
+                    <div className="flex flex-col gap-3">
+                        <div className="text-[10px] text-[var(--accent-color)] font-mono uppercase">EDITING MODE_</div>
+                        <input value={editRus} onChange={(e) => setEditRus(e.target.value)} className="bg-black/10 border border-[var(--accent-color)] p-2 text-[var(--text-main)] font-bold outline-none font-mono" />
+                        <input value={editAra} onChange={(e) => setEditAra(e.target.value)} className="bg-black/10 border border-[var(--text-muted)]/30 p-2 text-[var(--text-main)] text-right outline-none font-mono" />
+                        <div className="flex gap-2 pt-2">
+                            <button onClick={saveEdit} className="flex-1 bg-green-600/20 border border-green-500 text-green-500 py-1 text-xs hover:bg-green-600 hover:text-white transition-all">SAVE</button>
+                            <button onClick={() => setEditingId(null)} className="flex-1 bg-red-600/20 border border-red-500 text-red-500 py-1 text-xs hover:bg-red-600 hover:text-white transition-all">ABORT</button>
                         </div>
                     </div>
                 ) : (
                     <>
-                        <div className="flex justify-between items-start mb-4 relative z-10">
-                            <span className="text-[10px] font-mono font-bold text-[var(--accent-color)] bg-[var(--accent-color)]/10 px-3 py-1 rounded-full border border-[var(--accent-color)]/20 uppercase tracking-wider">
-                                {card.category}
-                            </span>
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-2">
+                                <IconFolder size={14} className="text-[var(--text-muted)]"/>
+                                <span className="text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-wider border border-[var(--text-muted)]/20 px-2 py-0.5 rounded-sm">
+                                    {card.category.substring(0, 12)}
+                                </span>
+                            </div>
                             {isJunior && (
-                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-2 group-hover:translate-x-0">
-                                    <button onClick={() => startEdit(card)} className="text-gray-400 hover:text-[var(--accent-color)] bg-[var(--bg-primary)] p-2 rounded-lg shadow-sm transition-colors"><IconPencil size={16} /></button>
-                                    <button onClick={() => onDelete(card.id)} className="text-gray-400 hover:text-red-500 bg-[var(--bg-primary)] p-2 rounded-lg shadow-sm transition-colors"><IconTrash size={16} /></button>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => startEdit(card)} className="text-[var(--text-muted)] hover:text-[var(--accent-color)] transition-colors"><IconPencil size={16}/></button>
+                                    <button onClick={() => onDelete(card.id)} className="text-[var(--text-muted)] hover:text-red-500 transition-colors"><IconTrash size={16}/></button>
                                 </div>
                             )}
                         </div>
-                        
-                        <div className="space-y-2 relative z-10">
-                            <h3 className="text-2xl font-black text-[var(--text-main)] tracking-tight group-hover:text-[var(--accent-color)] transition-colors">{card.russian}</h3>
-                            <div className="h-px w-10 bg-gray-500/20 group-hover:w-full group-hover:bg-[var(--accent-color)]/30 transition-all duration-700"></div>
-                            <p className="text-base text-[var(--text-muted)] dir-rtl font-medium">{card.arabic}</p>
+
+                        <div className="space-y-1">
+                            <h3 className="text-2xl font-black text-[var(--text-main)] tracking-tight group-hover:text-[var(--accent-color)] transition-colors font-sans">
+                                {card.russian}
+                            </h3>
+                            <div className="w-full h-[1px] bg-gradient-to-r from-[var(--text-muted)]/20 to-transparent my-2"></div>
+                            <p className="text-lg text-[var(--text-muted)] dir-rtl font-medium font-sans">
+                                {card.arabic}
+                            </p>
                         </div>
 
-                        {/* Tech Decoration */}
-                        <div className="absolute bottom-3 right-3 flex gap-1 opacity-20">
-                            <div className="w-1 h-1 bg-[var(--text-main)] rounded-full"></div>
-                            <div className="w-1 h-1 bg-[var(--text-main)] rounded-full"></div>
-                            <div className="w-1 h-1 bg-[var(--text-main)] rounded-full"></div>
+                        {/* Tech Footer */}
+                        <div className="mt-6 flex justify-between items-end opacity-40 group-hover:opacity-100 transition-opacity">
+                            <div className="text-[8px] font-mono text-[var(--text-muted)] flex flex-col">
+                                <span>ID: {card.id.toString().slice(-4)}</span>
+                                <span>SIZE: {card.russian.length}B</span>
+                            </div>
+                            <IconBinary size={16} className="text-[var(--accent-color)] opacity-50"/>
                         </div>
                     </>
                 )}
             </div>
         </div>
-    );
-  };
+    </motion.div>
+  );
 
   return (
-    <div className="w-full flex flex-col p-2 font-sans min-h-screen">
+    <div className="w-full flex flex-col p-4 font-sans min-h-screen">
       
-      {/* Hero Header */}
-      <div className="relative mb-10 p-8 rounded-3xl bg-gradient-to-r from-[var(--bg-secondary)] to-[var(--bg-primary)] border border-gray-500/10 overflow-hidden shadow-lg">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent-color)]/10 blur-[80px] rounded-full pointer-events-none"></div>
-          <div className="relative z-10">
-              <h1 className="text-5xl md:text-6xl font-black text-[var(--text-main)] tracking-tighter mb-2">
-                  DATA <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent-color)] to-purple-500">VAULT</span>
-              </h1>
-              <p className="text-[var(--text-muted)] text-sm font-mono uppercase tracking-[0.3em]">
-                  Secure Neural Archive • {filteredCards.length} Units
-              </p>
+      {/* 1. HUD Header */}
+      <div className="relative mb-10 p-1">
+          {/* Decorative Lines */}
+          <div className="absolute top-0 left-0 w-20 h-[1px] bg-[var(--accent-color)]"></div>
+          <div className="absolute top-0 left-0 h-20 w-[1px] bg-[var(--accent-color)]"></div>
+          
+          <div className="pl-6 pt-4">
+              <div className="flex items-center gap-3 mb-2">
+                  <IconCpu className="text-[var(--accent-color)] animate-pulse" size={32} stroke={1.5} />
+                  <h1 className="text-5xl font-black text-[var(--text-main)] tracking-tighter uppercase">
+                      Archive <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent-color)] to-purple-600">Core</span>
+                  </h1>
+              </div>
+              <div className="flex gap-6 text-xs font-mono text-[var(--text-muted)] uppercase tracking-widest">
+                  <span className="flex items-center gap-2"><IconDatabase size={14}/> Total Units: {filteredCards.length}</span>
+                  <span className="flex items-center gap-2"><IconActivity size={14}/> Status: Active</span>
+              </div>
           </div>
       </div>
 
-      {/* Admin Quick Add */}
-      {isJunior && (
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-8 bg-[var(--bg-secondary)] border border-[var(--accent-color)]/30 p-1 rounded-2xl shadow-lg shadow-[var(--accent-color)]/5">
-            <div className="flex flex-col md:flex-row gap-2">
-                <input value={newCard.russian} onChange={e => setNewCard({...newCard, russian: e.target.value})} placeholder="New Russian Word..." className="flex-1 bg-[var(--bg-primary)] rounded-xl px-4 py-3 outline-none text-[var(--text-main)] placeholder-gray-500/50" />
-                <input value={newCard.arabic} onChange={e => setNewCard({...newCard, arabic: e.target.value})} placeholder="Arabic Meaning..." className="flex-1 bg-[var(--bg-primary)] rounded-xl px-4 py-3 outline-none text-[var(--text-main)] placeholder-gray-500/50 text-right" />
-                <input value={newCard.category} onChange={e => setNewCard({...newCard, category: e.target.value})} placeholder="Tag" className="w-full md:w-32 bg-[var(--bg-primary)] rounded-xl px-4 py-3 outline-none text-[var(--text-main)] placeholder-gray-500/50" />
-                <button onClick={handleAddSubmit} className="bg-[var(--accent-color)] text-white font-bold px-6 py-3 rounded-xl hover:scale-105 transition-transform flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent-color)]/30"><IconPlus size={20}/> ADD</button>
-            </div>
-        </motion.div>
-      )}
-
-      {/* Search Bar & Filters */}
-      <div className="sticky top-0 z-40 py-4 bg-[var(--bg-primary)]/90 backdrop-blur-xl mb-8 -mx-2 px-2 border-b border-gray-500/5 transition-all">
-         <div className="flex flex-col md:flex-row gap-4 items-center">
-             <div className="relative group w-full md:w-auto flex-1">
-                <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--accent-color)] transition-colors" size={20} />
-                <input 
-                    type="text" 
-                    placeholder="Search the vault..." 
-                    className="w-full bg-[var(--bg-secondary)] border border-gray-500/10 rounded-2xl py-3.5 pl-12 pr-4 text-[var(--text-main)] focus:border-[var(--accent-color)]/50 focus:shadow-[0_0_20px_rgba(var(--accent-rgb),0.1)] outline-none font-mono text-sm transition-all" 
-                    value={search} 
-                    onChange={(e) => setSearch(e.target.value)} 
-                />
-            </div>
-            
-            <div className="flex gap-2 overflow-x-auto pb-1 max-w-full custom-scrollbar">
-                {categories.map(cat => (
-                    <button 
-                        key={cat} 
-                        onClick={() => setFilter(cat)} 
-                        className={`px-5 py-2 text-[11px] font-bold uppercase rounded-xl border transition-all whitespace-nowrap tracking-wider
-                        ${filter === cat 
-                            ? "bg-[var(--text-main)] text-[var(--bg-primary)] border-[var(--text-main)] shadow-lg" 
-                            : "bg-[var(--bg-secondary)] text-[var(--text-muted)] border-gray-500/10 hover:border-gray-500/30 hover:text-[var(--text-main)]"}`}
-                    >
-                        {cat}
-                    </button>
-                ))}
-            </div>
+      {/* 2. Command Bar (Search & Tools) */}
+      <div className="sticky top-0 z-40 bg-[var(--bg-primary)]/90 backdrop-blur-xl border-y border-[var(--text-muted)]/10 py-4 mb-8 -mx-4 px-6 flex flex-col md:flex-row gap-4 items-center shadow-2xl">
+         
+         {/* Search Input (Terminal Style) */}
+         <div className="relative flex-1 w-full group">
+             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                 <span className="text-[var(--accent-color)] font-mono text-lg">{'>'}</span>
+             </div>
+             <input 
+                type="text" 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="INITIATE SEARCH SEQUENCE..." 
+                className="w-full bg-[var(--bg-secondary)] text-[var(--text-main)] border border-[var(--text-muted)]/20 rounded-sm py-3 pl-10 pr-4 font-mono text-sm focus:border-[var(--accent-color)] focus:shadow-[0_0_15px_rgba(var(--accent-rgb),0.2)] outline-none transition-all"
+             />
+             <div className="absolute bottom-0 right-0 w-4 h-4 border-b border-r border-[var(--text-muted)]/50"></div>
          </div>
+
+         {/* Admin Quick Add */}
+         {isJunior && (
+             <div className="flex gap-0 w-full md:w-auto">
+                 <input value={newCard.russian} onChange={e => setNewCard({...newCard, russian: e.target.value})} placeholder="RUS" className="w-20 bg-[var(--bg-secondary)] border border-[var(--text-muted)]/20 border-r-0 px-3 text-sm font-mono outline-none text-[var(--text-main)]" />
+                 <input value={newCard.arabic} onChange={e => setNewCard({...newCard, arabic: e.target.value})} placeholder="ARA" className="w-20 bg-[var(--bg-secondary)] border border-[var(--text-muted)]/20 px-3 text-sm font-mono outline-none text-[var(--text-main)] text-right" />
+                 <input value={newCard.category} onChange={e => setNewCard({...newCard, category: e.target.value})} placeholder="CAT" className="w-20 bg-[var(--bg-secondary)] border border-[var(--text-muted)]/20 border-l-0 px-3 text-sm font-mono outline-none text-[var(--text-main)]" />
+                 <button onClick={handleAddSubmit} className="bg-[var(--accent-color)] text-white px-4 hover:brightness-110"><IconPlus size={18}/></button>
+             </div>
+         )}
       </div>
 
-      {/* The Grid */}
+      {/* 3. Filter Tabs (Matrix Style) */}
+      <div className="flex flex-wrap gap-2 mb-8">
+          {categories.map(cat => (
+              <button 
+                key={cat} 
+                onClick={() => setFilter(cat)} 
+                className={`px-4 py-1 text-[10px] font-mono uppercase tracking-widest border transition-all duration-300
+                ${filter === cat 
+                    ? "bg-[var(--accent-color)] border-[var(--accent-color)] text-white shadow-[0_0_10px_rgba(var(--accent-rgb),0.4)]" 
+                    : "bg-transparent border-[var(--text-muted)]/20 text-[var(--text-muted)] hover:border-[var(--accent-color)] hover:text-[var(--accent-color)]"}`}
+              >
+                  [{cat}]
+              </button>
+          ))}
+      </div>
+
+      {/* 4. The Data Matrix (Grid) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
-            {visibleCards.map((card) => <DataCard key={card.id} card={card} />)}
+            <AnimatePresence>
+                {visibleCards.map((card, index) => <CyberCard key={card.id} card={card} index={index} />)}
+            </AnimatePresence>
       </div>
 
+      {/* 5. Load More Button */}
       {visibleCards.length < filteredCards.length && (
             <button 
                 onClick={() => setDisplayLimit(prev => prev + 20)}
-                className="w-full py-5 text-center text-[var(--text-muted)] hover:text-[var(--text-main)] text-xs font-bold tracking-[0.3em] uppercase bg-[var(--bg-secondary)] hover:bg-[var(--bg-secondary)]/80 rounded-2xl transition-all flex items-center justify-center gap-3 mb-10 border border-gray-500/5 hover:border-gray-500/20"
+                className="w-full py-6 text-center text-[var(--text-muted)] hover:text-[var(--accent-color)] text-xs font-mono font-bold tracking-[0.5em] uppercase bg-[var(--bg-secondary)]/50 hover:bg-[var(--bg-secondary)] border border-[var(--text-muted)]/10 hover:border-[var(--accent-color)] transition-all flex items-center justify-center gap-3 mb-10 group"
             >
-                Initialize More Data <IconArrowDown size={14} className="animate-bounce"/>
+                <IconArrowDown size={14} className="animate-bounce group-hover:text-[var(--accent-color)]"/> DECRYPT MORE DATA
             </button>
       )}
     </div>
