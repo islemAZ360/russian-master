@@ -1,4 +1,4 @@
-/* app/globals.css */
+/* src/app/globals.css */
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
 
 @tailwind base;
@@ -6,25 +6,25 @@
 @tailwind utilities;
 
 :root {
-  /* الوضع الداكن: ألوان فضائية عميقة */
+  /* الوضع الداكن */
   --bg-main: #030014;
   --bg-card: rgba(13, 12, 34, 0.6);
   --text-main: #ffffff;
   --text-muted: #94a3b8;
-  --accent-color: #7c3aed; /* Electric Purple */
-  --accent-secondary: #06b6d4; /* Neon Cyan */
+  --accent-color: #7c3aed; 
+  --accent-secondary: #06b6d4; 
   --border-color: rgba(255, 255, 255, 0.08);
 }
 
 [data-theme='light'] {
-  /* الوضع الفاتح: ألوان زاهية ونظيفة */
+  /* الوضع الفاتح */
   --bg-main: #ffffff;
-  --bg-card: rgba(255, 255, 255, 0.8);
+  --bg-card: rgba(255, 255, 255, 0.85);
   --text-main: #0f172a;
   --text-muted: #475569;
-  --accent-color: #2563eb; /* Royal Blue */
-  --accent-secondary: #f43f5e; /* Vibrant Pink */
-  --border-color: rgba(0, 0, 0, 0.05);
+  --accent-color: #2563eb; 
+  --accent-secondary: #f43f5e; 
+  --border-color: rgba(0, 0, 0, 0.08);
 }
 
 body {
@@ -32,32 +32,38 @@ body {
   color: var(--text-main);
   transition: background-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   overflow-x: hidden;
+  /* تحسين الأداء العام للنصوص */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* === High Performance Aurora Animation (خلفية الشفق) === */
 @keyframes aurora-drift {
-  0% { transform: translate(0px, 0px) rotate(0deg); }
-  33% { transform: translate(30px, -50px) rotate(10deg); }
-  66% { transform: translate(-20px, 20px) rotate(-5deg); }
-  100% { transform: translate(0px, 0px) rotate(0deg); }
+  0% { transform: translate3d(0px, 0px, 0) rotate(0deg); }
+  50% { transform: translate3d(30px, -20px, 0) rotate(5deg); }
+  100% { transform: translate3d(0px, 0px, 0) rotate(0deg); }
 }
 
-/* دوائر لونية خفيفة جداً */
 .aurora-blob {
   position: absolute;
-  filter: blur(80px); /* ناعم جداً */
-  opacity: 0.4;
-  will-change: transform; /* تحسين الأداء */
-  animation: aurora-drift 20s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+  /* تخفيف الـ Blur قليلاً لتحسين الأداء بشكل هائل */
+  filter: blur(60px); 
+  opacity: 0.35;
+  /* إجبار استخدام GPU */
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0); 
+  animation: aurora-drift 25s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 50%;
   z-index: -1;
+  pointer-events: none;
 }
 
-/* === تأثير اللمعان للأزرار (Button Shine) === */
+/* === Button Shine Effect === */
 .btn-shine {
   position: relative;
   overflow: hidden;
   transition: all 0.3s ease;
+  transform: translate3d(0,0,0); /* GPU Force */
 }
 
 .btn-shine::after {
@@ -67,56 +73,59 @@ body {
   left: -100%;
   width: 50%;
   height: 100%;
-  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.2), transparent);
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.1), transparent);
   transform: skewX(-20deg);
   transition: 0.5s;
+  pointer-events: none;
 }
 
 .btn-shine:hover::after {
   left: 100%;
-  transition: 0.5s ease-in-out;
 }
 
 .btn-shine:active {
   transform: scale(0.96);
 }
 
-/* === تأثير الزجاج المطور === */
+/* === Glass Panel Optimization === */
 .glass-panel {
   background: var(--bg-card);
   backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px); /* Safari Support */
   border: 1px solid var(--border-color);
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
 }
 
-[data-theme='light'] .glass-panel {
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
-}
+/* === 🚀 Performance & Eco Mode Settings === */
 
-/* === إعدادات الجودة (Optimization) === */
-
-/* Low Quality: إيقاف كل شيء يستهلك البطارية */
+/* 1. Low Quality (ECO): أقصى سرعة، إيقاف كل شيء */
 body.quality-low .aurora-blob,
 body.quality-low .backdrop-blur-xl,
-body.quality-low .animate-pulse {
+body.quality-low .animate-pulse,
+body.quality-low .animate-shimmer {
   display: none !important;
   animation: none !important;
   filter: none !important;
   backdrop-filter: none !important;
-  background-color: var(--bg-main) !important;
 }
 
-body.quality-low .glass-panel {
-  background: var(--bg-main);
-  border: 1px solid var(--border-color);
+/* إصلاح اختفاء الشريط في وضع Eco: نعطيه لوناً ثابتاً بدلاً من الزجاج */
+body.quality-low .floating-dock-container {
+  background-color: #111111 !important;
+  border: 1px solid #333 !important;
   backdrop-filter: none !important;
 }
+[data-theme='light'] body.quality-low .floating-dock-container {
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
 
-/* Medium Quality: تخفيف العدد والفلتر */
+/* 2. Medium Quality: تخفيف الحمل */
 body.quality-medium .aurora-blob {
-  filter: blur(40px); /* بلور أقل تكلفة */
-  animation-duration: 40s; /* حركة أبطأ */
+  filter: blur(40px); 
+  opacity: 0.2;
+  animation-duration: 40s; 
 }
 
 /* Custom Scrollbar */

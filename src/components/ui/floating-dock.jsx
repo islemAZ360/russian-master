@@ -17,9 +17,10 @@ const FloatingDockBar = ({ items }) => {
     <motion.div
       onMouseMove={(e) => mouseX.set(e.pageX)}
       onMouseLeave={() => mouseX.set(Infinity)}
+      // FIX: أضفنا floating-dock-container هنا لكي نتحكم بها في CSS
       className={cn(
-        "mx-auto flex h-16 gap-3 items-end rounded-2xl bg-neutral-900/90 backdrop-blur-xl border border-white/10 px-3 pb-3",
-        "shadow-2xl shadow-black/50 max-w-[95vw] overflow-x-visible"
+        "floating-dock-container mx-auto flex h-16 gap-3 items-end rounded-2xl bg-neutral-900/80 backdrop-blur-xl border border-white/10 px-3 pb-3",
+        "shadow-2xl shadow-black/50 max-w-[95vw] overflow-x-visible transition-colors duration-300"
       )}
     >
       {items.map((item) => (
@@ -37,12 +38,12 @@ function IconContainer({ mouseX, title, icon, onClick }) {
     return val - bounds.x - bounds.width / 2;
   });
 
-  // أبعاد متجاوبة: أصغر قليلاً في الهاتف لتجنب الخروج عن الشاشة
+  // تقليل حدة الحركة للأداء
   let widthTransform = useTransform(distance, [-150, 0, 150], [40, 60, 40]);
   let heightTransform = useTransform(distance, [-150, 0, 150], [40, 60, 40]);
 
-  let width = useSpring(widthTransform, { mass: 0.1, stiffness: 150, damping: 12 });
-  let height = useSpring(heightTransform, { mass: 0.1, stiffness: 150, damping: 12 });
+  let width = useSpring(widthTransform, { mass: 0.1, stiffness: 120, damping: 15 });
+  let height = useSpring(heightTransform, { mass: 0.1, stiffness: 120, damping: 15 });
 
   const [hovered, setHovered] = useState(false);
 
@@ -53,7 +54,7 @@ function IconContainer({ mouseX, title, icon, onClick }) {
         style={{ width, height }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        className="aspect-square rounded-full bg-white/5 flex items-center justify-center relative cursor-pointer border border-white/10 hover:bg-white/10 transition-colors"
+        className="aspect-square rounded-full bg-white/5 flex items-center justify-center relative cursor-pointer border border-white/10 hover:bg-white/10 transition-colors will-change-transform"
       >
         <AnimatePresence>
           {hovered && (
@@ -61,7 +62,6 @@ function IconContainer({ mouseX, title, icon, onClick }) {
               initial={{ opacity: 0, y: 10, x: "-50%" }}
               animate={{ opacity: 1, y: 0, x: "-50%" }}
               exit={{ opacity: 0, y: 2, x: "-50%" }}
-              // إخفاء النص في الشاشات الصغيرة جداً لتجنب الفوضى
               className="hidden md:block px-2 py-0.5 whitespace-pre rounded-md bg-black border border-white/20 text-white absolute left-1/2 -translate-x-1/2 -top-10 w-fit text-xs font-bold z-50"
             >
               {title}
