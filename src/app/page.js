@@ -6,7 +6,7 @@ import {
   IconShield, IconMessageCircle, IconDeviceGamepad, IconBroadcast, IconLifebuoy 
 } from '@tabler/icons-react';
 
-// Hooks
+// FIX: استيراد الـ Hooks من مجلد hooks الصحيح
 import { useAuth } from '@/hooks/useAuth';
 import { useUI } from '@/hooks/useUI';
 import { useSettings } from '@/hooks/useSettings';
@@ -17,7 +17,7 @@ import { useAudio } from '@/hooks/useAudio';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot } from "firebase/firestore";
 
-// Layout & UI Components
+// UI Components
 import ViewManager from '@/components/views/ViewManager';
 import { FloatingDock } from '@/components/ui/floating-dock';
 import NotificationCenter from '@/components/ui/NotificationCenter';
@@ -28,7 +28,7 @@ import { GridBackground } from '@/components/ui/GridBackground';
 import SupportModal from '@/components/features/support/SupportModal';
 import { AuthScreen } from '@/components/features/auth/AuthScreen';
 
-// Games Overlays (Ensure these files exist in src/components/features/games/)
+// Games Overlays
 import TimeTraveler from '@/components/features/games/TimeTraveler';
 import GravityProtocol from '@/components/features/games/GravityProtocol';
 import MagneticField from '@/components/features/games/MagneticField';
@@ -103,6 +103,7 @@ export default function Page() {
     return links;
   }, [isJunior, isAdmin, setCurrentView, setShowSupport]);
 
+  // Render Logic
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
   if (loading) return <LoadingFallback />;
   if (isBanned || studyBanned) return <div className="h-screen flex items-center justify-center bg-black text-red-600 font-bold font-mono tracking-widest text-xl">ACCESS REVOKED</div>;
@@ -117,6 +118,7 @@ export default function Page() {
       className="relative h-screen w-full overflow-hidden font-sans text-[var(--text-main)] selection:bg-[var(--accent-color)] selection:text-white"
     >
       <NotificationCenter />
+      
       {!isAdminMode && <GridBackground />}
       
       {!isAdminMode && (

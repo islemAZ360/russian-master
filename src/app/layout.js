@@ -1,12 +1,12 @@
 import { JetBrains_Mono, Cairo } from "next/font/google";
 import "./globals.css";
 
-// استيراد الـ Providers باستخدام @
+// استيراد الـ Providers باستخدام @ (المسار الصحيح)
 import { AuthProvider } from "@/context/AuthContext";
 import { SettingsProvider } from "@/context/SettingsContext";
 import { UIProvider } from "@/context/UIContext";
 
-// FIX: تصحيح مسارات مكونات UI
+// استيراد مكونات UI المساعدة باستخدام @
 import ServiceWorkerRegister from "@/components/ui/ServiceWorkerRegister";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 
@@ -42,6 +42,10 @@ export const metadata = {
     statusBarStyle: "black-translucent",
     title: "Russian Master",
   },
+  // FIX: هذا الجزء يحل مشكلة التحذير الأصفر
+  other: {
+    "mobile-web-app-capable": "yes",
+  }
 };
 
 export const viewport = {
@@ -62,6 +66,7 @@ export default function RootLayout({ children }) {
       suppressHydrationWarning
     >
       <head>
+        {/* Optimized theme initialization script */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
