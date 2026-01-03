@@ -6,34 +6,27 @@ import {
 } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// --- مكون البطاقة (MemoryNode) - نسخة الأداء العالي ---
+// --- مكون البطاقة (MemoryNode) ---
 const MemoryNode = React.memo(({ card, index, isJunior, editingId, editForm, startEdit, saveEdit, cancelEdit, onDelete, setEditForm, categories }) => {
     
-    const handleChange = useCallback((field, value) => {
+    const handleChange = (field, value) => {
         setEditForm(prev => ({ ...prev, [field]: value }));
-    }, [setEditForm]);
-
-    // دوال مساعدة لتقليل عمليات الـ Render داخل الـ JSX
-    const handleStartEdit = useCallback(() => startEdit(card), [startEdit, card]);
-    const handleDelete = useCallback(() => onDelete(card.id), [onDelete, card]);
+    };
 
     return (
         <motion.div 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "50px" }}
-            transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.2) }} // تأخير بسيط جداً
+            transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.2) }}
             className="group relative h-full w-full will-change-transform"
         >
-            {/* تصميم Liquid Node المحسن للأداء: تدرجات بدلاً من Blur ثقيل */}
-            <div className="relative h-full w-full bg-[var(--bg-secondary)] rounded-[1.5rem] border border-white/5 overflow-hidden transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[var(--accent-color)]/10">
+            <div className="relative h-full w-full bg-[var(--bg-secondary)] rounded-[1.5rem] border border-white/5 overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[var(--accent-color)]/10">
                 
-                {/* تأثير الإضاءة الخفيفة (CSS Gradient) - خفيف جداً */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-color)]/5 rounded-full blur-[40px] pointer-events-none group-hover:bg-[var(--accent-color)]/10 transition-colors duration-300"></div>
                 
                 <div className="relative z-10 p-5 flex flex-col h-full justify-between min-h-[200px]">
                     
-                    {/* --- وضع التعديل (Edit Mode) --- */}
                     {editingId === card.id ? (
                         <div className="flex flex-col gap-3 h-full justify-center">
                             <div className="text-[10px] font-bold text-[var(--accent-color)] uppercase tracking-widest text-center">Editing</div>
@@ -70,7 +63,6 @@ const MemoryNode = React.memo(({ card, index, isJunior, editingId, editForm, sta
                             </div>
                         </div>
                     ) : (
-                        /* --- وضع العرض (View Mode) --- */
                         <>
                             <div className="flex justify-between items-start">
                                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--accent-color)]/10 text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider border border-[var(--accent-color)]/20">
@@ -78,9 +70,9 @@ const MemoryNode = React.memo(({ card, index, isJunior, editingId, editForm, sta
                                 </span>
                                 
                                 {isJunior && (
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                        <button onClick={handleStartEdit} className="p-2 rounded-full bg-[var(--bg-primary)] hover:text-[var(--accent-color)] text-[var(--text-muted)] transition-colors"><IconPencil size={14}/></button>
-                                        <button onClick={handleDelete} className="p-2 rounded-full bg-[var(--bg-primary)] hover:text-red-500 text-[var(--text-muted)] transition-colors"><IconTrash size={14}/></button>
+                                    <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
+                                        <button onClick={() => startEdit(card)} className="p-2 rounded-full bg-[var(--bg-primary)] hover:text-[var(--accent-color)] text-[var(--text-muted)] transition-colors"><IconPencil size={14}/></button>
+                                        <button onClick={() => onDelete(card.id)} className="p-2 rounded-full bg-[var(--bg-primary)] hover:text-red-500 text-[var(--text-muted)] transition-colors"><IconTrash size={14}/></button>
                                     </div>
                                 )}
                             </div>
@@ -208,7 +200,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
               </div>
               <div className="max-h-[60vh] overflow-y-auto custom-scrollbar space-y-3 pr-2">
                   {categories.filter(c => c !== "All" && c !== "Uncategorized").map(cat => (
-                      <div key={cat} className="flex items-center justify-between p-3 bg-[var(--bg-primary)] rounded-xl border border-white/5 group hover:border-[var(--accent-color)]/30 transition-colors">
+                      <div key={cat} className="flex items-center justify-between p-3 bg-[var(--bg-primary)]/50 rounded-xl border border-white/5 group hover:border-[var(--accent-color)]/30 transition-colors">
                           {editingCatName === cat ? (
                               <div className="flex-1 flex gap-2 mr-2">
                                   <input 
@@ -325,14 +317,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
       {/* 3. Filter Pills */}
       <div className="flex flex-wrap justify-center gap-2 mb-10">
           {categories.map(cat => (
-              <button 
-                key={cat} 
-                onClick={() => setFilter(cat)} 
-                className={`px-4 py-1.5 text-xs font-bold rounded-full transition-all duration-200 border border-transparent
-                ${filter === cat 
-                    ? "bg-[var(--accent-color)] text-white shadow-lg shadow-[var(--accent-color)]/30" 
-                    : "bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:border-[var(--accent-color)]/30"}`}
-              >
+              <button key={cat} onClick={() => setFilter(cat)} className={`px-4 py-1.5 text-xs font-bold rounded-full transition-all duration-200 border border-transparent ${filter === cat ? "bg-[var(--accent-color)] text-white shadow-lg shadow-[var(--accent-color)]/30" : "bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:border-[var(--accent-color)]/30"}`}>
                   {cat}
               </button>
           ))}

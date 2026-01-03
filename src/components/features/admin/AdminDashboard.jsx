@@ -8,7 +8,7 @@ import {
 import { 
   IconShieldLock, IconUsers, IconLayoutDashboard, 
   IconBroadcast, IconMessage2, IconBan, 
-  IconTrash, IconSettings, IconX, 
+  IconTrash, IconSettings, IconX, IconMenu2,
   IconSend, IconDeviceGamepad, IconHome, IconCheck, IconUser
 } from '@tabler/icons-react';
 import { useUI } from '@/context/UIContext';
@@ -16,6 +16,7 @@ import { useUI } from '@/context/UIContext';
 export default function AdminDashboard({ currentUser }) {
   const { setCurrentView } = useUI();
   const [activeView, setActiveView] = useState('overview');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // --- Data States ---
   const [users, setUsers] = useState([]);
@@ -154,16 +155,16 @@ export default function AdminDashboard({ currentUser }) {
   // --- Components ---
 
   const StatCard = ({ title, value, icon, color }) => (
-    <div className="p-6 rounded-2xl bg-[#111] border border-white/10 hover:border-white/20 transition-all">
+    <div className="p-4 md:p-6 rounded-2xl bg-[#111] border border-white/10 hover:border-white/20 transition-all">
         <div className={`p-3 rounded-xl bg-white/5 w-fit mb-4 ${color}`}>{icon}</div>
-        <div className="text-3xl font-black text-white mb-1">{value}</div>
-        <div className="text-xs font-bold uppercase text-gray-500 tracking-widest">{title}</div>
+        <div className="text-2xl md:text-3xl font-black text-white mb-1">{value}</div>
+        <div className="text-[10px] md:text-xs font-bold uppercase text-gray-500 tracking-widest">{title}</div>
     </div>
   );
 
   const NavBtn = ({ id, label, icon: Icon, count }) => (
     <button 
-        onClick={() => setActiveView(id)} 
+        onClick={() => { setActiveView(id); setIsMobileMenuOpen(false); }} 
         className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all mb-1 ${activeView === id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
     >
         <div className="flex items-center gap-3"><Icon size={20} /><span className="font-bold text-sm">{label}</span></div>
@@ -172,12 +173,24 @@ export default function AdminDashboard({ currentUser }) {
   );
 
   return (
-    // Fixed container to prevent layout shifting
     <div className="fixed inset-0 z-[200] flex bg-[#050505] text-white font-sans overflow-hidden">
         
-        {/* Sidebar */}
-        <nav className="w-72 border-r border-white/10 bg-black flex flex-col shrink-0">
-            <div className="p-6 h-20 border-b border-white/10 flex items-center gap-3">
+        {/* Mobile Header Overlay */}
+        <div className="md:hidden fixed top-0 left-0 w-full h-16 bg-[#050505] border-b border-white/10 z-50 flex items-center justify-between px-4">
+            <div className="flex items-center gap-2 font-black tracking-widest text-sm">
+                <IconShieldLock className="text-indigo-500"/> NEXUS ADMIN
+            </div>
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 rounded-lg bg-white/10 text-white">
+                <IconMenu2 size={24}/>
+            </button>
+        </div>
+
+        {/* Sidebar (Responsive) */}
+        <nav className={`
+            fixed md:relative top-0 left-0 h-full w-72 bg-black border-r border-white/10 z-40 transition-transform duration-300 flex flex-col shrink-0 pt-16 md:pt-0
+            ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}>
+            <div className="hidden md:flex p-6 h-20 border-b border-white/10 items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-900/20">
                     <IconShieldLock size={20} className="text-white" />
                 </div>
@@ -187,7 +200,7 @@ export default function AdminDashboard({ currentUser }) {
                 </div>
             </div>
             
-            <div className="flex-1 py-6 px-4 space-y-1">
+            <div className="flex-1 py-6 px-4 space-y-1 overflow-y-auto">
                 <div className="text-[10px] text-gray-600 font-bold uppercase tracking-widest mb-2 ml-2">Modules</div>
                 <NavBtn id="overview" label="Overview" icon={IconLayoutDashboard} />
                 <NavBtn id="users" label="Operatives" icon={IconUsers} />
@@ -210,9 +223,9 @@ export default function AdminDashboard({ currentUser }) {
         </nav>
 
         {/* Main Content Area */}
-        <main className="flex-1 flex flex-col h-full bg-[#050505] overflow-hidden relative">
-            {/* Header */}
-            <header className="h-20 border-b border-white/10 bg-black/50 backdrop-blur-md flex items-center justify-between px-8 shrink-0">
+        <main className="flex-1 flex flex-col h-full bg-[#050505] overflow-hidden relative pt-16 md:pt-0">
+            {/* Header (Desktop Only) */}
+            <header className="hidden md:flex h-20 border-b border-white/10 bg-black/50 backdrop-blur-md items-center justify-between px-8 shrink-0">
                 <h2 className="text-xl font-bold uppercase tracking-widest text-white flex items-center gap-3">
                     {activeView === 'overview' && <><IconLayoutDashboard className="text-indigo-500"/> System Overview</>}
                     {activeView === 'users' && <><IconUsers className="text-indigo-500"/> Operative Database</>}
@@ -231,8 +244,8 @@ export default function AdminDashboard({ currentUser }) {
                 
                 {/* 1. OVERVIEW */}
                 {activeView === 'overview' && (
-                    <div className="h-full overflow-y-auto p-8 custom-scrollbar">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-in fade-in">
+                    <div className="h-full overflow-y-auto p-4 md:p-8 custom-scrollbar">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 animate-in fade-in">
                             <StatCard title="Total Operatives" value={users.length} icon={<IconUsers/>} color="text-cyan-400" />
                             <StatCard title="Active Threats" value={users.filter(u => u.isBanned).length} icon={<IconBan/>} color="text-red-500" />
                             <StatCard title="Open Tickets" value={tickets.filter(t => t.status !== 'resolved').length} icon={<IconMessage2/>} color="text-yellow-500" />
@@ -243,9 +256,9 @@ export default function AdminDashboard({ currentUser }) {
 
                 {/* 2. USERS */}
                 {activeView === 'users' && (
-                    <div className="h-full overflow-y-auto p-8 custom-scrollbar">
-                        <div className="bg-[#111] border border-white/10 rounded-2xl overflow-hidden shadow-xl">
-                            <table className="w-full text-sm text-left">
+                    <div className="h-full overflow-y-auto p-4 md:p-8 custom-scrollbar">
+                        <div className="bg-[#111] border border-white/10 rounded-2xl overflow-hidden shadow-xl overflow-x-auto">
+                            <table className="w-full text-sm text-left min-w-[600px]">
                                 <thead className="bg-white/5 text-gray-400 font-bold uppercase text-xs">
                                     <tr>
                                         <th className="p-4">Operative</th>
@@ -259,11 +272,11 @@ export default function AdminDashboard({ currentUser }) {
                                         <tr key={u.id} className="hover:bg-white/5 transition-colors group">
                                             <td className="p-4">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-gray-800 overflow-hidden border border-white/10">
+                                                    <div className="w-8 h-8 rounded-full bg-gray-800 overflow-hidden border border-white/10 shrink-0">
                                                         {u.photoURL ? (
                                                             <img src={u.photoURL} className="w-full h-full object-cover" alt="avatar"/>
                                                         ) : (
-                                                            <div className="w-full h-full flex items-center justify-center text-xs font-bold text-gray-400"><IconUser size={20}/></div>
+                                                            <div className="w-full h-full flex items-center justify-center text-xs font-bold text-gray-400"><IconUser size={16}/></div>
                                                         )}
                                                     </div>
                                                     <div>
@@ -312,7 +325,7 @@ export default function AdminDashboard({ currentUser }) {
 
                 {/* 3. SQUAD COMMS (CHAT CONTROL) */}
                 {activeView === 'comms' && (
-                    <div className="h-full overflow-y-auto p-8 custom-scrollbar">
+                    <div className="h-full overflow-y-auto p-4 md:p-8 custom-scrollbar">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {chats.map(chat => (
                                 <div key={chat.id} className="p-6 rounded-2xl bg-[#111] border border-white/10 hover:border-indigo-500 transition-all group relative">
@@ -348,11 +361,11 @@ export default function AdminDashboard({ currentUser }) {
                     </div>
                 )}
 
-                {/* 4. SUPPORT SYSTEM */}
+                {/* 4. SUPPORT SYSTEM (Stacked on Mobile, Split on Desktop) */}
                 {activeView === 'support' && (
-                    <div className="absolute inset-0 p-6 flex gap-6">
+                    <div className="h-full flex flex-col md:flex-row p-4 md:p-6 gap-4 md:gap-6 overflow-hidden">
                         {/* Ticket List */}
-                        <div className="w-1/3 bg-[#111] border border-white/10 rounded-2xl flex flex-col overflow-hidden">
+                        <div className={`${selectedTicket ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-1/3 bg-[#111] border border-white/10 rounded-2xl overflow-hidden`}>
                             <div className="p-4 border-b border-white/10 font-bold text-gray-400 text-xs uppercase bg-[#151515] flex justify-between items-center">
                                 <span>Incoming Signals</span>
                                 <span className="bg-white/10 px-2 py-0.5 rounded text-[10px]">{tickets.length}</span>
@@ -366,7 +379,7 @@ export default function AdminDashboard({ currentUser }) {
                                         className={`p-4 border-b border-white/5 cursor-pointer transition-all hover:bg-white/5 ${selectedTicket?.id === t.id ? 'bg-indigo-900/20 border-l-4 border-indigo-500' : ''}`}
                                     >
                                         <div className="flex justify-between mb-1">
-                                            <span className="font-bold text-white text-sm truncate w-32">{t.userEmail}</span>
+                                            <span className="font-bold text-white text-sm truncate w-24 md:w-32">{t.userEmail}</span>
                                             <span className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${t.status === 'resolved' ? 'bg-green-900 text-green-400' : 'bg-yellow-900 text-yellow-400'}`}>
                                                 {t.status || 'new'}
                                             </span>
@@ -379,28 +392,31 @@ export default function AdminDashboard({ currentUser }) {
                         </div>
 
                         {/* Chat Interface */}
-                        <div className="flex-1 bg-[#111] border border-white/10 rounded-2xl flex flex-col overflow-hidden relative">
+                        <div className={`${!selectedTicket ? 'hidden md:flex' : 'flex'} flex-col flex-1 bg-[#111] border border-white/10 rounded-2xl overflow-hidden relative`}>
                             {selectedTicket ? (
                                 <>
                                     <div className="p-4 border-b border-white/10 bg-[#151515] flex justify-between items-center shrink-0">
-                                        <div>
-                                            <div className="font-bold text-white text-sm">{selectedTicket.userEmail}</div>
-                                            <div className="text-[10px] text-gray-500 uppercase tracking-widest font-mono">UID: {selectedTicket.userId}</div>
+                                        <div className="flex items-center gap-3">
+                                            <button onClick={() => setSelectedTicket(null)} className="md:hidden text-gray-400"><IconArrowLeft/></button>
+                                            <div>
+                                                <div className="font-bold text-white text-sm">{selectedTicket.userEmail}</div>
+                                                <div className="text-[10px] text-gray-500 uppercase tracking-widest font-mono hidden md:block">UID: {selectedTicket.userId}</div>
+                                            </div>
                                         </div>
                                         {selectedTicket.status !== 'resolved' && (
                                             <button 
                                                 onClick={() => markTicketResolved(selectedTicket.id)} 
                                                 className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs font-bold transition-colors"
                                             >
-                                                <IconCheck size={14}/> Resolve Ticket
+                                                <IconCheck size={14}/> <span className="hidden md:inline">Resolve</span>
                                             </button>
                                         )}
                                     </div>
                                     
-                                    <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar bg-black/50">
+                                    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar bg-black/50">
                                         {selectedTicket.messages.map((m, i) => (
                                             <div key={i} className={`flex ${m.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                                                <div className={`max-w-[70%] p-3 rounded-xl text-sm leading-relaxed ${m.sender === 'admin' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-[#222] text-gray-200 rounded-bl-none border border-white/5'}`} dir="auto">
+                                                <div className={`max-w-[85%] md:max-w-[70%] p-3 rounded-xl text-sm leading-relaxed ${m.sender === 'admin' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-[#222] text-gray-200 rounded-bl-none border border-white/5'}`} dir="auto">
                                                     {m.text}
                                                 </div>
                                             </div>
@@ -432,8 +448,8 @@ export default function AdminDashboard({ currentUser }) {
 
                 {/* 5. BROADCAST */}
                 {activeView === 'broadcast' && (
-                    <div className="h-full overflow-y-auto p-8 custom-scrollbar">
-                        <div className="max-w-2xl mx-auto bg-[#111] border border-white/10 rounded-2xl p-8 mt-10">
+                    <div className="h-full overflow-y-auto p-4 md:p-8 custom-scrollbar">
+                        <div className="max-w-2xl mx-auto bg-[#111] border border-white/10 rounded-2xl p-6 md:p-8 mt-4 md:mt-10">
                             <h3 className="text-xl font-bold mb-2 flex items-center gap-2 text-white"><IconBroadcast className="text-red-500"/> Global System Alert</h3>
                             <p className="text-gray-500 text-sm mb-6">This message will be broadcast to all active operatives immediately via the notification system.</p>
                             
@@ -456,7 +472,7 @@ export default function AdminDashboard({ currentUser }) {
 
                 {/* --- CHAT MANAGER MODAL --- */}
                 {managingChat && (
-                    <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
+                    <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 md:p-6">
                         <div className="w-full max-w-2xl bg-[#0f0f0f] border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
                             <div className="p-5 border-b border-white/10 flex justify-between items-center bg-[#151515]">
                                 <div>
@@ -468,7 +484,7 @@ export default function AdminDashboard({ currentUser }) {
                                 <button onClick={() => setManagingChat(null)} className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors"><IconX/></button>
                             </div>
                             
-                            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                            <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
                                 {/* Admin Message */}
                                 <div className="mb-8 bg-indigo-900/10 border border-indigo-500/30 p-4 rounded-xl">
                                     <label className="text-xs font-bold text-indigo-400 uppercase mb-2 block flex items-center gap-2"><IconBroadcast size={14}/> System Broadcast to Group</label>
@@ -489,7 +505,7 @@ export default function AdminDashboard({ currentUser }) {
                                     {chatMembers.map(member => (
                                         <div key={member.id} className="flex justify-between items-center p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors border border-transparent hover:border-white/10">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-xs font-bold border border-white/10 text-white overflow-hidden">
+                                                <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-xs font-bold border border-white/10 text-white overflow-hidden shrink-0">
                                                     {member.photoURL ? <img src={member.photoURL} className="w-full h-full object-cover"/> : member.displayName?.[0]}
                                                 </div>
                                                 <div>
@@ -498,7 +514,7 @@ export default function AdminDashboard({ currentUser }) {
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <div className="text-[10px] text-gray-400 font-mono mb-1">
+                                                <div className="text-[10px] text-gray-400 font-mono mb-1 hidden md:block">
                                                     Last: {member.lastLogin ? new Date(member.lastLogin.toDate()).toLocaleDateString() : 'N/A'}
                                                 </div>
                                                 <button 
