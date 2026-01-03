@@ -3,13 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { 
   collection, onSnapshot, doc, updateDoc, query, orderBy, 
-  deleteDoc, addDoc, serverTimestamp, arrayUnion, getDoc, where, getDocs 
+  deleteDoc, addDoc, serverTimestamp, arrayUnion, getDoc, where 
 } from "firebase/firestore";
+// تم إضافة IconHome هنا للإصلاح
 import { 
   IconShieldLock, IconUsers, IconLayoutDashboard, 
   IconBroadcast, IconMessage2, IconBan, 
   IconTrash, IconSettings, IconEye, 
-  IconSend, IconDeviceGamepad, IconAlertTriangle, IconX
+  IconSend, IconDeviceGamepad, IconAlertTriangle, IconX, IconHome
 } from '@tabler/icons-react';
 import { useUI } from '@/context/UIContext';
 
@@ -50,11 +51,8 @@ export default function AdminDashboard({ currentUser }) {
 
   const openChatManager = async (chat) => {
       setManagingChat(chat);
-      setChatMembers([]); // Reset
+      setChatMembers([]); 
       if (chat.members && chat.members.length > 0) {
-          // Fetch user details for members
-          // Note: Firestore 'in' query supports max 10 items. For prod, fetch individually or structure differently.
-          // Here we filter from the already loaded 'users' state for speed/efficiency
           const membersDetails = users.filter(u => chat.members.includes(u.id));
           setChatMembers(membersDetails);
       }
@@ -66,7 +64,7 @@ export default function AdminDashboard({ currentUser }) {
           await addDoc(collection(db, "chats", managingChat.id, "messages"), {
               text: adminChatMsg,
               senderName: "SYSTEM ADMIN",
-              isSystem: true, // Special flag for styling
+              isSystem: true,
               createdAt: serverTimestamp()
           });
           await updateDoc(doc(db, "chats", managingChat.id), {
@@ -81,7 +79,7 @@ export default function AdminDashboard({ currentUser }) {
   };
 
   const deleteChat = async (chatId) => {
-      if(!confirm("⚠️ DANGER: Are you sure you want to delete this channel? This cannot be undone.")) return;
+      if(!confirm("⚠️ DANGER: Delete this channel?")) return;
       try {
           await deleteDoc(doc(db, "chats", chatId));
           if(managingChat?.id === chatId) setManagingChat(null);
@@ -289,7 +287,7 @@ export default function AdminDashboard({ currentUser }) {
                     </div>
                 )}
 
-                {/* Support & Broadcast (Same as before) */}
+                {/* Support & Broadcast */}
                 {activeView === 'broadcast' && (
                     <div className="max-w-xl mx-auto bg-[#111] border border-white/10 rounded-2xl p-8 mt-10">
                         <textarea value={broadcastMsg} onChange={(e) => setBroadcastMsg(e.target.value)} className="w-full h-32 bg-black border border-white/20 rounded-xl p-4 text-white mb-4 focus:border-red-500 outline-none" placeholder="Global Alert Message..." dir="auto"/>
