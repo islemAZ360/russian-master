@@ -1,202 +1,207 @@
 "use client";
-import React, { useRef, useEffect } from 'react';
-import { Renderer, Program, Mesh, Triangle, Vec2 } from 'ogl';
-import { useSettings } from '@/context/SettingsContext';
+import { Renderer, Program, Mesh, Color, Triangle } from 'ogl';
+import { useEffect, useRef } from 'react';
+import './DarkVeil.css';
 
-const styles = {
-  container: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    width: '100vw',
-    height: '100vh',
-    zIndex: -1,
-    pointerEvents: 'none',
-    backgroundColor: '#050505',
-  },
-};
-
-const vertex = `
-attribute vec2 position;
-attribute vec2 uv;
-varying vec2 vUv;
+const VERT = `#version 300 es
+in vec2 position;
 void main() {
-    vUv = uv;
-    gl_Position = vec4(position, 0.0, 1.0);
+  gl_Position = vec4(position, 0.0, 1.0);
 }
 `;
 
-const fragment = `
+const FRAG = `#version 300 es
 precision highp float;
 
 uniform float uTime;
+uniform float uAmplitude;
+uniform vec3 uColorStops[3];
 uniform vec2 uResolution;
-uniform float uHueShift;
-uniform float uIsLight;
+uniform float uBlend;
 
-// دالة عشوائية عالية التردد (للتفاصيل الدقيقة)
-float random(vec2 st) {
-    return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
+out vec4 fragColor;
+
+vec3 permute(vec3 x) {
+  return mod(((x * 34.0) + 1.0) * x, 289.0);
 }
 
-// دالة ضجيج ناعمة
-float noise(vec2 st) {
-    vec2 i = floor(st);
-    vec2 f = fract(st);
-    float a = random(i);
-    float b = random(i + vec2(1.0, 0.0));
-    float c = random(i + vec2(0.0, 1.0));
-    float d = random(i + vec2(1.0, 1.0));
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(a, b, u.x) + (c - a)* u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+float snoise(vec2 v){
+  const vec4 C = vec4(
+      0.211324865405187, 0.366025403784439,
+      -0.577350269189626, 0.024390243902439
+  );
+  vec2 i  = floor(v + dot(v, C.yy));
+  vec2 x0 = v - i + dot(i, C.xx);
+  vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+  vec4 x12 = x0.xyxy + C.xxzz;
+  x12.xy -= i1;
+  i = mod(i, 289.0);
+
+  vec3 p = permute(
+      permute(i.y + vec3(0.0, i1.y, 1.0))
+    + i.x + vec3(0.0, i1.x, 1.0)
+  );
+
+  vec3 m = max(
+      0.5 - vec3(
+          dot(x0, x0),
+          dot(x12.xy, x12.xy),
+          dot(x12.zw, x12.zw)
+      ), 
+      0.0
+  );
+  m = m * m;
+  m = m * m;
+
+  vec3 x = 2.0 * fract(p * C.www) - 1.0;
+  vec3 h = abs(x) - 0.5;
+  vec3 ox = floor(x + 0.5);
+  vec3 a0 = x - ox;
+  m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+
+  vec3 g;
+  g.x  = a0.x  * x0.x  + h.x  * x0.y;
+  g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+  return 130.0 * dot(m, g);
 }
 
-// FBM مع تفاصيل دقيقة جداً
-#define OCTAVES 4
-float fbm(vec2 st) {
-    float v = 0.0;
-    float a = 0.5;
-    mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.50));
-    for (int i = 0; i < OCTAVES; ++i) {
-        v += a * noise(st);
-        st = rot * st * 2.0 + 100.0; // مضاعفة التردد في كل طبقة
-        a *= 0.5;
-    }
-    return v;
-}
+struct ColorStop {
+  vec3 color;
+  float position;
+};
 
-vec3 hsv2rgb(vec3 c) {
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+#define COLOR_RAMP(colors, factor, finalColor) {              \
+  int index = 0;                                            \
+  for (int i = 0; i < 2; i++) {                               \
+     ColorStop currentColor = colors[i];                    \
+     bool isInBetween = currentColor.position <= factor;    \
+     index = int(mix(float(index), float(i), float(isInBetween))); \
+  }                                                         \
+  ColorStop currentColor = colors[index];                   \
+  ColorStop nextColor = colors[index + 1];                  \
+  float range = nextColor.position - currentColor.position; \
+  float lerpFactor = (factor - currentColor.position) / range; \
+  finalColor = mix(currentColor.color, nextColor.color, lerpFactor); \
 }
 
 void main() {
-    // 1. تصحيح الأبعاد
-    vec2 uv = gl_FragCoord.xy / uResolution.xy;
-    uv.x *= uResolution.x / uResolution.y;
-
-    // 2. الحل الجذري: تكبير هائل (Zoom Out)
-    // كلما زاد هذا الرقم، صغرت التفاصيل. كان 3، الآن 15.
-    uv *= 15.0; 
-
-    // حركة بطيئة جداً وانسيابية
-    float time = uTime * 0.1;
-    
-    // إنشاء طبقتين من الحركة المتداخلة
-    vec2 q = vec2(0.);
-    q.x = fbm(uv + 0.00 * time);
-    q.y = fbm(uv + vec2(1.0));
-
-    vec2 r = vec2(0.);
-    r.x = fbm(uv + 1.0 * q + vec2(1.7, 9.2) + 0.15 * time);
-    r.y = fbm(uv + 1.0 * q + vec2(8.3, 2.8) + 0.126 * time);
-
-    float f = fbm(uv + r);
-
-    // الألوان
-    float hue = uHueShift / 360.0;
-    
-    // تلوين التفاصيل الدقيقة
-    vec3 color = mix(
-        vec3(0.02, 0.02, 0.05), // الخلفية الداكنة
-        hsv2rgb(vec3(hue, 0.8, 0.8)), // لون السديم
-        clamp(f * f * 2.0, 0.0, 1.0)
-    );
-
-    // إضافة "نجوم" أو ضجيج دقيق جداً لكسر التموج
-    float star = random(uv * 5.0); // نجوم صغيرة
-    if (star > 0.98) {
-        color += vec3(star * 0.5); // لمعان النجوم
-    }
-
-    // الوضع النهاري
-    if (uIsLight > 0.5) {
-        color = 1.0 - color; // عكس الألوان
-        color = mix(color, vec3(0.95, 0.95, 0.98), 0.5); // تفتيح
-    }
-
-    gl_FragColor = vec4(color, 1.0);
+  vec2 uv = gl_FragCoord.xy / uResolution;
+  
+  ColorStop colors[3];
+  colors[0] = ColorStop(uColorStops[0], 0.0);
+  colors[1] = ColorStop(uColorStops[1], 0.5);
+  colors[2] = ColorStop(uColorStops[2], 1.0);
+  
+  vec3 rampColor;
+  COLOR_RAMP(colors, uv.x, rampColor);
+  
+  float height = snoise(vec2(uv.x * 2.0 + uTime * 0.1, uTime * 0.25)) * 0.5 * uAmplitude;
+  height = exp(height);
+  height = (uv.y * 2.0 - height + 0.2);
+  float intensity = 0.6 * height;
+  
+  float midPoint = 0.20;
+  float auroraAlpha = smoothstep(midPoint - uBlend * 0.5, midPoint + uBlend * 0.5, intensity);
+  
+  vec3 auroraColor = intensity * rampColor;
+  
+  fragColor = vec4(auroraColor * auroraAlpha, auroraAlpha);
 }
 `;
 
-export default function DarkVeil({
-  hueShift = 220,
-  speed = 0.2
-}) {
-  const containerRef = useRef(null);
-  const { isDark } = useSettings();
+export default function DarkVeil(props) {
+  // الألوان الافتراضية (يمكنك تغييرها من هنا)
+  const { 
+    colorStops = ['#3A29FF', '#FF94B4', '#FF3232'], 
+    amplitude = 1.0, 
+    blend = 0.5 
+  } = props;
+  
+  const propsRef = useRef(props);
+  propsRef.current = props;
+
+  const ctnDom = useRef(null);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    // تنظيف الحاوية بالكامل قبل البدء
-    container.innerHTML = '';
+    const ctn = ctnDom.current;
+    if (!ctn) return;
 
     const renderer = new Renderer({
-      alpha: false,
-      dpr: Math.min(window.devicePixelRatio, 1.5), 
-      width: container.clientWidth,
-      height: container.clientHeight,
+      alpha: true,
+      premultipliedAlpha: true,
+      antialias: true
     });
-
     const gl = renderer.gl;
-    container.appendChild(gl.canvas);
-    gl.clearColor(0, 0, 0, 1);
+    gl.clearColor(0, 0, 0, 0);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.canvas.style.backgroundColor = 'transparent';
+
+    let program;
+
+    function resize() {
+      if (!ctn) return;
+      const width = ctn.offsetWidth;
+      const height = ctn.offsetHeight;
+      renderer.setSize(width, height);
+      if (program) {
+        program.uniforms.uResolution.value = [width, height];
+      }
+    }
+    window.addEventListener('resize', resize);
 
     const geometry = new Triangle(gl);
+    if (geometry.attributes.uv) {
+      delete geometry.attributes.uv;
+    }
 
-    const program = new Program(gl, {
-      vertex,
-      fragment,
+    const colorStopsArray = colorStops.map(hex => {
+      const c = new Color(hex);
+      return [c.r, c.g, c.b];
+    });
+
+    program = new Program(gl, {
+      vertex: VERT,
+      fragment: FRAG,
       uniforms: {
         uTime: { value: 0 },
-        uResolution: { value: new Vec2(gl.drawingBufferWidth, gl.drawingBufferHeight) },
-        uHueShift: { value: hueShift },
-        uIsLight: { value: isDark ? 0.0 : 1.0 }
-      },
+        uAmplitude: { value: amplitude },
+        uColorStops: { value: colorStopsArray },
+        uResolution: { value: [ctn.offsetWidth, ctn.offsetHeight] },
+        uBlend: { value: blend }
+      }
     });
 
     const mesh = new Mesh(gl, { geometry, program });
+    ctn.appendChild(gl.canvas);
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        if (width > 0 && height > 0) {
-            renderer.setSize(width, height);
-            program.uniforms.uResolution.value.set(gl.drawingBufferWidth, gl.drawingBufferHeight);
-        }
-      }
-    });
-
-    resizeObserver.observe(container);
-
-    let animationId;
-    const start = performance.now();
-
-    const update = () => {
-      animationId = requestAnimationFrame(update);
-      const time = (performance.now() - start) * 0.001 * speed;
-      program.uniforms.uTime.value = time;
-      program.uniforms.uHueShift.value = hueShift;
-      program.uniforms.uIsLight.value = isDark ? 0.0 : 1.0;
+    let animateId = 0;
+    const update = t => {
+      animateId = requestAnimationFrame(update);
+      const { time = t * 0.01, speed = 1.0 } = propsRef.current;
+      program.uniforms.uTime.value = time * speed * 0.1;
+      program.uniforms.uAmplitude.value = propsRef.current.amplitude ?? 1.0;
+      program.uniforms.uBlend.value = propsRef.current.blend ?? blend;
+      const stops = propsRef.current.colorStops ?? colorStops;
+      program.uniforms.uColorStops.value = stops.map(hex => {
+        const c = new Color(hex);
+        return [c.r, c.g, c.b];
+      });
       renderer.render({ scene: mesh });
     };
+    animateId = requestAnimationFrame(update);
 
-    animationId = requestAnimationFrame(update);
+    resize();
 
     return () => {
-      cancelAnimationFrame(animationId);
-      resizeObserver.disconnect();
-      // تنظيف آمن
-      const ext = gl.getExtension('WEBGL_lose_context');
-      if (ext) ext.loseContext();
-      if (container && container.contains(gl.canvas)) {
-        container.removeChild(gl.canvas);
+      cancelAnimationFrame(animateId);
+      window.removeEventListener('resize', resize);
+      if (ctn && gl.canvas.parentNode === ctn) {
+        ctn.removeChild(gl.canvas);
       }
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
     };
-  }, [hueShift, speed, isDark]);
+  }, [amplitude, colorStops, blend]);
 
-  return <div ref={containerRef} style={styles.container} />;
+  return <div ref={ctnDom} className="aurora-container" />;
 }
