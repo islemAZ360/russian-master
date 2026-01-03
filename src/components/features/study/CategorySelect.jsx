@@ -3,95 +3,127 @@ import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   IconCpu, IconSearch, IconDatabase, IconBolt, 
-  IconArrowRight, IconCategory, IconTerminal, IconFolders 
+  IconArrowRight, IconVersions, IconHash, IconActivity
 } from "@tabler/icons-react";
 
-// --- بطاقة عالية الأداء (CSS-Based) ---
-const ModuleCard = React.memo(({ category, stats, onClick, index }) => {
-  const percentage = stats.total > 0 ? Math.round((stats.mastered / stats.total) * 100) : 0;
+// --- مكون الزوايا التقنية (للتزيين فقط - خفيف جداً) ---
+const TechCorners = ({ color = "border-white/20" }) => (
+  <>
+    <div className={`absolute top-0 left-0 w-3 h-3 border-l-2 border-t-2 ${color} rounded-tl-sm transition-colors duration-300`}></div>
+    <div className={`absolute top-0 right-0 w-3 h-3 border-r-2 border-t-2 ${color} rounded-tr-sm transition-colors duration-300`}></div>
+    <div className={`absolute bottom-0 left-0 w-3 h-3 border-l-2 border-b-2 ${color} rounded-bl-sm transition-colors duration-300`}></div>
+    <div className={`absolute bottom-0 right-0 w-3 h-3 border-r-2 border-b-2 ${color} rounded-br-sm transition-colors duration-300`}></div>
+  </>
+);
+
+// --- شريط التقدم المقطع (Segmented Bar) ---
+const SegmentedProgress = ({ percent, color }) => {
+  const segments = 10;
+  const activeSegments = Math.ceil((percent / 100) * segments);
   
-  // تحديد اللون بناءً على الإنجاز (أخضر للمكتمل، أزرق للباقي)
+  return (
+    <div className="flex gap-1 h-1.5 w-full mt-4">
+      {[...Array(segments)].map((_, i) => (
+        <div 
+          key={i} 
+          className={`flex-1 rounded-sm transition-all duration-500 ${
+            i < activeSegments ? color : 'bg-white/5'
+          }`}
+        />
+      ))}
+    </div>
+  );
+};
+
+// --- البطاقة الاحترافية ---
+const DataModuleCard = React.memo(({ category, stats, onClick, index }) => {
+  const percentage = stats.total > 0 ? Math.round((stats.mastered / stats.total) * 100) : 0;
   const isMastered = percentage === 100;
-  const activeColor = isMastered ? "text-emerald-400" : "text-cyan-400";
-  const activeBorder = isMastered ? "group-hover:border-emerald-500/50" : "group-hover:border-cyan-500/50";
-  const activeGlow = isMastered ? "group-hover:shadow-[0_0_30px_-5px_rgba(16,185,129,0.3)]" : "group-hover:shadow-[0_0_30px_-5px_rgba(6,182,212,0.3)]";
+  
+  // تحديد الثيم اللوني
+  const theme = isMastered 
+    ? { text: "text-emerald-400", bg: "bg-emerald-500", border: "border-emerald-500/30", glow: "group-hover:shadow-emerald-900/20" }
+    : percentage > 50 
+    ? { text: "text-cyan-400", bg: "bg-cyan-500", border: "border-cyan-500/30", glow: "group-hover:shadow-cyan-900/20" }
+    : { text: "text-violet-400", bg: "bg-violet-500", border: "border-violet-500/30", glow: "group-hover:shadow-violet-900/20" };
 
   return (
-    <motion.div
+    <motion.button
       layout
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.2, delay: index * 0.03 }} // تأخير بسيط جداً للدخول
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.2, delay: index * 0.03 }}
       onClick={onClick}
       className={`
-        group relative h-[160px] w-full cursor-pointer 
-        rounded-2xl border border-white/5 bg-[#080808] 
-        overflow-hidden transition-all duration-300 ease-out
-        hover:-translate-y-1 hover:bg-[#0f0f0f] ${activeBorder} ${activeGlow}
+        group relative w-full h-[160px] text-left p-5 
+        bg-[#09090b] border border-white/5 rounded-xl 
+        hover:border-opacity-50 transition-all duration-300 
+        hover:-translate-y-1 hover:shadow-2xl ${theme.glow}
+        overflow-hidden
       `}
     >
-      {/* 1. زخرفة خلفية ثابتة (خفيفة جداً) */}
-      <div className="absolute top-0 right-0 p-3 opacity-5 group-hover:opacity-10 transition-opacity">
-        <IconCategory size={80} />
-      </div>
-      
-      {/* 2. خط سفلي مضيء */}
-      <div className={`absolute bottom-0 left-0 h-1 w-full bg-white/5`}>
-        <div 
-            style={{ width: `${percentage}%` }} 
-            className={`h-full ${isMastered ? 'bg-emerald-500' : 'bg-cyan-600'} shadow-[0_0_10px_currentColor] transition-all duration-1000`}
-        ></div>
-      </div>
+      {/* Tech Corners Effect */}
+      <TechCorners color={theme.border} />
 
-      <div className="relative z-10 p-5 flex flex-col h-full justify-between">
+      {/* Background Gradient Mesh */}
+      <div className={`absolute top-0 right-0 w-32 h-32 ${theme.bg} opacity-5 blur-[60px] group-hover:opacity-15 transition-opacity duration-500`}></div>
+
+      <div className="relative z-10 flex flex-col h-full justify-between">
         
-        {/* Header */}
+        {/* Top Section */}
         <div className="flex justify-between items-start">
-            <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg bg-white/5 border border-white/5 ${activeColor}`}>
-                    {isMastered ? <IconBolt size={20}/> : <IconFolders size={20}/>}
-                </div>
-                <div className="flex flex-col">
-                    <span className="text-[10px] font-mono text-white/30 tracking-widest uppercase">Protocol {index + 1 < 10 ? `0${index+1}` : index+1}</span>
-                    <h3 className={`text-lg font-bold text-white leading-tight group-hover:translate-x-1 transition-transform ${activeColor}`}>
-                        {category}
-                    </h3>
-                </div>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg bg-white/5 ${theme.text}`}>
+              <IconVersions size={22} />
             </div>
+            <div>
+              <span className="block text-[9px] text-white/30 font-mono tracking-widest uppercase">
+                SEQ_ID: {index + 1}
+              </span>
+              <h3 className={`text-lg font-bold text-white group-hover:text-white transition-colors leading-none mt-1`}>
+                {category}
+              </h3>
+            </div>
+          </div>
+          
+          {/* Percentage Badge */}
+          <div className={`text-xs font-mono font-bold px-2 py-1 rounded bg-white/5 ${theme.text}`}>
+            {percentage}%
+          </div>
         </div>
 
-        {/* Footer Info */}
-        <div className="flex items-center justify-between mt-auto">
-            <div className="flex items-center gap-4 text-xs font-mono text-white/40">
-                <span className="flex items-center gap-1 group-hover:text-white transition-colors">
-                    <IconDatabase size={14}/> {stats.total}
-                </span>
-                <span className={`flex items-center gap-1 ${percentage > 0 ? activeColor : ''}`}>
-                    {percentage}%
-                </span>
-            </div>
-
-            {/* Action Button */}
-            <div className={`
-                w-8 h-8 rounded-full border border-white/10 flex items-center justify-center 
-                text-white/50 group-hover:text-black group-hover:bg-white 
-                group-hover:border-white transition-all duration-300
-            `}>
-                <IconArrowRight size={14} className="group-hover:-rotate-45 transition-transform duration-300"/>
-            </div>
+        {/* Bottom Section */}
+        <div>
+          <div className="flex justify-between text-[10px] text-white/40 font-mono uppercase mb-1">
+            <span className="flex items-center gap-1"><IconDatabase size={10}/> Capacity: {stats.total}</span>
+            <span>{isMastered ? "COMPLETED" : "IN PROGRESS"}</span>
+          </div>
+          
+          {/* Visual Progress */}
+          <SegmentedProgress percent={percentage} color={theme.bg} />
         </div>
+
+        {/* Hover Action Indicator */}
+        <div className={`
+            absolute bottom-0 right-0 w-8 h-8 flex items-center justify-center
+            opacity-0 group-hover:opacity-100 transition-all duration-300
+            translate-y-2 group-hover:translate-y-0
+        `}>
+            <IconArrowRight size={14} className={theme.text} />
+        </div>
+
       </div>
-    </motion.div>
+    </motion.button>
   );
 });
 
-ModuleCard.displayName = "ModuleCard";
+DataModuleCard.displayName = "DataModuleCard";
 
 // --- المكون الرئيسي ---
 export function CategorySelect({ categories = [], cards = [], activeCategory, onSelect }) {
   const [search, setSearch] = useState("");
 
-  // استخدام useMemo للحسابات الثقيلة
   const filteredCategories = useMemo(() => {
     const safeCategories = Array.isArray(categories) ? categories : [];
     
@@ -112,58 +144,70 @@ export function CategorySelect({ categories = [], cards = [], activeCategory, on
   }, [categories, cards, search]);
 
   return (
-    <div className="w-full h-full flex flex-col font-sans relative px-4 md:px-8 py-6">
+    <div className="w-full h-full flex flex-col font-sans relative px-4 md:px-8 pt-4 pb-0">
       
-      {/* HEADER */}
-      <div className="shrink-0 mb-8">
+      {/* HEADER SECTION */}
+      <div className="shrink-0 mb-8 space-y-6">
+        {/* Title & Decorative Elements */}
         <div className="flex flex-col md:flex-row justify-between items-end gap-6">
-            <div>
-                <div className="flex items-center gap-2 mb-2 text-cyan-500 opacity-80">
-                    <IconTerminal size={18} />
-                    <span className="text-xs font-bold tracking-[0.2em] uppercase">System Database</span>
-                </div>
-                <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter">
+            <motion.div 
+                initial={{opacity:0, x:-20}} 
+                animate={{opacity:1, x:0}} 
+                className="relative"
+            >
+                <div className="absolute -left-6 top-2 w-1 h-12 bg-cyan-500 hidden md:block"></div>
+                <h2 className="text-5xl md:text-6xl font-black text-white tracking-tighter leading-none">
                     DATA <span className="text-white/20">MODULES</span>
                 </h2>
-            </div>
+                <div className="flex items-center gap-3 mt-2 text-cyan-500/60 font-mono text-xs">
+                    <IconCpu size={14}/>
+                    <span>SYSTEM_READY</span>
+                    <span className="w-1 h-1 bg-cyan-500 rounded-full"></span>
+                    <span>{filteredCategories.length} AVAILABLE</span>
+                </div>
+            </motion.div>
 
-            {/* Search Input - Optimized */}
-            <div className="w-full md:w-72">
-                <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-white/30 group-focus-within:text-cyan-400 transition-colors">
-                        <IconSearch size={18} />
-                    </div>
+            {/* Futuristic Search Bar */}
+            <div className="w-full md:w-80 group">
+                <div className="relative flex items-center bg-[#09090b] border-b-2 border-white/10 group-focus-within:border-cyan-500 transition-colors py-3">
+                    <IconSearch size={20} className="text-white/30 mr-3 group-focus-within:text-cyan-500 transition-colors"/>
                     <input 
                         type="text"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        placeholder="SEARCH..."
-                        className="w-full bg-[#0a0a0a] border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder-white/20 outline-none focus:border-cyan-500/50 transition-colors font-mono"
+                        placeholder="FILTER_PROTOCOL..."
+                        className="w-full bg-transparent border-none outline-none text-white text-sm font-mono placeholder-white/20 uppercase"
                     />
+                    <div className="text-[10px] text-white/20 bg-white/5 px-1.5 py-0.5 rounded ml-2">ESC</div>
                 </div>
             </div>
         </div>
       </div>
 
-      {/* GRID AREA */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar pb-32 -mr-2 pr-2">
+      {/* GRID SECTION */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar pb-32 -mr-3 pr-3">
         {filteredCategories.length === 0 ? (
-            <div className="h-64 w-full flex flex-col items-center justify-center border border-dashed border-white/10 rounded-2xl">
-                <p className="text-white/30 font-mono text-sm">NO MODULES FOUND</p>
+            <div className="h-full w-full flex flex-col items-center justify-center opacity-30">
+                <IconHash size={64} className="mb-4"/>
+                <p className="font-mono text-sm tracking-widest">NO MATCHING DATA</p>
             </div>
         ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
-                {/* إزالة AnimatePresence للشبكة الكبيرة لتحسين الأداء، الحركات تتم عبر CSS */}
-                {filteredCategories.map((cat, index) => (
-                    <ModuleCard 
-                        key={cat.name} 
-                        category={cat.name} 
-                        stats={{ total: cat.total, mastered: cat.mastered }}
-                        index={index}
-                        onClick={() => onSelect(cat.name)} 
-                    />
-                ))}
-            </div>
+            <motion.div 
+                layout 
+                className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5"
+            >
+                <AnimatePresence mode="popLayout">
+                    {filteredCategories.map((cat, index) => (
+                        <DataModuleCard 
+                            key={cat.name} 
+                            category={cat.name} 
+                            stats={{ total: cat.total, mastered: cat.mastered }}
+                            index={index}
+                            onClick={() => onSelect(cat.name)}
+                        />
+                    ))}
+                </AnimatePresence>
+            </motion.div>
         )}
       </div>
     </div>
