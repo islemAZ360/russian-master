@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { 
   IconTrash, IconPencil, IconSearch, IconDatabase, IconArrowDown, 
-  IconPlus, IconBinary, IconCpu, IconActivity, IconFolder, IconHash, IconCode 
+  IconPlus, IconCategory, IconLanguage, IconSparkles 
 } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -39,186 +39,161 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
 
   const visibleCards = filteredCards.slice(0, displayLimit);
 
-  // --- مكون البطاقة المتطور (Data Shard V2) ---
-  const DataShard = ({ card, index }) => (
-    <motion.div 
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        transition={{ delay: index * 0.05, duration: 0.4 }}
-        className="group relative h-full w-full"
-    >
-        {/* الخلفية الرئيسية للبطاقة مع تأثير الزجاج */}
-        <div className="relative h-full bg-[var(--bg-secondary)] border border-[var(--text-muted)]/10 p-0 rounded-lg overflow-hidden transition-all duration-300 group-hover:border-[var(--accent-color)]/50 group-hover:shadow-[0_0_30px_rgba(var(--accent-rgb),0.1)]">
-            
-            {/* الشريط العلوي التقني (Header Bar) */}
-            <div className="h-8 bg-gradient-to-r from-[var(--bg-primary)] to-[var(--bg-secondary)] border-b border-[var(--text-muted)]/10 flex items-center justify-between px-3 relative overflow-hidden">
-                {/* شريط ملون صغير */}
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-[var(--accent-color)] opacity-50 group-hover:opacity-100 transition-opacity"></div>
+  // --- تصميم البطاقة الجديد: Liquid Memory Node ---
+  const MemoryNode = ({ card, index }) => {
+    return (
+        <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.03, duration: 0.4, ease: "easeOut" }}
+            className="group relative h-full"
+        >
+            {/* الخلفية الأساسية: زجاجية بالكامل وبدون حدود */}
+            <div className="relative h-full w-full bg-white/5 dark:bg-white/5 backdrop-blur-2xl rounded-[2rem] overflow-hidden transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--accent-color)]/20 hover:-translate-y-2">
                 
-                <span className="text-[9px] font-mono text-[var(--accent-color)] uppercase tracking-widest flex items-center gap-2 pl-2">
-                    <IconHash size={10}/> {card.id.toString().slice(-4)}
-                </span>
+                {/* طبقة لونية خلفية ناعمة جداً تظهر عند التحويم */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent-color)]/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
                 
-                {/* أيقونات التحكم تظهر فقط للمشرف */}
-                {isJunior && (
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => startEdit(card)} className="text-[var(--text-muted)] hover:text-[var(--accent-color)]"><IconPencil size={12}/></button>
-                        <button onClick={() => onDelete(card.id)} className="text-[var(--text-muted)] hover:text-red-500"><IconTrash size={12}/></button>
-                    </div>
-                )}
-            </div>
+                {/* دائرة زخرفية في الخلفية */}
+                <div className="absolute -right-10 -top-10 w-40 h-40 bg-[var(--accent-color)]/10 rounded-full blur-3xl pointer-events-none group-hover:bg-[var(--accent-color)]/20 transition-colors duration-500"></div>
 
-            {/* محتوى البطاقة */}
-            <div className="p-5 relative">
-                {/* زخرفة خلفية خفيفة */}
-                <div className="absolute right-2 top-2 opacity-[0.03] pointer-events-none">
-                    <IconBinary size={64} />
+                <div className="relative z-10 p-6 flex flex-col h-full justify-between">
+                    
+                    {/* وضع التعديل */}
+                    {editingId === card.id ? (
+                        <div className="flex flex-col gap-4 h-full justify-center">
+                            <div className="text-xs font-bold text-[var(--accent-color)] uppercase tracking-widest text-center mb-2">Editing Node</div>
+                            <input value={editRus} onChange={(e) => setEditRus(e.target.value)} className="bg-black/5 dark:bg-white/10 rounded-xl p-4 text-center text-xl font-bold text-[var(--text-main)] outline-none focus:ring-2 focus:ring-[var(--accent-color)] transition-all" />
+                            <input value={editAra} onChange={(e) => setEditAra(e.target.value)} className="bg-black/5 dark:bg-white/10 rounded-xl p-3 text-center text-lg text-[var(--text-main)] outline-none focus:ring-2 focus:ring-[var(--accent-color)] transition-all" />
+                            <div className="flex gap-2 mt-2">
+                                <button onClick={saveEdit} className="flex-1 bg-green-500 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-green-500/30 transition-all">Save</button>
+                                <button onClick={() => setEditingId(null)} className="flex-1 bg-gray-500/20 text-[var(--text-main)] py-3 rounded-xl font-bold hover:bg-gray-500/40 transition-all">Cancel</button>
+                            </div>
+                        </div>
+                    ) : (
+                        /* وضع العرض - التصميم الجديد */
+                        <>
+                            {/* Header: Category Badge */}
+                            <div className="flex justify-between items-start">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--accent-color)]/10 text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider backdrop-blur-md">
+                                    <IconCategory size={12} /> {card.category}
+                                </span>
+                                
+                                {isJunior && (
+                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-4 group-hover:translate-x-0">
+                                        <button onClick={() => startEdit(card)} className="p-2 rounded-full bg-white/10 hover:bg-[var(--accent-color)] hover:text-white text-[var(--text-muted)] transition-colors"><IconPencil size={14}/></button>
+                                        <button onClick={() => onDelete(card.id)} className="p-2 rounded-full bg-white/10 hover:bg-red-500 hover:text-white text-[var(--text-muted)] transition-colors"><IconTrash size={14}/></button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Main Content: Russian Word */}
+                            <div className="py-6 text-center relative">
+                                <h3 className="text-3xl md:text-4xl font-black tracking-tight leading-tight text-transparent bg-clip-text bg-gradient-to-r from-[var(--text-main)] to-[var(--text-muted)] group-hover:to-[var(--accent-color)] transition-all duration-500">
+                                    {card.russian}
+                                </h3>
+                            </div>
+
+                            {/* Footer: Arabic & Icon */}
+                            <div className="mt-auto">
+                                <div className="w-12 h-1 bg-[var(--accent-color)]/20 rounded-full mb-4 mx-auto group-hover:w-full group-hover:bg-[var(--accent-color)] transition-all duration-500"></div>
+                                <div className="flex justify-between items-end">
+                                    <IconSparkles size={18} className="text-[var(--accent-color)] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                    <p className="text-lg text-[var(--text-muted)] group-hover:text-[var(--text-main)] dir-rtl font-bold transition-colors">
+                                        {card.arabic}
+                                    </p>
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
-
-                {editingId === card.id ? (
-                    <div className="flex flex-col gap-3 relative z-10 animate-in fade-in">
-                        <div className="text-[9px] text-[var(--accent-color)] font-mono uppercase tracking-widest mb-1">:: EDIT SEQUENCE ::</div>
-                        <input value={editRus} onChange={(e) => setEditRus(e.target.value)} className="bg-[var(--bg-primary)] border border-[var(--accent-color)] p-2 text-[var(--text-main)] font-bold outline-none font-mono text-sm rounded-sm" />
-                        <input value={editAra} onChange={(e) => setEditAra(e.target.value)} className="bg-[var(--bg-primary)] border border-[var(--text-muted)]/20 p-2 text-[var(--text-main)] text-right outline-none font-mono text-sm rounded-sm" />
-                        <div className="flex gap-2 pt-2">
-                            <button onClick={saveEdit} className="flex-1 bg-green-500/10 border border-green-500 text-green-500 py-1.5 text-[10px] font-black hover:bg-green-500 hover:text-white transition-all uppercase">Save Data</button>
-                            <button onClick={() => setEditingId(null)} className="flex-1 bg-red-500/10 border border-red-500 text-red-500 py-1.5 text-[10px] font-black hover:bg-red-500 hover:text-white transition-all uppercase">Abort</button>
-                        </div>
-                    </div>
-                ) : (
-                    <>
-                        {/* التصنيف كـ شارة تقنية */}
-                        <div className="mb-4">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-[var(--text-muted)]/5 border border-[var(--text-muted)]/10 text-[9px] font-mono text-[var(--text-muted)] uppercase tracking-wider group-hover:border-[var(--accent-color)]/30 group-hover:text-[var(--accent-color)] transition-colors">
-                                <IconFolder size={10} /> {card.category}
-                            </span>
-                        </div>
-
-                        {/* الكلمة الروسية */}
-                        <h3 className="text-2xl font-black text-[var(--text-main)] tracking-tight mb-2 group-hover:text-[var(--accent-color)] transition-colors relative z-10">
-                            {card.russian}
-                        </h3>
-
-                        {/* خط فاصل متحرك */}
-                        <div className="h-px w-10 bg-[var(--text-muted)]/20 my-3 group-hover:w-full group-hover:bg-[var(--accent-color)]/50 transition-all duration-500"></div>
-
-                        {/* الترجمة العربية */}
-                        <p className="text-base text-[var(--text-muted)] dir-rtl font-medium group-hover:text-[var(--text-main)] transition-colors">
-                            {card.arabic}
-                        </p>
-                    </>
-                )}
             </div>
-
-            {/* الشريط السفلي (Footer Status) */}
-            <div className="h-1 w-full bg-[var(--bg-primary)] mt-auto relative">
-                <div className="absolute left-0 top-0 bottom-0 bg-[var(--accent-color)] w-0 group-hover:w-full transition-all duration-700 ease-out"></div>
-            </div>
-        </div>
-    </motion.div>
-  );
+        </motion.div>
+    );
+  };
 
   return (
-    <div className="w-full flex flex-col p-4 md:p-6 font-sans min-h-screen">
+    <div className="w-full flex flex-col p-4 md:p-8 font-sans min-h-screen">
       
-      {/* 1. Futuristic Header */}
-      <div className="relative mb-12">
-          <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-4">
-              <div>
-                  <h1 className="text-5xl md:text-7xl font-black text-[var(--text-main)] tracking-tighter leading-[0.9]">
-                      DATA <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent-color)] to-purple-600">GRID</span>
-                  </h1>
-                  <div className="flex items-center gap-2 mt-2">
-                      <div className="h-1 w-10 bg-[var(--accent-color)]"></div>
-                      <p className="text-[var(--text-muted)] font-mono text-xs uppercase tracking-[0.3em]">
-                          Neural Archive System V.4.0
-                      </p>
-                  </div>
+      {/* 1. Luxurious Header */}
+      <div className="flex flex-col items-center justify-center mb-12 text-center relative">
+          <div className="absolute inset-0 bg-[var(--accent-color)]/20 blur-[100px] rounded-full pointer-events-none"></div>
+          <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="relative z-10">
+              <span className="text-[10px] font-bold tracking-[0.4em] text-[var(--accent-color)] uppercase mb-2 block">Knowledge Base</span>
+              <h1 className="text-5xl md:text-7xl font-black text-[var(--text-main)] tracking-tighter mb-4">
+                  Archive
+              </h1>
+              <div className="flex items-center gap-4 text-sm text-[var(--text-muted)] bg-[var(--bg-secondary)]/50 px-6 py-2 rounded-full border border-white/5 backdrop-blur-md">
+                  <span>{filteredCards.length} Items</span>
+                  <span className="w-1 h-4 bg-gray-500/30"></span>
+                  <span>{categories.length - 1} Topics</span>
               </div>
-              
-              {/* Stats Module */}
-              <div className="flex gap-4">
-                  <div className="text-right">
-                      <div className="text-3xl font-black text-[var(--text-main)]">{filteredCards.length}</div>
-                      <div className="text-[9px] font-mono text-[var(--text-muted)] uppercase tracking-widest">Entries Loaded</div>
-                  </div>
-                  <div className="w-px h-10 bg-[var(--text-muted)]/20"></div>
-                  <div className="text-right">
-                      <div className="text-3xl font-black text-[var(--text-main)]">{categories.length - 1}</div>
-                      <div className="text-[9px] font-mono text-[var(--text-muted)] uppercase tracking-widest">Vectors</div>
-                  </div>
-              </div>
-          </div>
+          </motion.div>
       </div>
 
-      {/* 2. Command Interface (Sticky) */}
-      <div className="sticky top-0 z-30 bg-[var(--bg-primary)]/80 backdrop-blur-xl border-y border-[var(--text-muted)]/10 py-4 mb-8 -mx-4 px-6 md:px-8 shadow-2xl transition-all">
-         <div className="flex flex-col lg:flex-row gap-4">
-             
-             {/* Search Terminal */}
-             <div className="relative flex-1 group">
-                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                     <span className="text-[var(--accent-color)] font-mono text-sm animate-pulse">{'>'}</span>
-                 </div>
-                 <input 
+      {/* 2. Floating Search Bar (Glass Capsule) */}
+      <div className="sticky top-4 z-40 mb-10 flex justify-center">
+         <div className="w-full max-w-4xl bg-[var(--bg-secondary)]/80 dark:bg-[#111]/80 backdrop-blur-2xl border border-white/10 rounded-full p-2 pl-6 shadow-2xl flex flex-col md:flex-row gap-4 items-center">
+             <div className="flex-1 flex items-center gap-3 w-full">
+                <IconSearch className="text-[var(--text-muted)]" size={20} />
+                <input 
                     type="text" 
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="INITIATE_SEARCH_PROTOCOL..." 
-                    className="w-full bg-[var(--bg-secondary)] text-[var(--text-main)] border border-[var(--text-muted)]/20 rounded-sm py-3.5 pl-10 pr-4 font-mono text-sm focus:border-[var(--accent-color)] focus:shadow-[0_0_15px_rgba(var(--accent-rgb),0.15)] outline-none transition-all placeholder:text-[var(--text-muted)]/40"
-                 />
-                 {/* Corner Accent */}
-                 <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-[var(--accent-color)] opacity-50"></div>
-                 <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-[var(--accent-color)] opacity-50"></div>
+                    placeholder="Search for words..." 
+                    className="flex-1 bg-transparent text-[var(--text-main)] placeholder-[var(--text-muted)]/50 outline-none text-base font-medium h-10"
+                />
              </div>
 
-             {/* Admin Input Array */}
+             {/* Admin Quick Add */}
              {isJunior && (
-                 <div className="flex bg-[var(--bg-secondary)] border border-[var(--text-muted)]/20 rounded-sm p-1 gap-1">
-                     <input value={newCard.russian} onChange={e => setNewCard({...newCard, russian: e.target.value})} placeholder="RUS" className="w-24 bg-transparent px-3 text-sm font-mono outline-none text-[var(--text-main)] border-r border-[var(--text-muted)]/10 placeholder:text-[var(--text-muted)]/40" />
-                     <input value={newCard.arabic} onChange={e => setNewCard({...newCard, arabic: e.target.value})} placeholder="ARA" className="w-24 bg-transparent px-3 text-sm font-mono outline-none text-[var(--text-main)] text-right border-r border-[var(--text-muted)]/10 placeholder:text-[var(--text-muted)]/40" />
-                     <input value={newCard.category} onChange={e => setNewCard({...newCard, category: e.target.value})} placeholder="CAT" className="w-20 bg-transparent px-3 text-sm font-mono outline-none text-[var(--text-main)] placeholder:text-[var(--text-muted)]/40" />
-                     <button onClick={handleAddSubmit} className="bg-[var(--accent-color)] text-white px-4 hover:brightness-110 flex items-center justify-center rounded-sm transition-all"><IconPlus size={18}/></button>
+                 <div className="hidden md:flex items-center gap-2 pr-2 border-l border-white/10 pl-4">
+                     <input value={newCard.russian} onChange={e => setNewCard({...newCard, russian: e.target.value})} placeholder="Rus" className="w-20 bg-transparent outline-none text-sm text-[var(--text-main)]" />
+                     <input value={newCard.arabic} onChange={e => setNewCard({...newCard, arabic: e.target.value})} placeholder="Ara" className="w-20 bg-transparent outline-none text-sm text-[var(--text-main)] text-right" />
+                     <button onClick={handleAddSubmit} className="bg-[var(--accent-color)] text-white w-8 h-8 rounded-full flex items-center justify-center hover:scale-110 transition-transform"><IconPlus size={16}/></button>
                  </div>
              )}
          </div>
-
-         {/* Filter Chips */}
-         <div className="flex gap-2 overflow-x-auto pb-1 mt-4 custom-scrollbar">
-            {categories.map(cat => (
-                <button 
-                    key={cat} 
-                    onClick={() => setFilter(cat)} 
-                    className={`px-4 py-1.5 text-[10px] font-mono uppercase tracking-widest border transition-all duration-300 rounded-sm whitespace-nowrap
-                    ${filter === cat 
-                        ? "bg-[var(--accent-color)] border-[var(--accent-color)] text-white shadow-[0_0_10px_rgba(var(--accent-rgb),0.3)]" 
-                        : "bg-transparent border-[var(--text-muted)]/20 text-[var(--text-muted)] hover:border-[var(--accent-color)] hover:text-[var(--accent-color)]"}`}
-                >
-                    {cat}
-                </button>
-            ))}
-        </div>
       </div>
 
-      {/* 3. The Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 pb-20">
+      {/* 3. Filter Pills (Minimal) */}
+      <div className="flex flex-wrap justify-center gap-3 mb-12">
+          {categories.map(cat => (
+              <button 
+                key={cat} 
+                onClick={() => setFilter(cat)} 
+                className={`px-5 py-2 text-xs font-bold rounded-full transition-all duration-300
+                ${filter === cat 
+                    ? "bg-[var(--accent-color)] text-white shadow-lg shadow-[var(--accent-color)]/30 scale-105" 
+                    : "bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:bg-[var(--text-main)] hover:text-[var(--bg-primary)]"}`}
+              >
+                  {cat}
+              </button>
+          ))}
+      </div>
+
+      {/* 4. The Liquid Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20 max-w-7xl mx-auto w-full">
             <AnimatePresence mode="popLayout">
                 {visibleCards.map((card, index) => (
-                    <DataShard key={card.id} card={card} index={index} />
+                    <MemoryNode key={card.id} card={card} index={index} />
                 ))}
             </AnimatePresence>
       </div>
 
-      {/* 4. Load More Trigger */}
+      {/* 5. Load More (Elegant) */}
       {visibleCards.length < filteredCards.length && (
-            <button 
-                onClick={() => setDisplayLimit(prev => prev + 20)}
-                className="w-full py-6 text-center text-[var(--text-muted)] hover:text-[var(--accent-color)] text-xs font-mono font-bold tracking-[0.5em] uppercase bg-[var(--bg-secondary)]/50 hover:bg-[var(--bg-secondary)] border border-[var(--text-muted)]/10 hover:border-[var(--accent-color)] transition-all flex items-center justify-center gap-3 mb-10 group relative overflow-hidden"
-            >
-                <span className="relative z-10 flex items-center gap-2">Initialize More Data <IconArrowDown size={14} className="animate-bounce"/></span>
-                <div className="absolute inset-0 bg-[var(--accent-color)]/5 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-            </button>
+            <div className="flex justify-center pb-10">
+                <button 
+                    onClick={() => setDisplayLimit(prev => prev + 20)}
+                    className="group flex flex-col items-center gap-2 text-[var(--text-muted)] hover:text-[var(--accent-color)] transition-colors"
+                >
+                    <span className="text-xs font-bold tracking-[0.2em] uppercase">Discover More</span>
+                    <div className="p-3 rounded-full bg-[var(--bg-secondary)] border border-white/10 shadow-lg group-hover:scale-110 transition-transform">
+                        <IconArrowDown size={20} className="animate-bounce"/>
+                    </div>
+                </button>
+            </div>
       )}
     </div>
   );
