@@ -1,7 +1,8 @@
 "use client";
 import React from 'react';
-import { DataManager } from '../features/DataManager';
-import { useAuth } from '../../context/AuthContext';
+// FIX: الإشارة للمجلد الفرعي data
+import { DataManager } from '@/components/features/data/DataManager';
+import { useAuth } from '@/context/AuthContext';
 
 export default function DataView({ cards, addCard, deleteCard, updateCard }) {
   const { isJunior } = useAuth();

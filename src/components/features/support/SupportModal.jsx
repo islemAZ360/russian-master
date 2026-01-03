@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
-import { db } from '../../lib/firebase';
+// FIX: استخدام @ للمسار الصحيح
+import { db } from '@/lib/firebase';
 import { doc, updateDoc, arrayUnion, setDoc, onSnapshot, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { IconX, IconSend, IconMessage2, IconLoader } from '@tabler/icons-react';
 
@@ -26,20 +27,18 @@ export default function SupportModal({ user, onClose }) {
     if(!msg.trim()) return;
     const text = msg; setMsg("");
 
-    // 1. تحديث التذكرة
     await updateDoc(doc(db, "support_tickets", user.uid), {
         messages: arrayUnion({ text, sender: 'user', time: Date.now() }),
         lastUpdate: Date.now(),
-        status: 'new' // تغيير الحالة لينتبه الأدمن
+        status: 'new'
     });
 
-    // 2. 🔥 إرسال إشعار فوري للأدمن (هذه هي الإضافة المهمة)
     await addDoc(collection(db, "notifications"), {
-        target: "admin", // يستهدف الأدمن
+        target: "admin",
         title: "NEW SUPPORT TICKET",
         message: `User ${user.email.split('@')[0]} sent a message: "${text.substring(0, 20)}..."`,
         type: "admin_alert",
-        linkUserId: user.uid, // لكي يضغط الأدمن ويفتح تذكرته
+        linkUserId: user.uid,
         createdAt: serverTimestamp()
     });
   };
