@@ -1,24 +1,23 @@
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
-import { IconRocket, IconActivity, IconBrain, IconTerminal, IconSkull, IconSparkles } from "@tabler/icons-react";
-
-// FIX: استخدام @ للوصول لمكونات الـ UI
+import { IconRocket, IconTerminal, IconSparkles } from "@tabler/icons-react";
 import { BorderBeam } from "@/components/ui/BorderBeam";
 import { DecryptText } from "@/components/ui/DecryptText";
 import { MagneticButton } from "@/components/ui/MagneticButton";
-
-// FIX: استخدام @ للوصول للـ Context
 import { useSettings } from "@/context/SettingsContext";
+import { useLanguage } from "@/hooks/useLanguage"; // استدعاء هوك اللغة
 
 export function HeroSection({ onStart, onOpenGame, user }) {
-  const userName = user?.email?.split('@')[0].toUpperCase() || "OPERATIVE";
+  const userName = user?.displayName || user?.email?.split('@')[0].toUpperCase() || "OPERATIVE";
   const { isDark } = useSettings();
+  const { t, dir } = useLanguage(); // استخدام الترجمة
 
   return (
-    <div className="w-full h-full flex flex-col md:flex-row items-center justify-between p-6 md:p-12 relative z-10 gap-10">
+    // إضافة dir هنا لضمان الاتجاه الصحيح للنصوص
+    <div className="w-full h-full flex flex-col md:flex-row items-center justify-between p-6 md:p-12 relative z-10 gap-10" dir={dir}>
       <motion.div 
-        initial={{ opacity: 0, x: -50 }} 
+        initial={{ opacity: 0, x: dir === 'rtl' ? 50 : -50 }} // عكس الحركة حسب اللغة
         animate={{ opacity: 1, x: 0 }} 
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="flex-1 space-y-8"
@@ -29,14 +28,14 @@ export function HeroSection({ onStart, onOpenGame, user }) {
             : 'border-blue-400/50 bg-blue-50 text-blue-600 shadow-sm'
         }`}>
             <span className={`w-2 h-2 rounded-full animate-pulse ${isDark ? 'bg-cyan-400' : 'bg-blue-500'}`}></span> 
-            SYSTEM STATUS: ONLINE
+            {t('hero_status')}
         </div>
         
         <div>
             <h1 className={`text-4xl md:text-6xl lg:text-7xl font-black leading-tight mb-2 ${
               isDark ? 'text-white' : 'text-slate-800'
             }`}>
-                WELCOME BACK, <br/>
+                {t('hero_welcome')} <br/>
                 <span className={`text-transparent bg-clip-text ${
                   isDark 
                     ? 'bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500' 
@@ -51,8 +50,8 @@ export function HeroSection({ onStart, onOpenGame, user }) {
                 ? 'text-white/40 border-purple-500' 
                 : 'text-slate-500 border-blue-400'
             }`}>
-                <p>{'>'} Neural Interface Ready.</p>
-                <p>{'>'} Objectives Loaded.</p>
+                <p>{t('hero_line1')}</p>
+                <p>{t('hero_line2')}</p>
             </div>
         </div>
 
@@ -65,15 +64,15 @@ export function HeroSection({ onStart, onOpenGame, user }) {
           >
             <div className="px-4 py-3 bg-white/80 backdrop-blur-sm rounded-xl border border-blue-200 shadow-sm">
               <div className="text-2xl font-black text-blue-600">1000+</div>
-              <div className="text-xs text-slate-500 font-medium">Words</div>
+              <div className="text-xs text-slate-500 font-medium">{t('hero_stat_words')}</div>
             </div>
             <div className="px-4 py-3 bg-white/80 backdrop-blur-sm rounded-xl border border-purple-200 shadow-sm">
               <div className="text-2xl font-black text-purple-600">4</div>
-              <div className="text-xs text-slate-500 font-medium">Games</div>
+              <div className="text-xs text-slate-500 font-medium">{t('hero_stat_games')}</div>
             </div>
             <div className="px-4 py-3 bg-white/80 backdrop-blur-sm rounded-xl border border-indigo-200 shadow-sm">
               <div className="text-2xl font-black text-indigo-600">∞</div>
-              <div className="text-xs text-slate-500 font-medium">Practice</div>
+              <div className="text-xs text-slate-500 font-medium">{t('hero_stat_practice')}</div>
             </div>
           </motion.div>
         )}
@@ -103,7 +102,7 @@ export function HeroSection({ onStart, onOpenGame, user }) {
                 <IconRocket size={48} className={isDark ? 'text-white mb-2' : 'text-blue-600 mb-2'} />
                 <span className={`text-xl md:text-2xl font-black tracking-[0.2em] ${
                   isDark ? 'text-white' : 'text-slate-700'
-                }`}>START</span>
+                }`}>{t('btn_start')}</span>
             </div>
         </MagneticButton>
 
@@ -124,30 +123,18 @@ export function HeroSection({ onStart, onOpenGame, user }) {
             <div className="relative z-10 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <IconTerminal size={24} className={isDark ? 'text-red-500' : 'text-orange-600'}/>
-                    <div className="text-left">
+                    <div className={`text-${dir === 'rtl' ? 'right' : 'left'}`}>
                         <div className={`text-sm font-bold tracking-widest ${
                           isDark ? 'text-red-500' : 'text-orange-700'
-                        }`}>NEURAL BREACH</div>
+                        }`}>{t('btn_hacking')}</div>
                         <div className={`text-[10px] font-mono ${
                           isDark ? 'text-red-400/50' : 'text-orange-500/70'
-                        }`}>HACKING PROTOCOL: READY</div>
+                        }`}>{t('hacking_sub')}</div>
                     </div>
                 </div>
                 <IconSparkles className={isDark ? 'text-red-500/20' : 'text-orange-400/40'} size={32} />
             </div>
         </MagneticButton>
-
-        {!isDark && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="absolute -z-10 w-[500px] h-[500px] rounded-full opacity-30 blur-3xl"
-            style={{
-              background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%)',
-            }}
-          />
-        )}
       </motion.div>
     </div>
   );

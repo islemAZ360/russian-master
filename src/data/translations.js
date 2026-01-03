@@ -2,22 +2,56 @@
 
 export const translations = {
   ar: {
-    // Nav
-    nav_home: "الرئيسية",
+    // --- Navigation ---
+    nav_home: "القاعدة",
     nav_games: "الألعاب",
-    nav_live: "بث مباشر",
-    nav_chat: "المحادثة",
-    nav_study: "الدراسة",
+    nav_live: "بث حي",
+    nav_chat: "الكتيبة",
+    nav_study: "المهام",
     nav_archive: "الأرشيف",
-    nav_rank: "الترتيب",
+    nav_rank: "السجل",
     nav_settings: "الإعدادات",
     nav_admin: "تحكم",
+
+    // --- Hero Section (Home) ---
+    hero_status: "حالة النظام: متصل",
+    hero_welcome: "أهلاً بعودتك،",
+    hero_line1: "> الواجهة العصبية جاهزة.",
+    hero_line2: "> الأهداف تم تحميلها.",
+    hero_stat_words: "كلمة",
+    hero_stat_games: "ألعاب",
+    hero_stat_practice: "تمرين",
+    btn_start: "ابدأ المهمة",
+    btn_hacking: "اختراق عصبي",
+    hacking_sub: "بروتوكول الهجوم: جاهز",
+
+    // --- Data Modules (Study Selection) ---
+    modules_system_ready: "النظام جاهز",
+    modules_available: "وحدة متاحة",
+    modules_title_1: "بروتوكولات",
+    modules_title_2: "البيانات",
+    modules_search_placeholder: "بحث في السجلات...",
+    modules_no_data: "لا توجد بيانات مطابقة",
+    modules_esc: "خروج",
     
-    // Settings Page
+    // --- Profile (CyberDeck) ---
+    profile_level: "مستوى",
+    profile_class: "فئة",
+    profile_exp: "خبرة",
+    profile_next: "التالي",
+    profile_total_cards: "إجمالي الكروت",
+    profile_mastered: "تم الإتقان",
+    profile_streak: "تتابع الأيام",
+    profile_efficiency: "معدل الكفاءة",
+    profile_performance: "مؤشرات الأداء",
+    profile_badges: "أوسمة الخدمة",
+    profile_locked: "مغلق",
+    profile_unlocked: "مفتوح: صلاحية كاملة",
+    profile_requires: "يتطلب",
+
+    // --- Settings ---
     settings_title: "إعدادات النظام",
     settings_subtitle: "وحدة تفضيلات المستخدم",
-    
-    // Identity Section
     identity_title: "هوية العميل",
     identity_upload: "اضغط لرفع صورة جديدة",
     identity_name_label: "الاسم الرمزي",
@@ -25,43 +59,69 @@ export const translations = {
     identity_avatar_label: "اختر الأفاتار",
     identity_save_btn: "حفظ الهوية",
     identity_saving: "جاري الحفظ...",
-    
-    // System Section
     system_lang_title: "اللغة والموقع",
     lang_system_label: "لغة النظام",
     lang_target_label: "لغة التعلم (مستقبلاً)",
-    
-    // Theme Section
     theme_title: "مظهر الواجهة",
     theme_dark: "ليلي",
     theme_light: "نهاري",
     theme_auto: "تلقائي",
-    
-    // Logout
     logout_btn: "إنهاء الجلسة",
-    
-    // Alerts
     alert_saved: "تم تحديث الهوية بنجاح",
     alert_error: "فشل التحديث"
   },
   
   en: {
-    // Nav
+    // --- Navigation ---
     nav_home: "Base",
     nav_games: "Arcade",
     nav_live: "Live",
-    nav_chat: "Comms",
+    nav_chat: "Squad",
     nav_study: "Missions",
     nav_archive: "Archive",
-    nav_rank: "Rank",
+    nav_rank: "ID Card",
     nav_settings: "Config",
     nav_admin: "Control",
 
-    // Settings Page
+    // --- Hero Section ---
+    hero_status: "SYSTEM STATUS: ONLINE",
+    hero_welcome: "WELCOME BACK,",
+    hero_line1: "> Neural Interface Ready.",
+    hero_line2: "> Objectives Loaded.",
+    hero_stat_words: "Words",
+    hero_stat_games: "Games",
+    hero_stat_practice: "Practice",
+    btn_start: "START MISSION",
+    btn_hacking: "NEURAL BREACH",
+    hacking_sub: "HACKING PROTOCOL: READY",
+
+    // --- Data Modules ---
+    modules_system_ready: "SYSTEM_READY",
+    modules_available: "AVAILABLE",
+    modules_title_1: "DATA",
+    modules_title_2: "MODULES",
+    modules_search_placeholder: "SEARCH PROTOCOLS...",
+    modules_no_data: "NO MATCHING DATA",
+    modules_esc: "ESC",
+
+    // --- Profile ---
+    profile_level: "LVL",
+    profile_class: "CLASS",
+    profile_exp: "EXP",
+    profile_next: "NEXT",
+    profile_total_cards: "Total Cards",
+    profile_mastered: "Mastered",
+    profile_streak: "Day Streak",
+    profile_efficiency: "Efficiency Rating",
+    profile_performance: "PERFORMANCE METRICS",
+    profile_badges: "SERVICE BADGES",
+    profile_locked: "LOCKED",
+    profile_unlocked: "UNLOCKED: FULL ACCESS",
+    profile_requires: "REQUIRES",
+
+    // --- Settings ---
     settings_title: "SYSTEM CONFIG",
     settings_subtitle: "USER_PREFERENCES_MODULE",
-    
-    // Identity Section
     identity_title: "OPERATIVE IDENTITY",
     identity_upload: "CLICK TO UPLOAD NEW AVATAR",
     identity_name_label: "CODENAME",
@@ -69,67 +129,85 @@ export const translations = {
     identity_avatar_label: "SELECT AVATAR PROTOCOL",
     identity_save_btn: "SAVE IDENTITY",
     identity_saving: "PROCESSING...",
-    
-    // System Section
     system_lang_title: "LOCALIZATION",
     lang_system_label: "SYSTEM LANGUAGE",
     lang_target_label: "TARGET LANGUAGE (SOON)",
-    
-    // Theme Section
     theme_title: "INTERFACE THEME",
     theme_dark: "CYBER DARK",
     theme_light: "PRO LIGHT",
     theme_auto: "AUTO SYNC",
-    
-    // Logout
     logout_btn: "TERMINATE SESSION",
-    
-    // Alerts
     alert_saved: "IDENTITY UPDATED SUCCESSFULLY",
     alert_error: "UPDATE FAILED"
   },
 
   ru: {
-    // Nav
+    // --- Navigation ---
     nav_home: "База",
     nav_games: "Аркада",
     nav_live: "Эфир",
-    nav_chat: "Чат",
+    nav_chat: "Отряд",
     nav_study: "Миссии",
     nav_archive: "Архив",
-    nav_rank: "Ранг",
+    nav_rank: "ID Карта",
     nav_settings: "Настр.",
     nav_admin: "Контроль",
 
-    // Settings Page
-    settings_title: "НАСТРОЙКИ СИСТЕМЫ",
-    settings_subtitle: "МОДУЛЬ ПРЕДПОЧТЕНИЙ",
-    
-    // Identity Section
-    identity_title: "ЛИЧНОСТЬ ОПЕРАТОРА",
-    identity_upload: "ЗАГРУЗИТЬ НОВЫЙ АВАТАР",
+    // --- Hero Section ---
+    hero_status: "СТАТУС: ОНЛАЙН",
+    hero_welcome: "С ВОЗВРАЩЕНИЕМ,",
+    hero_line1: "> Нейроинтерфейс готов.",
+    hero_line2: "> Цели загружены.",
+    hero_stat_words: "Слов",
+    hero_stat_games: "Игры",
+    hero_stat_practice: "Практика",
+    btn_start: "НАЧАТЬ МИССИЮ",
+    btn_hacking: "ВЗЛОМ",
+    hacking_sub: "ПРОТОКОЛ АТАКИ: ГОТОВ",
+
+    // --- Data Modules ---
+    modules_system_ready: "СИСТЕМА ГОТОВА",
+    modules_available: "ДОСТУПНО",
+    modules_title_1: "МОДУЛИ",
+    modules_title_2: "ДАННЫХ",
+    modules_search_placeholder: "ПОИСК ПРОТОКОЛОВ...",
+    modules_no_data: "НЕТ ДАННЫХ",
+    modules_esc: "ESC",
+
+    // --- Profile ---
+    profile_level: "УР",
+    profile_class: "КЛАСС",
+    profile_exp: "ОПЫТ",
+    profile_next: "СЛЕД",
+    profile_total_cards: "Всего карт",
+    profile_mastered: "Изучено",
+    profile_streak: "Серия дней",
+    profile_efficiency: "Рейтинг эффективности",
+    profile_performance: "МЕТРИКИ",
+    profile_badges: "ЗНАКИ ОТЛИЧИЯ",
+    profile_locked: "ЗАКРЫТО",
+    profile_unlocked: "ОТКРЫТО",
+    profile_requires: "ТРЕБУЕТСЯ",
+
+    // --- Settings ---
+    settings_title: "НАСТРОЙКИ",
+    settings_subtitle: "МОДУЛЬ ПОЛЬЗОВАТЕЛЯ",
+    identity_title: "ЛИЧНОСТЬ",
+    identity_upload: "ЗАГРУЗИТЬ АВАТАР",
     identity_name_label: "ПОЗЫВНОЙ",
     identity_name_placeholder: "ВВЕДИТЕ ИМЯ...",
     identity_avatar_label: "ВЫБРАТЬ АВАТАР",
     identity_save_btn: "СОХРАНИТЬ",
-    identity_saving: "ОБРАБОТКА...",
-    
-    // System Section
-    system_lang_title: "ЛОКАЛИЗАЦИЯ",
+    identity_saving: "СОХРАНЕНИЕ...",
+    system_lang_title: "ЯЗЫК",
     lang_system_label: "ЯЗЫК СИСТЕМЫ",
-    lang_target_label: "ЯЗЫК ИЗУЧЕНИЯ (СКОРО)",
-    
-    // Theme Section
-    theme_title: "ТЕМА ИНТЕРФЕЙСА",
+    lang_target_label: "ИЗУЧАЕМЫЙ ЯЗЫК",
+    theme_title: "ТЕМА",
     theme_dark: "ТЕМНАЯ",
     theme_light: "СВЕТЛАЯ",
     theme_auto: "АВТО",
-    
-    // Logout
-    logout_btn: "ЗАВЕРШИТЬ СЕАНС",
-    
-    // Alerts
-    alert_saved: "ЛИЧНОСТЬ ОБНОВЛЕНА",
-    alert_error: "ОШИБКА ОБНОВЛЕНИЯ"
+    logout_btn: "ВЫХОД",
+    alert_saved: "СОХРАНЕНО",
+    alert_error: "ОШИБКА"
   }
 };

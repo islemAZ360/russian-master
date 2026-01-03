@@ -1,18 +1,19 @@
 "use client";
 import React from 'react';
 import { CosmicBackground } from '../ui/CosmicBackground';
-// استيراد المكون الجديد
 import GlobalLiveManager from '../features/live/GlobalLiveManager';
 
 export default function CyberLayout({ children }) {
   return (
     <div className="relative h-screen w-full overflow-hidden font-sans text-[var(--text-main)] bg-transparent">
       
+      {/* الخلفية */}
       <CosmicBackground />
       
-      {/* المشغل العام للبث المباشر - يعيش هنا دائماً */}
+      {/* مدير البث المباشر (يبقى حياً دائماً) */}
       <GlobalLiveManager />
       
+      {/* المحتوى الرئيسي */}
       <main className="relative z-10 w-full h-full flex flex-col pt-20 md:pt-24 pb-32 md:pb-10 px-3 md:px-6 overflow-y-auto custom-scrollbar scroll-smooth">
           <div className="w-full max-w-7xl mx-auto h-full flex flex-col">
             {children}
