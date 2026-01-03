@@ -14,6 +14,33 @@ export const UIProvider = ({ children }) => {
   const [showSupport, setShowSupport] = useState(false);
   const [activeOverlayGame, setActiveOverlayGame] = useState(null);
   const [notifications, setNotifications] = useState([]);
+
+  // --- إضافات البث المباشر ---
+  const [liveState, setLiveState] = useState({
+    isActive: false, // هل البث يعمل؟
+    roomName: null,  // اسم الغرفة
+    isMinimized: false // هل هو مصغر؟
+  });
+
+  const startLive = (roomName) => {
+    setLiveState({ isActive: true, roomName, isMinimized: false });
+  };
+
+  const stopLive = () => {
+    setLiveState({ isActive: false, roomName: null, isMinimized: false });
+  };
+
+  // مراقبة تغيير الصفحة للتحكم في التصغير تلقائياً
+  useEffect(() => {
+    if (liveState.isActive) {
+      if (currentView !== 'live') {
+        setLiveState(prev => ({ ...prev, isMinimized: true }));
+      } else {
+        setLiveState(prev => ({ ...prev, isMinimized: false }));
+      }
+    }
+  }, [currentView, liveState.isActive]);
+  // ---------------------------
   
   useEffect(() => {
     if (!user) {
@@ -21,8 +48,6 @@ export const UIProvider = ({ children }) => {
         return;
     }
     
-    // تم إزالة orderBy لتجنب خطأ "Requires an Index"
-    // سيتم ترتيب البيانات في الواجهة (Client Side) بدلاً من قاعدة البيانات
     const myNotifsQuery = query(
         collection(db, "notifications"),
         where("userId", "==", user.uid)
@@ -34,7 +59,6 @@ export const UIProvider = ({ children }) => {
             const others = prev.filter(n => n.userId !== user.uid && n.target === 'admin');
             const all = [...others, ...myData];
             const unique = Array.from(new Map(all.map(item => [item.id, item])).values());
-            // الترتيب هنا بدلاً من Firestore
             return unique.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
         });
     }, (e) => console.log("Notif error:", e));
@@ -75,7 +99,9 @@ export const UIProvider = ({ children }) => {
         activeCategory, setActiveCategory,
         showSupport, setShowSupport,
         activeOverlayGame, setActiveOverlayGame,
-        notifications, removeNotification
+        notifications, removeNotification,
+        // Live Exports
+        liveState, startLive, stopLive
     }}>
       {children}
     </UIContext.Provider>
