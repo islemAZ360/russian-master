@@ -6,12 +6,11 @@ export const SettingsContext = createContext(null);
 const DEFAULT_SETTINGS = {
   sound: true,
   sfx: true,
-  quality: 'high',
-  theme: 'system',
+  theme: 'dark', // dark, light, system
   language: 'ar',
 };
 
-const STORAGE_KEY = 'russian_master_config_v2';
+const STORAGE_KEY = 'russian_master_config_v3';
 
 export const SettingsProvider = ({ children }) => {
   const [mounted, setMounted] = useState(false);
@@ -21,26 +20,24 @@ export const SettingsProvider = ({ children }) => {
   const applySettings = (newSettings) => {
     if (typeof document === 'undefined') return;
     const root = document.documentElement;
-    const body = document.body;
 
-    let theme = newSettings.theme;
-    if (theme === 'system') {
-      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    let themeToApply = newSettings.theme;
+    
+    if (themeToApply === 'system') {
+      themeToApply = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
     
-    setIsDark(theme === 'dark');
-    if (theme === 'light') {
+    setIsDark(themeToApply === 'dark');
+    
+    if (themeToApply === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+      root.classList.add('dark');
+      root.classList.remove('light');
+    } else {
       root.setAttribute('data-theme', 'light');
       root.classList.add('light');
       root.classList.remove('dark');
-    } else {
-      root.removeAttribute('data-theme');
-      root.classList.remove('light');
-      root.classList.add('dark');
     }
-
-    body.classList.remove('quality-low', 'quality-medium', 'quality-high');
-    body.classList.add(`quality-${newSettings.quality}`);
   };
 
   useEffect(() => {
@@ -49,8 +46,15 @@ export const SettingsProvider = ({ children }) => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setSettings(parsed);
-        applySettings(parsed);
+        // تنظيف الإعدادات القديمة (مثل quality)
+        const cleanSettings = {
+            sound: parsed.sound ?? true,
+            sfx: parsed.sfx ?? true,
+            theme: parsed.theme || 'dark',
+            language: 'ar'
+        };
+        setSettings(cleanSettings);
+        applySettings(cleanSettings);
       } catch(e) { applySettings(DEFAULT_SETTINGS); }
     } else {
       applySettings(DEFAULT_SETTINGS);
@@ -71,7 +75,6 @@ export const SettingsProvider = ({ children }) => {
   );
 };
 
-// تعريف الـ Hook هنا
 export const useSettings = () => {
   const context = useContext(SettingsContext);
   if (!context) throw new Error('useSettings must be used within a SettingsProvider');
