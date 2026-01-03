@@ -5,78 +5,42 @@
 @tailwind utilities;
 
 :root {
-  /* ألوان جديدة أكثر حيوية وجمالاً */
-  --bg-main: #050505;
+  /* الألوان الأساسية للنظام */
+  --bg-main: #030014;
   --text-main: #ffffff;
-  --accent-color: #6366f1; /* Indigo vibrant */
-  --accent-secondary: #ec4899; /* Pink vibrant */
+  --accent-color: #7c3aed;
   
-  /* تحسين أداء الشريط السفلي */
-  --dock-bg: rgba(10, 10, 10, 0.6);
-  --dock-border: rgba(255, 255, 255, 0.08);
-  --dock-blur: 12px;
+  /* متغيرات الشريط السفلي */
+  --dock-bg: rgba(15, 15, 20, 0.6);
+  --dock-border: rgba(255, 255, 255, 0.1);
+  --dock-blur: 16px;
 }
 
 body {
-  background-color: var(--bg-main);
+  /* مهم جداً: جعل الخلفية شفافة للسماح بظهور CosmicBackground */
+  background-color: transparent;
   color: var(--text-main);
-  /* خاصية مهمة جداً لمنع اللاق عند السكرول */
+  overflow-x: hidden; /* منع السكرول الأفقي */
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
 }
 
-/* === تحسينات الأداء القصوى (GPU Optimization) === */
-.gpu-accelerated {
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  perspective: 1000px;
-  will-change: transform, opacity;
-}
-
-/* تقليل الضغط على المتصفح بإخفاء الـ Scrollbar المزعج */
+/* إصلاح التمرير (Scrollbar) */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
 
-/* === خلفية المش (Mesh Gradient) الجديدة === */
-/* هذه الخلفية تعتمد على CSS نقي خفيف جداً بدلاً من الصور الثقيلة */
-.mesh-bg {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: -1;
-  background-color: #000000;
-  background-image: 
-    radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
-    radial-gradient(at 50% 0%, hsla(225,39%,30%,1) 0, transparent 50%), 
-    radial-gradient(at 100% 0%, hsla(339,49%,30%,1) 0, transparent 50%);
-}
-
-/* تأثير التوهج الخفيف المتحرك بدون لاق */
-.mesh-blob {
-  position: absolute;
-  filter: blur(80px); /* تقليل البلور قليلاً للأداء */
-  opacity: 0.4;
-  animation: float 20s infinite ease-in-out;
-  border-radius: 50%;
-  z-index: -1;
-}
-
-@keyframes float {
-  0% { transform: translate(0, 0) rotate(0deg); }
-  33% { transform: translate(30px, -50px) rotate(10deg); }
-  66% { transform: translate(-20px, 20px) rotate(-5deg); }
-  100% { transform: translate(0, 0) rotate(0deg); }
-}
-
-/* Smart Dock Class */
+/* كلاس الشريط السفلي */
 .smart-dock {
   background-color: var(--dock-bg) !important;
   backdrop-filter: blur(var(--dock-blur)) !important;
   -webkit-backdrop-filter: blur(var(--dock-blur)) !important;
   border: 1px solid var(--dock-border) !important;
-  transition: transform 0.2s ease-out;
+  transition: all 0.3s ease-in-out;
+}
+
+/* كلاسات مساعدة للزجاج */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }

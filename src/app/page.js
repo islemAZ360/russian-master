@@ -6,43 +6,33 @@ import {
   IconShield, IconMessageCircle, IconDeviceGamepad, IconBroadcast, IconLifebuoy 
 } from '@tabler/icons-react';
 
-// FIX: استيراد الـ Hooks من مجلد hooks الصحيح
 import { useAuth } from '@/hooks/useAuth';
 import { useUI } from '@/hooks/useUI';
 import { useSettings } from '@/hooks/useSettings';
 import { useStudySystem } from '@/hooks/useStudySystem';
 import { useAudio } from '@/hooks/useAudio';
 
-// Backend
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot } from "firebase/firestore";
 
-// UI Components
 import ViewManager from '@/components/views/ViewManager';
 import { FloatingDock } from '@/components/ui/floating-dock';
 import NotificationCenter from '@/components/ui/NotificationCenter';
 import IntroSequence from '@/components/ui/IntroSequence';
-import { GridBackground } from '@/components/ui/GridBackground'; 
+import CyberLayout from '@/components/layout/CyberLayout'; // استيراد اللي اوت الجديد
 
-// Features
 import SupportModal from '@/components/features/support/SupportModal';
 import { AuthScreen } from '@/components/features/auth/AuthScreen';
 
-// Games Overlays
 import TimeTraveler from '@/components/features/games/TimeTraveler';
 import GravityProtocol from '@/components/features/games/GravityProtocol';
 import MagneticField from '@/components/features/games/MagneticField';
 import WordScale from '@/components/features/games/WordScale';
 
 const LoadingFallback = () => (
-  <div className="h-screen w-screen flex flex-col items-center justify-center bg-[var(--bg-main)] transition-colors duration-500">
-    <div className="relative w-20 h-20">
-      <div className="absolute inset-0 rounded-full border-4 border-current opacity-20 animate-ping"></div>
-      <div className="absolute inset-0 rounded-full border-4 border-t-[var(--accent-color)] border-r-transparent border-b-[var(--accent-color)] border-l-transparent animate-spin"></div>
-    </div>
-    <div className="mt-6 font-mono text-xs font-bold tracking-[0.4em] text-[var(--text-muted)] animate-pulse uppercase">
-      System Initializing...
-    </div>
+  <div className="h-screen w-screen flex flex-col items-center justify-center bg-black text-white">
+    <div className="w-10 h-10 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+    <div className="text-xs font-mono tracking-widest animate-pulse">SYSTEM LOADING...</div>
   </div>
 );
 
@@ -55,21 +45,8 @@ export default function Page() {
   const [broadcast, setBroadcast] = useState(null);
   const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0 });
   
-  const containerRef = useRef(null);
-
   const { cards, currentCard, stats, handleSwipe, resetProgress, addCard, deleteCard, updateCard, isBanned: studyBanned } = useStudySystem(user);
   const { speak, playSFX } = useAudio();
-  
-  const handleMouseMove = useCallback((e) => {
-    if (!containerRef.current || settings.quality === 'low') return;
-    requestAnimationFrame(() => {
-      if (containerRef.current) {
-        const { left, top } = containerRef.current.getBoundingClientRect();
-        containerRef.current.style.setProperty("--mouse-x", `${e.clientX - left}px`);
-        containerRef.current.style.setProperty("--mouse-y", `${e.clientY - top}px`);
-      }
-    });
-  }, [settings.quality]);
 
   useEffect(() => {
     if (!user) return;
@@ -85,16 +62,16 @@ export default function Page() {
   );
 
   const navLinks = useMemo(() => {
-    const iconClass = "w-full text-[var(--text-main)] group-hover:text-[var(--accent-color)] transition-colors";
+    const iconClass = "w-full text-white/80 group-hover:text-purple-400 transition-colors";
     const links = [
       { title: "Base", icon: <IconHome className={iconClass} />, onClick: () => setCurrentView('home') },
-      { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-500" />, onClick: () => setCurrentView('games') },
-      { title: "Live", icon: <IconBroadcast className="w-full text-red-500" />, onClick: () => setCurrentView('live') },
+      { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-400" />, onClick: () => setCurrentView('games') },
+      { title: "Live", icon: <IconBroadcast className="w-full text-red-400" />, onClick: () => setCurrentView('live') },
       { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
       { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
       { title: "Archive", icon: <IconDatabase className="w-full text-teal-400" />, onClick: () => setCurrentView('data') }, 
-      { title: "ID", icon: <IconTrophy className="w-full text-yellow-500" />, onClick: () => setCurrentView('leaderboard') },
-      { title: "Config", icon: <IconSettings className="w-full text-[var(--text-muted)]" />, onClick: () => setCurrentView('settings') },
+      { title: "ID", icon: <IconTrophy className="w-full text-yellow-400" />, onClick: () => setCurrentView('leaderboard') },
+      { title: "Config", icon: <IconSettings className="w-full text-gray-400" />, onClick: () => setCurrentView('settings') },
     ];
     
     if (isJunior) links.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-600" />, onClick: () => setCurrentView('admin_panel') });
@@ -103,7 +80,6 @@ export default function Page() {
     return links;
   }, [isJunior, isAdmin, setCurrentView, setShowSupport]);
 
-  // Render Logic
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
   if (loading) return <LoadingFallback />;
   if (isBanned || studyBanned) return <div className="h-screen flex items-center justify-center bg-black text-red-600 font-bold font-mono tracking-widest text-xl">ACCESS REVOKED</div>;
@@ -112,14 +88,9 @@ export default function Page() {
   const isAdminMode = isAdmin && currentView === 'admin_panel';
 
   return (
-    <div 
-      ref={containerRef} 
-      onMouseMove={handleMouseMove} 
-      className="relative h-screen w-full overflow-hidden font-sans text-[var(--text-main)] selection:bg-[var(--accent-color)] selection:text-white"
-    >
+    // استخدام CyberLayout كحاوية رئيسية
+    <CyberLayout>
       <NotificationCenter />
-      
-      {!isAdminMode && <GridBackground />}
       
       {!isAdminMode && (
           <AnimatePresence>
@@ -145,7 +116,7 @@ export default function Page() {
         )}
       </AnimatePresence>
 
-      <main className="relative z-10 flex flex-col items-center justify-start h-full w-full pt-6 md:pt-0">
+      <div className="relative z-10 flex flex-col items-center justify-start h-full w-full pt-6 md:pt-0">
            <ViewManager 
                 cards={cards} 
                 currentCard={currentCard} 
@@ -161,7 +132,7 @@ export default function Page() {
                 stats={stats} 
                 categories={categories} 
            />
-      </main>
+      </div>
 
       {!isAdminMode && (
           <div className="fixed bottom-6 left-0 w-full z-50 flex justify-center pointer-events-none">
@@ -175,6 +146,6 @@ export default function Page() {
               </motion.div>
           </div>
       )}
-    </div>
+    </CyberLayout>
   );
 }
