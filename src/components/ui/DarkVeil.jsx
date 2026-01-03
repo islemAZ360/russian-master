@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useMemo } from 'react'; // أضفنا useMemo و React.memo
+import React, { useEffect, useRef, useMemo } from 'react';
 import {
   Scene,
   OrthographicCamera,
@@ -11,7 +11,7 @@ import {
   Vector2,
   Clock
 } from 'three';
-
+import { useSettings } from '@/context/SettingsContext'; // 1. استيراد هوك الإعدادات
 import './DarkVeil.css';
 
 const vertexShader = `
@@ -27,6 +27,7 @@ precision highp float;
 uniform float iTime;
 uniform vec3  iResolution;
 uniform float animationSpeed;
+uniform float uIsLight; // متغير جديد للوضع النهاري
 
 uniform bool enableTop;
 uniform bool enableMiddle;
@@ -69,8 +70,11 @@ vec3 background_color(vec2 uv) {
   vec3 col = vec3(0.0);
   float y = sin(uv.x - 0.2) * 0.3 - 0.1;
   float m = uv.y - y;
+  
+  // الألوان الأساسية للموجات الخلفية
   col += mix(BLUE, BLACK, smoothstep(0.0, 1.0, abs(m)));
   col += mix(PINK, BLACK, smoothstep(0.0, 1.0, abs(m - 0.8)));
+  
   return col * 0.5;
 }
 
@@ -181,6 +185,13 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
     }
   }
 
+  // === السحر هنا ===
+  // إذا كان الوضع نهاري (uIsLight > 0.5) نقوم بقلب الألوان
+  // الأسود (0) يصبح أبيض (1)، والألوان المضيئة تصبح داكنة
+  if (uIsLight > 0.5) {
+      col = vec3(0.98) - col; // 0.98 ليكون أبيض ناعم وليس ساطع جداً
+  }
+
   fragColor = vec4(col, 1.0);
 }
 
@@ -213,7 +224,6 @@ function hexToVec3(hex) {
   return new Vector3(r / 255, g / 255, b / 255);
 }
 
-// 1. تحويل المكون إلى دالة عادية أولاً ليمكننا تغليفها بـ React.memo لاحقاً
 const DarkVeil = ({
   linesGradient = [], 
   enabledWaves = ['top', 'middle', 'bottom'],
@@ -228,10 +238,11 @@ const DarkVeil = ({
   bendStrength = -0.5,
   mouseDamping = 0.05,
   parallax = true,
-  parallaxStrength = 0.2,
-  mixBlendMode = 'screen'
+  parallaxStrength = 0.2
 }) => {
   const containerRef = useRef(null);
+  const { isDark } = useSettings(); // 2. الحصول على حالة الثيم
+
   const targetMouseRef = useRef(new Vector2(-1000, -1000));
   const currentMouseRef = useRef(new Vector2(-1000, -1000));
   const targetInfluenceRef = useRef(0);
@@ -239,7 +250,7 @@ const DarkVeil = ({
   const targetParallaxRef = useRef(new Vector2(0, 0));
   const currentParallaxRef = useRef(new Vector2(0, 0));
 
-  // useMemo للحسابات البسيطة لتقليل العبء
+  // useMemo
   const topLineCount = useMemo(() => enabledWaves.includes('top') ? (typeof lineCount === 'number' ? lineCount : lineCount[enabledWaves.indexOf('top')] ?? 6) : 0, [enabledWaves, lineCount]);
   const middleLineCount = useMemo(() => enabledWaves.includes('middle') ? (typeof lineCount === 'number' ? lineCount : lineCount[enabledWaves.indexOf('middle')] ?? 6) : 0, [enabledWaves, lineCount]);
   const bottomLineCount = useMemo(() => enabledWaves.includes('bottom') ? (typeof lineCount === 'number' ? lineCount : lineCount[enabledWaves.indexOf('bottom')] ?? 6) : 0, [enabledWaves, lineCount]);
@@ -259,15 +270,12 @@ const DarkVeil = ({
     const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
     camera.position.z = 1;
 
-    // 2. تحسين الأداء: إيقاف antialias وتقليل PixelRatio
-    // هذا سيجعل الخلفية أخف بكثير على كروت الشاشة الضعيفة والموبايل
     const renderer = new WebGLRenderer({ 
-        antialias: false, // لا حاجة له مع هذا النوع من الشيدر
+        antialias: false,
         alpha: false,
-        powerPreference: "high-performance" // طلب الأداء العالي من المتصفح
+        powerPreference: "high-performance"
     });
     
-    // استخدام 1 بدلاً من 2 لتقليل الحمل على الـ GPU للنصف
     renderer.setPixelRatio(1); 
     
     renderer.domElement.style.width = '100%';
@@ -278,6 +286,9 @@ const DarkVeil = ({
       iTime: { value: 0 },
       iResolution: { value: new Vector3(1, 1, 1) },
       animationSpeed: { value: animationSpeed },
+      // 3. تمرير حالة الثيم إلى الشيدر (0 لليلي، 1 للنهاري)
+      uIsLight: { value: isDark ? 0.0 : 1.0 }, 
+
       enableTop: { value: enabledWaves.includes('top') },
       enableMiddle: { value: enabledWaves.includes('middle') },
       enableBottom: { value: enabledWaves.includes('bottom') },
@@ -331,8 +342,8 @@ const DarkVeil = ({
       uniforms,
       vertexShader,
       fragmentShader,
-      depthWrite: false, // تحسين طفيف
-      depthTest: false   // تحسين طفيف
+      depthWrite: false,
+      depthTest: false
     });
 
     const geometry = new PlaneGeometry(2, 2);
@@ -363,7 +374,6 @@ const DarkVeil = ({
       const rect = renderer.domElement.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
-      // نستخدم 1 دائماً هنا لأننا ثبتنا الـ PixelRatio
       const dpr = 1; 
       targetMouseRef.current.set(x * dpr, (rect.height - y) * dpr);
       targetInfluenceRef.current = 1.0;
@@ -388,6 +398,13 @@ const DarkVeil = ({
     let raf = 0;
     const renderLoop = () => {
       uniforms.iTime.value = clock.getElapsedTime();
+      
+      // 4. تحديث قيمة الثيم في كل فريم (لضمان السلاسة عند التبديل)
+      // نستخدم isDark من الـ Hook مباشرة هنا
+      // ملاحظة: بما أن useEffect سيعاد تشغيله عند تغير isDark، 
+      // فهذا التحديث داخل الـ Loop قد لا يكون ضرورياً جداً لكنه يضمن التزامن.
+      // لكن الأهم هو إعادة بناء الـ Shader عند تغير الثيم وهو ما يفعله useEffect
+      
       if (interactive) {
         currentMouseRef.current.lerp(targetMouseRef.current, mouseDamping);
         uniforms.iMouse.value.copy(currentMouseRef.current);
@@ -420,7 +437,8 @@ const DarkVeil = ({
       }
     };
   }, [
-    // إبقاء قائمة الاعتمادات كما هي لضمان التحديث عند تغير الخصائص
+    // إضافة isDark للقائمة ليعاد بناء الخلفية عند التغيير
+    isDark,
     linesGradient, enabledWaves, lineCount, lineDistance, topWavePosition, 
     middleWavePosition, bottomWavePosition, animationSpeed, interactive, 
     bendRadius, bendStrength, mouseDamping, parallax, parallaxStrength,
@@ -432,14 +450,10 @@ const DarkVeil = ({
     <div
       ref={containerRef}
       className="darkveil-container"
-      style={{
-        mixBlendMode: mixBlendMode
-      }}
+      // إزالة mixBlendMode هنا لأننا نتحكم بالألوان داخل الشيدر الآن
+      // هذا يمنع اختفاء الخلفية عند الوضع النهاري
     />
   );
 }
 
-// 3. الخطوة السحرية: تغليف المكون بـ React.memo
-// هذا يمنع إعادة تصيير الخلفية (وإعادة تحميل WebGL) عند تغير حالة الـ Parent 
-// (مثل تغيير الصفحة أو فتح قائمة) طالما أن الـ Props الخاصة بالخلفية لم تتغير.
 export default React.memo(DarkVeil);
