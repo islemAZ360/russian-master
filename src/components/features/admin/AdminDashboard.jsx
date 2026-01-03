@@ -46,53 +46,77 @@ export default function AdminDashboard({ currentUser }) {
   const sendBroadcast = async () => {
     if(!broadcastMsg.trim()) return;
     if(!confirm("Send this message to ALL users?")) return;
-    await updateDoc(doc(db, "system", "broadcast"), { 
-        message: broadcastMsg, 
-        active: true, 
-        sentBy: currentUser.email, 
-        timestamp: new Date().toISOString() 
-    });
-    setBroadcastMsg("");
-    alert("Global Broadcast Sent!");
+    try {
+        await updateDoc(doc(db, "system", "broadcast"), { 
+            message: broadcastMsg, 
+            active: true, 
+            sentBy: currentUser.email, 
+            timestamp: new Date().toISOString() 
+        });
+        setBroadcastMsg("");
+        alert("Global Broadcast Sent!");
+    } catch (e) {
+        alert("Error sending broadcast: " + e.message);
+    }
   };
 
   const handleRoleChange = async (uid, newRole) => {
       if(!confirm(`Change user role to ${newRole}?`)) return;
-      await updateDoc(doc(db, "users", uid), { role: newRole });
+      try {
+          await updateDoc(doc(db, "users", uid), { role: newRole });
+      } catch (e) {
+          alert("Error changing role: " + e.message);
+      }
   };
 
   const toggleBan = async (uid, currentStatus) => {
       if(!confirm(currentStatus ? "Unban User?" : "BAN USER?")) return;
-      await updateDoc(doc(db, "users", uid), { isBanned: !currentStatus });
+      try {
+          await updateDoc(doc(db, "users", uid), { isBanned: !currentStatus });
+      } catch (e) {
+          alert("Error updating ban status: " + e.message);
+      }
   };
 
+  // --- دالة الحذف المعدلة ---
   const deleteChat = async (chatId) => {
       if(!confirm("Delete this squad channel permanently?")) return;
-      await deleteDoc(doc(db, "chats", chatId));
+      
+      try {
+          // محاولة الحذف
+          await deleteDoc(doc(db, "chats", chatId));
+          // لا حاجة لرسالة نجاح، العنصر سيختفي تلقائياً بفضل onSnapshot
+      } catch (error) {
+          console.error("Delete failed:", error);
+          // هذه الرسالة ستخبرك بالسبب الحقيقي (مثلاً: Missing permissions)
+          alert("FAILED TO DELETE: " + error.message + "\n\nCheck your Firebase Security Rules.");
+      }
   };
 
   const sendSupportReply = async () => {
       if(!selectedTicket || !replyText.trim()) return;
       
-      const newMsg = { text: replyText, sender: 'admin', time: Date.now() };
-      
-      // Update ticket
-      await updateDoc(doc(db, "support_tickets", selectedTicket.id), {
-          messages: arrayUnion(newMsg),
-          lastUpdate: Date.now(),
-          status: 'replied'
-      });
+      try {
+          const newMsg = { text: replyText, sender: 'admin', time: Date.now() };
+          
+          await updateDoc(doc(db, "support_tickets", selectedTicket.id), {
+              messages: arrayUnion(newMsg),
+              lastUpdate: Date.now(),
+              status: 'replied'
+          });
 
-      // Notify user
-      await addDoc(collection(db, "notifications"), {
-          userId: selectedTicket.userId,
-          title: "SUPPORT REPLY",
-          message: "Admin has replied to your ticket.",
-          type: "support_reply",
-          createdAt: serverTimestamp()
-      });
+          await addDoc(collection(db, "notifications"), {
+              userId: selectedTicket.userId,
+              title: "SUPPORT REPLY",
+              message: "Admin has replied to your ticket.",
+              type: "support_reply",
+              createdAt: serverTimestamp()
+          });
 
-      setReplyText("");
+          setReplyText("");
+      } catch (e) {
+          alert("Error sending reply: " + e.message);
+      }
   };
 
   // --- UI Components ---
@@ -215,7 +239,7 @@ export default function AdminDashboard({ currentUser }) {
                                                         <div className="w-full h-full flex items-center justify-center text-xs font-bold">{u.email[0].toUpperCase()}</div>
                                                     )}
                                                 </div>
-                                                <span className="font-bold text-white">{u.displayName || "Unknown Agent"}</span>
+                                                <span className="font-bold text-white" dir="auto">{u.displayName || "Unknown Agent"}</span>
                                             </div>
                                         </td>
                                         <td className="p-4 text-gray-400 font-mono text-xs">{u.email}</td>
@@ -270,7 +294,7 @@ export default function AdminDashboard({ currentUser }) {
                                         <span className="font-bold text-white text-sm truncate w-24">{t.userEmail}</span>
                                         <span className="text-[10px] text-gray-500">{new Date(t.lastUpdate).toLocaleDateString()}</span>
                                     </div>
-                                    <div className="text-xs text-gray-400 truncate">{t.messages[t.messages.length-1]?.text || "No Data"}</div>
+                                    <div className="text-xs text-gray-400 truncate" dir="auto">{t.messages[t.messages.length-1]?.text || "No Data"}</div>
                                 </div>
                             ))}
                         </div>
@@ -288,7 +312,7 @@ export default function AdminDashboard({ currentUser }) {
                                     <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
                                         {selectedTicket.messages.map((m, i) => (
                                             <div key={i} className={`flex ${m.sender === 'admin' ? 'justify-end' : 'justify-start'}`}>
-                                                <div className={`max-w-[70%] p-3 rounded-xl text-sm ${m.sender === 'admin' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-200'}`}>
+                                                <div className={`max-w-[70%] p-3 rounded-xl text-sm ${m.sender === 'admin' ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-200'}`} dir="auto">
                                                     {m.text}
                                                 </div>
                                             </div>
@@ -320,11 +344,15 @@ export default function AdminDashboard({ currentUser }) {
                                     <div className="p-3 rounded-xl bg-white/5 text-indigo-400 group-hover:text-white group-hover:bg-indigo-500 transition-all">
                                         <IconDeviceGamepad size={24}/>
                                     </div>
-                                    <button onClick={() => deleteChat(chat.id)} className="text-gray-600 hover:text-red-500 transition-colors p-2">
+                                    <button 
+                                        onClick={() => deleteChat(chat.id)} 
+                                        className="text-gray-600 hover:text-red-500 transition-colors p-2 rounded-full hover:bg-white/5"
+                                        title="Delete Channel"
+                                    >
                                         <IconTrash size={18}/>
                                     </button>
                                 </div>
-                                <h3 className="font-bold text-white text-lg mb-1">{chat.name}</h3>
+                                <h3 className="font-bold text-white text-lg mb-1" dir="auto">{chat.name}</h3>
                                 <div className="text-xs text-gray-500 font-mono uppercase mb-4">{chat.type} CHANNEL</div>
                                 <div className="text-[10px] text-gray-600">Last Activity: {chat.lastActivity ? new Date(chat.lastActivity.toDate()).toLocaleString() : 'N/A'}</div>
                             </div>
@@ -343,6 +371,7 @@ export default function AdminDashboard({ currentUser }) {
                             onChange={(e) => setBroadcastMsg(e.target.value)}
                             className="w-full h-32 bg-black border border-white/20 rounded-xl p-4 text-white mb-4 focus:border-red-500 outline-none resize-none font-mono text-sm"
                             placeholder="ENTER ALERT MESSAGE..."
+                            dir="auto"
                         />
                         <button 
                             onClick={sendBroadcast}
