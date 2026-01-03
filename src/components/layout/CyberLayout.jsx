@@ -11,12 +11,12 @@ export default function CyberLayout({ children }) {
       
       {/* 
          المحتوى الرئيسي:
-         - h-full: يملأ الشاشة
-         - pt-20: (80px) مسافة علوية مناسبة (ليست كبيرة جداً)
-         - pb-24: مسافة سفلية للشريط العائم
-         - overflow-y-auto: هذا هو المسؤول عن تفعيل السكرول في الصفحات الطويلة مثل Archive و ID
+         - md:pt-24: مسافة علوية للحاسوب
+         - pt-20: مسافة علوية للهاتف
+         - pb-32: مسافة سفلية كبيرة في الهاتف لتجنب تغطية المحتوى بواسطة الـ Dock
+         - md:pb-10: مسافة سفلية عادية للحاسوب
       */}
-      <main className="relative z-10 w-full h-full flex flex-col pt-20 pb-24 px-4 md:px-6 overflow-y-auto custom-scrollbar scroll-smooth">
+      <main className="relative z-10 w-full h-full flex flex-col pt-20 md:pt-24 pb-32 md:pb-10 px-3 md:px-6 overflow-y-auto custom-scrollbar scroll-smooth">
           <div className="w-full max-w-7xl mx-auto h-full flex flex-col">
             {children}
           </div>
