@@ -22,11 +22,34 @@ export default function ViewManager(props) {
   const { currentView, setActiveCategory, activeCategory, setCurrentView } = useUI();
   const { isJunior, isAdmin } = useAuth();
 
-  // تبسيط الحركة لمنع اختفاء المحتوى
+  // --- إعدادات الأنيميشن الاحترافي (Cinematic Blur) ---
   const variants = {
-    initial: { opacity: 0 },
-    animate: { opacity: 1 },
-    exit: { opacity: 0 }
+    initial: { 
+      opacity: 0, 
+      scale: 0.98,        // تبدأ أصغر قليلاً
+      filter: "blur(10px)", // ضبابية قوية في البداية
+      y: 10               // تأتي من الأسفل قليلاً
+    },
+    animate: { 
+      opacity: 1, 
+      scale: 1, 
+      filter: "blur(0px)", // تصبح واضحة
+      y: 0 
+    },
+    exit: { 
+      opacity: 0, 
+      scale: 1.02,        // تكبر قليلاً عند الخروج
+      filter: "blur(10px)", // تعود للضبابية
+      y: -10              // تخرج للأعلى قليلاً
+    }
+  };
+
+  const transitionSettings = {
+    type: "spring",
+    stiffness: 300,  // سرعة الحركة
+    damping: 25,     // نعومة التوقف
+    mass: 0.5,       // خفة العنصر
+    duration: 0.3
   };
 
   const renderContent = () => {
@@ -47,7 +70,7 @@ export default function ViewManager(props) {
       case 'study':
         return <StudyView cards={props.cards} currentCard={props.currentCard} sessionStats={props.sessionStats} setSessionStats={props.setSessionStats} handleSwipe={props.handleSwipe} playSFX={props.playSFX} speak={props.speak} addCard={props.addCard} categories={props.categories} />;
       case 'data':
-        return <DataView cards={props.cards} addCard={props.addCard} deleteCard={props.deleteCard} updateCard={props.updateCard} />;
+        return <DataView cards={props.cards} addCard={props.addCard} deleteCard={props.deleteCard} updateCard={props.updateCard} isJunior={isJunior} />;
       case 'leaderboard':
         return <LeaderboardView cards={props.cards} stats={props.stats} />;
       case 'settings':
@@ -58,16 +81,16 @@ export default function ViewManager(props) {
   };
 
   return (
-    // إزالة mode='wait' هو الحل السحري لمشكلة اختفاء الصفحة
-    <AnimatePresence>
+    // mode="wait" يضمن خروج الصفحة القديمة تماماً قبل دخول الجديدة لمنع التداخل
+    <AnimatePresence mode="wait">
       <motion.div 
         key={currentView}
         variants={variants}
         initial="initial"
         animate="animate"
         exit="exit"
-        transition={{ duration: 0.2 }} // سرعة انتقال عالية
-        className="w-full h-full relative"
+        transition={transitionSettings}
+        className="w-full h-full relative will-change-transform" // تحسين الأداء
       >
         {renderContent()}
       </motion.div>
