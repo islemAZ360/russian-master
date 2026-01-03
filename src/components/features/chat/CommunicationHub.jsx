@@ -4,12 +4,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   IconMessage, IconPlus, IconLock, IconSend, IconUserPlus, IconArrowLeft, IconX, IconHash
 } from "@tabler/icons-react";
-import { db } from "../../lib/firebase";
+// FIX: استخدام @ للمسارات
+import { db } from "@/lib/firebase";
 import { 
   collection, addDoc, query, orderBy, onSnapshot, 
-  serverTimestamp, doc, updateDoc, arrayUnion 
+  serverTimestamp, doc, updateDoc 
 } from "firebase/firestore";
-import { useAuth } from "../../context/AuthContext";
+// FIX: استخدام @ للمسارات
+import { useAuth } from "@/context/AuthContext";
 
 export default function CommunicationHub() {
   const { user, userData, isJunior } = useAuth();
@@ -125,7 +127,6 @@ export default function CommunicationHub() {
           </div>
         ) : (
           <>
-            {/* Header المعدل: زر الدعوة بجانب الاسم */}
             <header className="h-20 border-b border-white/10 flex items-center px-6 bg-black/40 backdrop-blur-md gap-4">
               <button onClick={() => setSelectedChat(null)} className="md:hidden p-2 hover:bg-white/10 rounded-full"><IconArrowLeft/></button>
               
@@ -139,7 +140,6 @@ export default function CommunicationHub() {
                      <span className="text-[10px] text-cyan-500 font-mono tracking-wider uppercase">{selectedChat.type} SERVER</span>
                  </div>
 
-                 {/* زر الدعوة تم نقله هنا بجانب الاسم */}
                  {selectedChat.createdBy === user.uid && (
                     <button 
                         onClick={() => setShowInviteModal(true)} 
@@ -152,7 +152,6 @@ export default function CommunicationHub() {
               </div>
             </header>
 
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-90 custom-scrollbar">
               {messages.map((m, i) => (
                 <div key={i} className={`flex flex-col ${m.senderName === (userData?.displayName || user.email) ? 'items-end' : 'items-start'}`}>
@@ -180,7 +179,6 @@ export default function CommunicationHub() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Footer Input */}
             <footer className="p-4 bg-black/60 border-t border-white/10 backdrop-blur-md">
               <div className="flex gap-2 bg-[#111] p-1.5 rounded-2xl border border-white/10 focus-within:border-cyan-500/50 transition-colors">
                   <input 
@@ -203,7 +201,6 @@ export default function CommunicationHub() {
         )}
       </main>
 
-      {/* Invite Modal */}
       <AnimatePresence>
         {showInviteModal && (
           <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
@@ -230,7 +227,6 @@ export default function CommunicationHub() {
         )}
       </AnimatePresence>
 
-      {/* Create Modal */}
       <AnimatePresence>
         {showCreateModal && (
           <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">

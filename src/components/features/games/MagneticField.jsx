@@ -1,7 +1,8 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { MAGNET_DATA } from '../../data/games/magnetData';
+// FIX: استخدام @ للمسارات
+import { MAGNET_DATA } from '@/data/games/magnetData';
 import { IconMagnet, IconArrowLeft, IconAtom } from '@tabler/icons-react';
 
 export default function MagneticField({ onClose }) {
@@ -39,20 +40,14 @@ export default function MagneticField({ onClose }) {
                 const dx = magnetPos.x - word.x;
                 const dy = magnetPos.y - word.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
-
-                // *** الإصلاح الجذري للمسافة ***
-                // الكلمة تبدأ بالتحرك فقط إذا كانت المسافة أقل من 130 بكسل
                 const ATTRACTION_START_DISTANCE = 130;
 
                 if (dist < ATTRACTION_START_DISTANCE && word.type === 'related') {
                     isAttractedNow = true;
-                    
-                    // قوة الجذب
                     const force = 1200 / (dist * dist + 10);
                     newVx += dx * force * 0.15;
                     newVy += dy * force * 0.15;
                     
-                    // منع الاهتزاز عند الوصول
                     if (dist < 50) {
                         newVx *= 0.6;
                         newVy *= 0.6;
@@ -61,13 +56,10 @@ export default function MagneticField({ onClose }) {
                         newVy *= 0.9;
                     }
                 } else {
-                    // إذا كانت بعيدة، توقف فوراً (احتكاك قوي جداً)
-                    // هذا يمنعها من الانجذاب من بعيد
                     newVx *= 0.5; 
                     newVy *= 0.5;
                 }
 
-                // ارتداد من الحواف (اختياري، لابقائها في الشاشة)
                 if (word.x < 300) newVx += 1;
                 if (word.x > window.innerWidth - 50) newVx -= 1;
 
@@ -87,7 +79,6 @@ export default function MagneticField({ onClose }) {
     return () => cancelAnimationFrame(animationFrame);
   }, [magnetPos, collected]);
 
-  // منطق الجمع
   useEffect(() => {
       const interval = setInterval(() => {
           setWords(prev => {
@@ -112,10 +103,8 @@ export default function MagneticField({ onClose }) {
          onMouseMove={(e) => setMagnetPos({ x: e.clientX, y: e.clientY })}
          ref={containerRef}>
       
-      {/* Background */}
       <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-5 pointer-events-none"></div>
 
-      {/* Sidebar */}
       <div className="absolute left-0 top-0 w-72 h-full bg-black/60 border-r border-purple-500/20 backdrop-blur-xl p-6 z-20 pointer-events-auto">
          <button onClick={onClose} className="mb-8 text-white/50 hover:text-white flex gap-2 text-xs font-bold tracking-widest"><IconArrowLeft size={16}/> EXIT</button>
          <div className="mb-6">
@@ -138,23 +127,18 @@ export default function MagneticField({ onClose }) {
          )}
       </div>
 
-      {/* Magnet Cursor */}
       <div className="fixed pointer-events-none z-50 mix-blend-screen" style={{ left: magnetPos.x, top: magnetPos.y, transform: 'translate(-50%, -50%)' }}>
           <div className="w-16 h-16 rounded-full border-2 border-purple-400 bg-purple-500/20 shadow-[0_0_30px_#a855f7] flex items-center justify-center">
               <IconMagnet className="text-white"/>
           </div>
-          {/* دائرة توضح الحد المسموح للجذب (Visual Guide) */}
           <div className="absolute w-[260px] h-[260px] rounded-full border border-white/5 -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
       </div>
 
-      {/* Words */}
       {words.map(word => {
           if (collected.includes(word.id)) return null;
-          
           return (
               <motion.div
                  key={word.id}
-                 // التحديث الفوري للموقع
                  animate={{ x: word.x, y: word.y }}
                  transition={{ duration: 0 }} 
                  className={`absolute px-4 py-2 rounded-lg font-mono text-sm font-bold border flex items-center justify-center transition-all duration-200 z-30
