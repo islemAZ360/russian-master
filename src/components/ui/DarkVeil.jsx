@@ -23,7 +23,7 @@ uniform float uNoise;
 uniform float uScan;
 uniform float uScanFreq;
 uniform float uWarp;
-// متغير للتحقق من الوضع (0 = ليلي، 1 = نهاري)
+// دعم الوضع النهاري
 uniform float uIsLight; 
 
 #define iTime uTime
@@ -51,9 +51,9 @@ vec4 sigmoid(vec4 x){
     return 1.0 / (1.0 + exp(-x));
 }
 
+// دالة توليد الأنماط العضوية
 vec4 cppn_fn(vec2 coordinate, float in0, float in1, float in2){
     buf[6] = vec4(coordinate.x, coordinate.y, 0.3948333106474662 + in0, 0.36 + in1);
-    // التصحيح الرياضي: إضافة علامة الضرب *
     buf[7] = vec4(0.14 + in2, sqrt(coordinate.x * coordinate.x + coordinate.y * coordinate.y), 0.0, 0.0);
     
     buf[0] = mat4(vec4(6.5404263,-3.6126034,0.7590882,-1.13613),vec4(2.4582713,3.1660357,1.2219609,0.06276096),vec4(-5.478085,-6.159632,1.8701609,-4.7742867),vec4(6.039214,-5.542865,-0.90925294,3.251348)) * buf[6] + 
@@ -67,7 +67,7 @@ vec4 cppn_fn(vec2 coordinate, float in0, float in1, float in2){
     buf[0] = sigmoid(buf[0]);
     buf[1] = sigmoid(buf[1]);
     
-    // معادلة مبسطة لضمان الأداء
+    // تبسيط المصفوفات للأداء
     buf[4] = mat4(vec4(5.2,-7.1,2.7,2.6), vec4(-5.6,-25.3,4.0,0.4), vec4(-10.5,24.2,21.1,37.5), vec4(4.3,-1.9,2.3,-1.3)) * buf[0] + 
              vec4(-7.6, 15.9, 1.3, -1.6);
              
@@ -77,10 +77,18 @@ vec4 cppn_fn(vec2 coordinate, float in0, float in1, float in2){
 }
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord){
+    // تصحيح: استخدام uResolution الصحيح لتجنب القص
     vec2 uv = fragCoord / uResolution.xy * 2.0 - 1.0;
+    
+    // تصحيح النسبة (Aspect Ratio) لمنع التمدد
+    uv.x *= uResolution.x / uResolution.y;
+    
+    // تصحيح الحجم: ضربنا في 3.0 لنرى التفاصيل بدلاً من موجة عملاقة واحدة
+    uv *= 3.0; 
+    
     uv.y *= -1.0;
     
-    // Warp effect
+    // تأثير التموج (Warp)
     uv += uWarp * vec2(sin(uv.y * 6.283 + uTime * 0.5), cos(uv.x * 6.283 + uTime * 0.5)) * 0.05;
     
     fragColor = cppn_fn(uv, 0.1 * sin(0.3 * uTime), 0.1 * sin(0.69 * uTime), 0.1 * sin(0.44 * uTime));
@@ -90,18 +98,23 @@ void main(){
     vec4 col;
     mainImage(col, gl_FragCoord.xy);
     
-    // تطبيق التأثيرات
+    // تطبيق تغيير اللون (Hue Shift)
     col.rgb = hueShiftRGB(col.rgb, uHueShift);
     
+    // تأثير خطوط المسح (Scanlines)
     float scanline_val = sin(gl_FragCoord.y * uScanFreq) * 0.5 + 0.5;
     col.rgb *= 1.0 - (scanline_val * scanline_val) * uScan;
     
+    // تأثير الضجيج (Noise)
     col.rgb += (rand(gl_FragCoord.xy + uTime) - 0.5) * uNoise;
     
-    // === المنطق السحري للوضع النهاري ===
-    // إذا كان الوضع نهاري، نقلب الألوان ليصبح الأساس أبيض
+    // قلب الألوان في الوضع النهاري
     if (uIsLight > 0.5) {
         col.rgb = 1.0 - col.rgb; 
+        col.rgb = mix(col.rgb, vec3(0.9, 0.9, 0.95), 0.5); // تخفيف التباين قليلاً في النهاري
+    } else {
+        // تعميق السواد في الوضع الليلي
+        col.rgb *= 0.8; 
     }
     
     gl_FragColor = vec4(clamp(col.rgb, 0.0, 1.0), 1.0);
@@ -109,16 +122,16 @@ void main(){
 `;
 
 export default function DarkVeil({
-  hueShift = 20,
-  noiseIntensity = 0.05,
-  scanlineIntensity = 0.1,
-  speed = 0.3,
+  hueShift = 20, // تعديل طفيف ليعطي ألوان نيون
+  noiseIntensity = 0.08,
+  scanlineIntensity = 0.15,
+  speed = 0.2, // أبطأ قليلاً ليكون أهدأ
   scanlineFrequency = 0.5,
-  warpAmount = 0.5,
-  resolutionScale = 0.8
+  warpAmount = 0.8,
+  resolutionScale = 0.5 // تقليل الدقة قليلاً للأداء العالي (مثل الألعاب)
 }) {
   const ref = useRef(null);
-  const { isDark } = useSettings(); // استدعاء حالة الثيم
+  const { isDark } = useSettings(); // استدعاء حالة الثيم من السياق
 
   useEffect(() => {
     const canvas = ref.current;
@@ -129,7 +142,9 @@ export default function DarkVeil({
     const renderer = new Renderer({
       dpr: Math.min(window.devicePixelRatio, 2),
       alpha: false, 
-      canvas
+      canvas,
+      width: parent.clientWidth,
+      height: parent.clientHeight
     });
 
     const gl = renderer.gl;
@@ -146,7 +161,6 @@ export default function DarkVeil({
         uScan: { value: scanlineIntensity },
         uScanFreq: { value: scanlineFrequency },
         uWarp: { value: warpAmount },
-        // تمرير حالة الثيم للشيدر (0 لليلي، 1 للنهاري)
         uIsLight: { value: isDark ? 0.0 : 1.0 } 
       }
     });
@@ -157,8 +171,14 @@ export default function DarkVeil({
       if (!parent) return;
       const w = parent.clientWidth;
       const h = parent.clientHeight;
+      
+      // ضبط حجم الريندر (Buffer Size)
       renderer.setSize(w * resolutionScale, h * resolutionScale);
-      program.uniforms.uResolution.value.set(w, h);
+      
+      // *** التصحيح الحاسم *** 
+      // نرسل حجم الكانفاس الفعلي (بالبكسل) للشيدر حتى يعرف الحدود الصحيحة
+      // هذا يحل مشكلة الشاشة المقصوصة
+      program.uniforms.uResolution.value.set(gl.canvas.width, gl.canvas.height);
     };
 
     window.addEventListener('resize', resize);
@@ -168,14 +188,17 @@ export default function DarkVeil({
     const start = performance.now();
 
     const loop = () => {
+      // الوقت
       program.uniforms.uTime.value = ((performance.now() - start) / 1000) * speed;
+      
+      // تحديث القيم
       program.uniforms.uHueShift.value = hueShift;
       program.uniforms.uNoise.value = noiseIntensity;
       program.uniforms.uScan.value = scanlineIntensity;
       program.uniforms.uScanFreq.value = scanlineFrequency;
       program.uniforms.uWarp.value = warpAmount;
       
-      // تحديث القيمة ديناميكياً عند تغيير الثيم
+      // تحديث الوضع (ليلي/نهاري)
       program.uniforms.uIsLight.value = isDark ? 0.0 : 1.0;
 
       renderer.render({ scene: mesh });
@@ -187,12 +210,15 @@ export default function DarkVeil({
     return () => {
       cancelAnimationFrame(animationId);
       window.removeEventListener('resize', resize);
+      // تنظيف WebGL context إن أمكن
+      const gl = renderer.gl;
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
     };
   }, [hueShift, noiseIntensity, scanlineIntensity, speed, scanlineFrequency, warpAmount, resolutionScale, isDark]);
 
   return (
-    <div className="darkveil-container">
-        <canvas ref={ref} className="darkveil-canvas" />
+    <div className="darkveil-container" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: -1, pointerEvents: 'none' }}>
+        <canvas ref={ref} className="darkveil-canvas" style={{ display: 'block', width: '100%', height: '100%' }} />
     </div>
   );
 }
