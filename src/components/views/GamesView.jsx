@@ -1,33 +1,35 @@
 "use client";
-import React from 'react';
-// هذا هو السطر الذي كان ناقصاً ويسبب المشكلة 👇
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { useUI } from '../../context/UIContext';
+import { useUI } from '@/context/UIContext';
+import { useLanguage } from '@/hooks/useLanguage'; // إضافة الهوك
 import { IconClock, IconTarget, IconMagnet, IconScale, IconPlayerPlay } from "@tabler/icons-react";
 
 export default function GamesView() {
   const { setActiveOverlayGame } = useUI();
+  const { t, dir } = useLanguage(); // استخدام الترجمة
 
-  const GAMES = [
+  // استخدام useMemo لإعادة حساب المصفوفة عند تغيير اللغة
+  const GAMES = useMemo(() => [
     { 
-      id: 'time_traveler', title: 'CHRONO MASTER', desc: 'Learn Russian time system.', color: 'text-amber-400', icon: <IconClock size={40} />, bg: 'bg-amber-500/10'
+      id: 'time_traveler', title: t('game_chrono_title'), desc: t('game_chrono_desc'), color: 'text-amber-400', icon: <IconClock size={40} />, bg: 'bg-amber-500/10'
     },
     { 
-      id: 'gravity', title: 'GRAVITY PROTOCOL', desc: 'Master Russian prepositions.', color: 'text-cyan-400', icon: <IconTarget size={40} />, bg: 'bg-cyan-500/10'
+      id: 'gravity', title: t('game_gravity_title'), desc: t('game_gravity_desc'), color: 'text-cyan-400', icon: <IconTarget size={40} />, bg: 'bg-cyan-500/10'
     },
     { 
-      id: 'magnet', title: 'MAGNETIC FIELD', desc: 'Extract word roots.', color: 'text-purple-400', icon: <IconMagnet size={40} />, bg: 'bg-purple-500/10'
+      id: 'magnet', title: t('game_magnet_title'), desc: t('game_magnet_desc'), color: 'text-purple-400', icon: <IconMagnet size={40} />, bg: 'bg-purple-500/10'
     },
     { 
-      id: 'scale', title: 'WORD SCALE', desc: 'Balance category weights.', color: 'text-emerald-400', icon: <IconScale size={40} />, bg: 'bg-emerald-500/10'
+      id: 'scale', title: t('game_scale_title'), desc: t('game_scale_desc'), color: 'text-emerald-400', icon: <IconScale size={40} />, bg: 'bg-emerald-500/10'
     }
-  ];
+  ], [t]);
 
   return (
-    <div className="w-full h-full p-6 overflow-y-auto custom-scrollbar pb-32">
+    <div className="w-full h-full p-6 overflow-y-auto custom-scrollbar pb-32" dir={dir}>
         <header className="mb-10 text-center">
-            <h1 className="text-4xl font-black text-white mb-2">NEURAL ARCADE</h1>
-            <p className="text-white/40 font-mono text-xs tracking-widest uppercase">Select Training Module</p>
+            <h1 className="text-4xl font-black text-white mb-2">{t('games_title')}</h1>
+            <p className="text-white/40 font-mono text-xs tracking-widest uppercase">{t('games_subtitle')}</p>
         </header>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto">

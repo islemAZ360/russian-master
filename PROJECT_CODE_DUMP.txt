@@ -1,6 +1,6 @@
 ==================================================================
 PROJECT STRUCTURE (هيكل الملفات)
-Generated on: 3/1/2026, 23:59:59
+Generated on: 4/1/2026, 02:50:32
 ==================================================================
 
 (ROOT)
@@ -50,6 +50,7 @@ Generated on: 3/1/2026, 23:59:59
 │   │   │   ├── home
 │   │   │   │   └── HeroSection.jsx
 │   │   │   ├── live
+│   │   │   │   ├── GlobalLiveManager.jsx
 │   │   │   │   └── RealLiveStream.jsx
 │   │   │   ├── profile
 │   │   │   │   ├── CyberDeck.jsx
@@ -111,10 +112,12 @@ Generated on: 3/1/2026, 23:59:59
 │   │   │   └── magnetData.js
 │   │   ├── achievements.js
 │   │   ├── fullDatabase.js
-│   │   └── militaryRanks.js
+│   │   ├── militaryRanks.js
+│   │   └── translations.js
 │   ├── hooks
 │   │   ├── useAudio.js
 │   │   ├── useAuth.js
+│   │   ├── useLanguage.js
 │   │   ├── useMusic.js
 │   │   ├── useSettings.js
 │   │   ├── useSmartSRS.js
@@ -141,7 +144,7 @@ Generated on: 3/1/2026, 23:59:59
 
 ==================================================================
 FILE CONTENTS (محتوى الملفات)
-Total Files Scanned: 108
+Total Files Scanned: 111
 ==================================================================
 
 
@@ -560,7 +563,8 @@ FILE: package.json
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "tailwind-merge": "^2.6.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "three": "^0.182.0"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.23",
@@ -1069,7 +1073,7 @@ export default function NotFound() {
 FILE: src\app\page.js
 ------------------------------------------------------------------
 "use client";
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { 
   IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
@@ -1081,6 +1085,7 @@ import { useUI } from '@/hooks/useUI';
 import { useSettings } from '@/hooks/useSettings';
 import { useStudySystem } from '@/hooks/useStudySystem';
 import { useAudio } from '@/hooks/useAudio';
+import { useLanguage } from '@/hooks/useLanguage'; // إضافة هوك اللغة
 
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot } from "firebase/firestore";
@@ -1089,11 +1094,12 @@ import ViewManager from '@/components/views/ViewManager';
 import { FloatingDock } from '@/components/ui/floating-dock';
 import NotificationCenter from '@/components/ui/NotificationCenter';
 import IntroSequence from '@/components/ui/IntroSequence';
-import CyberLayout from '@/components/layout/CyberLayout'; // استيراد اللي اوت الجديد
+import CyberLayout from '@/components/layout/CyberLayout';
 
 import SupportModal from '@/components/features/support/SupportModal';
 import { AuthScreen } from '@/components/features/auth/AuthScreen';
 
+// استيراد الألعاب
 import TimeTraveler from '@/components/features/games/TimeTraveler';
 import GravityProtocol from '@/components/features/games/GravityProtocol';
 import MagneticField from '@/components/features/games/MagneticField';
@@ -1107,10 +1113,13 @@ const LoadingFallback = () => (
 );
 
 export default function Page() {
+  // استدعاء الهوكس
   const { user, loading, isAdmin, isJunior, isBanned } = useAuth();
   const { currentView, setCurrentView, showSupport, setShowSupport, activeOverlayGame, setActiveOverlayGame } = useUI();
   const { settings } = useSettings();
+  const { t, dir } = useLanguage(); // استدعاء الترجمة والاتجاه
   
+  // الحالة المحلية
   const [showIntro, setShowIntro] = useState(true);
   const [broadcast, setBroadcast] = useState(null);
   const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0 });
@@ -1118,6 +1127,7 @@ export default function Page() {
   const { cards, currentCard, stats, handleSwipe, resetProgress, addCard, deleteCard, updateCard, isBanned: studyBanned } = useStudySystem(user);
   const { speak, playSFX } = useAudio();
 
+  // مراقبة رسائل البث من المدير
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(doc(db, "system", "broadcast"), (d) => {
@@ -1126,30 +1136,35 @@ export default function Page() {
     return () => unsub();
   }, [user]);
 
+  // حساب التصنيفات
   const categories = useMemo(() => 
     cards ? [...new Set(cards.map(c => c.category || "General"))] : [], 
     [cards]
   );
 
+  // روابط التنقل (مترجمة)
   const navLinks = useMemo(() => {
     const iconClass = "w-full text-white/80 group-hover:text-purple-400 transition-colors";
+    
+    // استخدام t() لترجمة العناوين
     const links = [
-      { title: "Base", icon: <IconHome className={iconClass} />, onClick: () => setCurrentView('home') },
-      { title: "Arcade", icon: <IconDeviceGamepad className="w-full text-green-400" />, onClick: () => setCurrentView('games') },
-      { title: "Live", icon: <IconBroadcast className="w-full text-red-400" />, onClick: () => setCurrentView('live') },
-      { title: "Comms", icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
-      { title: "Missions", icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
-      { title: "Archive", icon: <IconDatabase className="w-full text-teal-400" />, onClick: () => setCurrentView('data') }, 
-      { title: "ID", icon: <IconTrophy className="w-full text-yellow-400" />, onClick: () => setCurrentView('leaderboard') },
-      { title: "Config", icon: <IconSettings className="w-full text-gray-400" />, onClick: () => setCurrentView('settings') },
+      { title: t('nav_home'), icon: <IconHome className={iconClass} />, onClick: () => setCurrentView('home') },
+      { title: t('nav_games'), icon: <IconDeviceGamepad className="w-full text-green-400" />, onClick: () => setCurrentView('games') },
+      { title: t('nav_live'), icon: <IconBroadcast className="w-full text-red-400" />, onClick: () => setCurrentView('live') },
+      { title: t('nav_chat'), icon: <IconMessageCircle className="w-full text-blue-400" />, onClick: () => setCurrentView('chat') },
+      { title: t('nav_study'), icon: <IconCpu className="w-full text-purple-400" />, onClick: () => setCurrentView('category') },
+      { title: t('nav_archive'), icon: <IconDatabase className="w-full text-teal-400" />, onClick: () => setCurrentView('data') }, 
+      { title: t('nav_rank'), icon: <IconTrophy className="w-full text-yellow-400" />, onClick: () => setCurrentView('leaderboard') },
+      { title: t('nav_settings'), icon: <IconSettings className="w-full text-gray-400" />, onClick: () => setCurrentView('settings') },
     ];
     
-    if (isJunior) links.push({ title: "CONTROL", icon: <IconShield className="w-full text-red-600" />, onClick: () => setCurrentView('admin_panel') });
+    if (isJunior) links.push({ title: t('nav_admin'), icon: <IconShield className="w-full text-red-600" />, onClick: () => setCurrentView('admin_panel') });
     if (!isAdmin) links.push({ title: "Support", icon: <IconLifebuoy className="w-full text-orange-500" />, onClick: () => setShowSupport(true) });
     
     return links;
-  }, [isJunior, isAdmin, setCurrentView, setShowSupport]);
+  }, [isJunior, isAdmin, setCurrentView, setShowSupport, t]); // أضفنا t للاعتماديات
 
+  // حالات التحميل والحظر
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
   if (loading) return <LoadingFallback />;
   if (isBanned || studyBanned) return <div className="h-screen flex items-center justify-center bg-black text-red-600 font-bold font-mono tracking-widest text-xl">ACCESS REVOKED</div>;
@@ -1158,64 +1173,71 @@ export default function Page() {
   const isAdminMode = isAdmin && currentView === 'admin_panel';
 
   return (
-    // استخدام CyberLayout كحاوية رئيسية
     <CyberLayout>
-      <NotificationCenter />
-      
-      {!isAdminMode && (
-          <AnimatePresence>
-            {activeOverlayGame === 'time_traveler' && <TimeTraveler onClose={() => setActiveOverlayGame(null)} />}
-            {activeOverlayGame === 'gravity' && <GravityProtocol onClose={() => setActiveOverlayGame(null)} />}
-            {activeOverlayGame === 'magnet' && <MagneticField onClose={() => setActiveOverlayGame(null)} />}
-            {activeOverlayGame === 'scale' && <WordScale onClose={() => setActiveOverlayGame(null)} />}
-          </AnimatePresence>
-      )}
-      
-      {showSupport && <SupportModal user={user} onClose={() => setShowSupport(false)} />}
-      
-      <AnimatePresence>
-        {broadcast && (
-            <motion.div 
-              initial={{ y: -100, opacity: 0 }} 
-              animate={{ y: 0, opacity: 1 }} 
-              exit={{ y: -100, opacity: 0 }} 
-              className="fixed top-0 left-0 w-full bg-red-600/90 backdrop-blur-md text-white text-center py-3 z-[100] font-bold shadow-[0_0_30px_rgba(220,38,38,0.5)] border-b border-red-400"
-            >
-                🚨 TRANSMISSION: {broadcast}
-            </motion.div>
+      {/* تطبيق اتجاه النص (RTL/LTR) على الحاوية الداخلية */}
+      <div className="relative h-full w-full" dir={dir}>
+        
+        <NotificationCenter />
+        
+        {/* الألعاب المنبثقة */}
+        {!isAdminMode && (
+            <AnimatePresence>
+              {activeOverlayGame === 'time_traveler' && <TimeTraveler onClose={() => setActiveOverlayGame(null)} />}
+              {activeOverlayGame === 'gravity' && <GravityProtocol onClose={() => setActiveOverlayGame(null)} />}
+              {activeOverlayGame === 'magnet' && <MagneticField onClose={() => setActiveOverlayGame(null)} />}
+              {activeOverlayGame === 'scale' && <WordScale onClose={() => setActiveOverlayGame(null)} />}
+            </AnimatePresence>
         )}
-      </AnimatePresence>
-
-      <div className="relative z-10 flex flex-col items-center justify-start h-full w-full pt-6 md:pt-0">
-           <ViewManager 
-                cards={cards} 
-                currentCard={currentCard} 
-                sessionStats={sessionStats} 
-                setSessionStats={setSessionStats} 
-                handleSwipe={handleSwipe} 
-                playSFX={playSFX} 
-                speak={speak} 
-                addCard={addCard} 
-                deleteCard={deleteCard} 
-                updateCard={updateCard} 
-                resetProgress={resetProgress}
-                stats={stats} 
-                categories={categories} 
-           />
-      </div>
-
-      {!isAdminMode && (
-          <div className="fixed bottom-6 left-0 w-full z-50 flex justify-center pointer-events-none">
+        
+        {showSupport && <SupportModal user={user} onClose={() => setShowSupport(false)} />}
+        
+        {/* شريط البث العاجل */}
+        <AnimatePresence>
+          {broadcast && (
               <motion.div 
-                initial={{ y: 100, opacity: 0 }} 
+                initial={{ y: -100, opacity: 0 }} 
                 animate={{ y: 0, opacity: 1 }} 
-                transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                className="pointer-events-auto"
+                exit={{ y: -100, opacity: 0 }} 
+                className="fixed top-0 left-0 w-full bg-red-600/90 backdrop-blur-md text-white text-center py-3 z-[100] font-bold shadow-[0_0_30px_rgba(220,38,38,0.5)] border-b border-red-400"
               >
-                  <FloatingDock items={navLinks} />
+                  🚨 TRANSMISSION: {broadcast}
               </motion.div>
-          </div>
-      )}
+          )}
+        </AnimatePresence>
+
+        {/* مدير العرض الرئيسي */}
+        <div className="relative z-10 flex flex-col items-center justify-start h-full w-full pt-6 md:pt-0">
+             <ViewManager 
+                  cards={cards} 
+                  currentCard={currentCard} 
+                  sessionStats={sessionStats} 
+                  setSessionStats={setSessionStats} 
+                  handleSwipe={handleSwipe} 
+                  playSFX={playSFX} 
+                  speak={speak} 
+                  addCard={addCard} 
+                  deleteCard={deleteCard} 
+                  updateCard={updateCard} 
+                  resetProgress={resetProgress}
+                  stats={stats} 
+                  categories={categories} 
+             />
+        </div>
+
+        {/* شريط التنقل السفلي - تم رفع z-index ليكون فوق الفيديو */}
+        {!isAdminMode && (
+            <div className="fixed bottom-6 left-0 w-full z-[60] flex justify-center pointer-events-none">
+                <motion.div 
+                  initial={{ y: 100, opacity: 0 }} 
+                  animate={{ y: 0, opacity: 1 }} 
+                  transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                  className="pointer-events-auto"
+                >
+                    <FloatingDock items={navLinks} />
+                </motion.div>
+            </div>
+        )}
+      </div>
     </CyberLayout>
   );
 }
@@ -4351,24 +4373,23 @@ FILE: src\components\features\home\HeroSection.jsx
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
-import { IconRocket, IconActivity, IconBrain, IconTerminal, IconSkull, IconSparkles } from "@tabler/icons-react";
-
-// FIX: استخدام @ للوصول لمكونات الـ UI
+import { IconRocket, IconTerminal, IconSparkles } from "@tabler/icons-react";
 import { BorderBeam } from "@/components/ui/BorderBeam";
 import { DecryptText } from "@/components/ui/DecryptText";
 import { MagneticButton } from "@/components/ui/MagneticButton";
-
-// FIX: استخدام @ للوصول للـ Context
 import { useSettings } from "@/context/SettingsContext";
+import { useLanguage } from "@/hooks/useLanguage"; // استدعاء هوك اللغة
 
 export function HeroSection({ onStart, onOpenGame, user }) {
-  const userName = user?.email?.split('@')[0].toUpperCase() || "OPERATIVE";
+  const userName = user?.displayName || user?.email?.split('@')[0].toUpperCase() || "OPERATIVE";
   const { isDark } = useSettings();
+  const { t, dir } = useLanguage(); // استخدام الترجمة
 
   return (
-    <div className="w-full h-full flex flex-col md:flex-row items-center justify-between p-6 md:p-12 relative z-10 gap-10">
+    // إضافة dir هنا لضمان الاتجاه الصحيح للنصوص
+    <div className="w-full h-full flex flex-col md:flex-row items-center justify-between p-6 md:p-12 relative z-10 gap-10" dir={dir}>
       <motion.div 
-        initial={{ opacity: 0, x: -50 }} 
+        initial={{ opacity: 0, x: dir === 'rtl' ? 50 : -50 }} // عكس الحركة حسب اللغة
         animate={{ opacity: 1, x: 0 }} 
         transition={{ duration: 0.5, ease: "easeOut" }}
         className="flex-1 space-y-8"
@@ -4379,14 +4400,14 @@ export function HeroSection({ onStart, onOpenGame, user }) {
             : 'border-blue-400/50 bg-blue-50 text-blue-600 shadow-sm'
         }`}>
             <span className={`w-2 h-2 rounded-full animate-pulse ${isDark ? 'bg-cyan-400' : 'bg-blue-500'}`}></span> 
-            SYSTEM STATUS: ONLINE
+            {t('hero_status')}
         </div>
         
         <div>
             <h1 className={`text-4xl md:text-6xl lg:text-7xl font-black leading-tight mb-2 ${
               isDark ? 'text-white' : 'text-slate-800'
             }`}>
-                WELCOME BACK, <br/>
+                {t('hero_welcome')} <br/>
                 <span className={`text-transparent bg-clip-text ${
                   isDark 
                     ? 'bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500' 
@@ -4401,8 +4422,8 @@ export function HeroSection({ onStart, onOpenGame, user }) {
                 ? 'text-white/40 border-purple-500' 
                 : 'text-slate-500 border-blue-400'
             }`}>
-                <p>{'>'} Neural Interface Ready.</p>
-                <p>{'>'} Objectives Loaded.</p>
+                <p>{t('hero_line1')}</p>
+                <p>{t('hero_line2')}</p>
             </div>
         </div>
 
@@ -4415,15 +4436,15 @@ export function HeroSection({ onStart, onOpenGame, user }) {
           >
             <div className="px-4 py-3 bg-white/80 backdrop-blur-sm rounded-xl border border-blue-200 shadow-sm">
               <div className="text-2xl font-black text-blue-600">1000+</div>
-              <div className="text-xs text-slate-500 font-medium">Words</div>
+              <div className="text-xs text-slate-500 font-medium">{t('hero_stat_words')}</div>
             </div>
             <div className="px-4 py-3 bg-white/80 backdrop-blur-sm rounded-xl border border-purple-200 shadow-sm">
               <div className="text-2xl font-black text-purple-600">4</div>
-              <div className="text-xs text-slate-500 font-medium">Games</div>
+              <div className="text-xs text-slate-500 font-medium">{t('hero_stat_games')}</div>
             </div>
             <div className="px-4 py-3 bg-white/80 backdrop-blur-sm rounded-xl border border-indigo-200 shadow-sm">
               <div className="text-2xl font-black text-indigo-600">∞</div>
-              <div className="text-xs text-slate-500 font-medium">Practice</div>
+              <div className="text-xs text-slate-500 font-medium">{t('hero_stat_practice')}</div>
             </div>
           </motion.div>
         )}
@@ -4453,7 +4474,7 @@ export function HeroSection({ onStart, onOpenGame, user }) {
                 <IconRocket size={48} className={isDark ? 'text-white mb-2' : 'text-blue-600 mb-2'} />
                 <span className={`text-xl md:text-2xl font-black tracking-[0.2em] ${
                   isDark ? 'text-white' : 'text-slate-700'
-                }`}>START</span>
+                }`}>{t('btn_start')}</span>
             </div>
         </MagneticButton>
 
@@ -4474,32 +4495,298 @@ export function HeroSection({ onStart, onOpenGame, user }) {
             <div className="relative z-10 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <IconTerminal size={24} className={isDark ? 'text-red-500' : 'text-orange-600'}/>
-                    <div className="text-left">
+                    <div className={`text-${dir === 'rtl' ? 'right' : 'left'}`}>
                         <div className={`text-sm font-bold tracking-widest ${
                           isDark ? 'text-red-500' : 'text-orange-700'
-                        }`}>NEURAL BREACH</div>
+                        }`}>{t('btn_hacking')}</div>
                         <div className={`text-[10px] font-mono ${
                           isDark ? 'text-red-400/50' : 'text-orange-500/70'
-                        }`}>HACKING PROTOCOL: READY</div>
+                        }`}>{t('hacking_sub')}</div>
                     </div>
                 </div>
                 <IconSparkles className={isDark ? 'text-red-500/20' : 'text-orange-400/40'} size={32} />
             </div>
         </MagneticButton>
-
-        {!isDark && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="absolute -z-10 w-[500px] h-[500px] rounded-full opacity-30 blur-3xl"
-            style={{
-              background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%)',
-            }}
-          />
-        )}
       </motion.div>
     </div>
+  );
+}
+
+------------------------------------------------------------------
+FILE: src\components\features\live\GlobalLiveManager.jsx
+------------------------------------------------------------------
+"use client";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import dynamic from 'next/dynamic';
+import { motion, AnimatePresence } from "framer-motion";
+import { useUI } from "@/context/UIContext";
+import { useAuth } from "@/context/AuthContext";
+import { 
+  IconX, IconMaximize, IconMinimize, IconMicrophone, 
+  IconPlayerRecord, IconPlayerStop, IconWifi, IconCpu, 
+  IconLayoutSidebarRightCollapse, IconGripVertical
+} from "@tabler/icons-react";
+
+// --- استيراد Jitsi (معزول) ---
+// loading component بسيط وخفيف
+const JitsiMeeting = dynamic(
+  () => import('@jitsi/react-sdk').then((mod) => mod.JitsiMeeting),
+  { ssr: false, loading: () => <div className="w-full h-full bg-black flex items-center justify-center text-cyan-900 font-mono tracking-widest text-xs">INITIALIZING SECURE FEED...</div> }
+);
+
+// --- موجات صوتية وهمية (للأداء العالي بدلاً من تحليل الصوت الحقيقي) ---
+const FakeAudioVisualizer = () => (
+  <div className="flex items-end gap-[2px] h-4">
+    {[...Array(5)].map((_, i) => (
+      <div key={i} className="w-1 bg-cyan-500/80 rounded-t-sm animate-pulse"
+        style={{ height: `${Math.random() * 100}%`, animationDuration: `${0.4 + Math.random() * 0.5}s` }} 
+      />
+    ))}
+  </div>
+);
+
+export default function GlobalLiveManager() {
+  const { liveStream, stopLive, setCurrentView, toggleMinimize } = useUI();
+  const { user } = useAuth();
+  
+  // حالات محلية للواجهة
+  const [isRecording, setIsRecording] = useState(false);
+  const [timer, setTimer] = useState("00:00");
+  const [isHovered, setIsHovered] = useState(false);
+  const timerInterval = useRef(null);
+
+  // --- إعدادات Jitsi (Memoized بصرامة لمنع إعادة التحميل) ---
+  const configOverwrite = useMemo(() => ({
+    startWithAudioMuted: true,
+    startWithVideoMuted: true,
+    disableThirdPartyRequests: true,
+    prejoinPageEnabled: false,
+    resolution: 720, // دقة مثالية للأداء
+    constraints: {
+        video: { height: { ideal: 720, max: 720, min: 240 } }
+    },
+    // إخفاء بعض الأزرار التي سنستبدلها بواجهتنا أو لا نحتاجها
+    toolbarButtons: [
+       'microphone', 'camera', 'desktop', 'chat', 'raisehand', 
+       'tileview', 'select-background', 'hangup'
+    ]
+  }), []);
+
+  const interfaceConfigOverwrite = useMemo(() => ({
+    SHOW_JITSI_WATERMARK: false,
+    SHOW_WATERMARK_FOR_GUESTS: false,
+    DEFAULT_BACKGROUND: '#000000',
+    TOOLBAR_ALWAYS_VISIBLE: false, // نعتمد على تحريك الماوس لإظهارها
+    DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
+    filmStripOnly: false,
+    VERTICAL_FILMSTRIP: true,
+  }), []);
+
+  // --- منطق المؤقت الوهمي للتسجيل ---
+  useEffect(() => {
+    if (isRecording) {
+      let seconds = 0;
+      timerInterval.current = setInterval(() => {
+          seconds++;
+          const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+          const s = (seconds % 60).toString().padStart(2, '0');
+          setTimer(`${m}:${s}`);
+      }, 1000);
+    } else {
+      clearInterval(timerInterval.current);
+      setTimer("00:00");
+    }
+    return () => clearInterval(timerInterval.current);
+  }, [isRecording]);
+
+  // إذا لم يكن البث نشطاً، لا ترسم شيئاً
+  if (!liveStream.isActive) return null;
+
+  // --- إعدادات الحركة والموقع (Framer Motion Variants) ---
+  const variants = {
+    full: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      borderRadius: 0,
+      x: 0, y: 0,
+      zIndex: 40, // تحت القائمة السفلية (z-60)
+      borderWidth: 0,
+    },
+    mini: {
+      position: "fixed",
+      bottom: 100, // فوق شريط التنقل
+      right: 20,
+      width: 320,
+      height: 190,
+      borderRadius: 16,
+      zIndex: 100, // فوق كل شيء
+      x: 0, y: 0,
+      borderWidth: 1,
+      borderColor: "rgba(6, 182, 212, 0.3)",
+      boxShadow: "0 10px 40px rgba(0,0,0,0.6)"
+    }
+  };
+
+  return (
+    <motion.div
+      layout // السحر هنا: هذا يجعل التحول ناعماً تلقائياً
+      initial="full"
+      animate={liveStream.isMinimized ? "mini" : "full"}
+      variants={variants}
+      transition={{ type: "spring", stiffness: 120, damping: 20 }}
+      className="bg-black overflow-hidden relative group"
+      drag={liveStream.isMinimized} // السحب مسموح فقط في الوضع المصغر
+      dragMomentum={false}
+      dragElastic={0.1}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+        {/* =========================================================
+            1. حاوية الفيديو (Jitsi Container) - ثابتة لا تتغير
+           ========================================================= */}
+        <div className={`w-full h-full bg-black relative`}>
+             {/* طبقة حماية شفافة في الوضع المصغر لمنع التفاعل الخاطئ مع أزرار الفيديو أثناء السحب */}
+             {liveStream.isMinimized && <div className="absolute inset-0 z-10 bg-transparent" />}
+
+             <JitsiMeeting
+                domain="meet.jit.si"
+                roomName={`RM_SECURE_${liveStream.roomName}`}
+                configOverwrite={configOverwrite}
+                interfaceConfigOverwrite={interfaceConfigOverwrite}
+                userInfo={{ displayName: user?.displayName || "Operative" }}
+                onReadyToClose={() => { stopLive(); setCurrentView('home'); }}
+                getIFrameRef={(iframeRef) => {
+                    iframeRef.style.height = '100%';
+                    iframeRef.style.width = '100%';
+                    iframeRef.style.border = 'none';
+                    iframeRef.style.background = 'black';
+                }}
+            />
+        </div>
+
+        {/* =========================================================
+            2. واجهة التحكم الكاملة (Full Screen HUD)
+           ========================================================= */}
+        <AnimatePresence>
+            {!liveState.isMinimized && (
+                <motion.div 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 pointer-events-none z-20"
+                >
+                    {/* الشريط العلوي العائم */}
+                    <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
+                        
+                        {/* معلومات البث (يسار) */}
+                        <div className="flex flex-col gap-2 pointer-events-auto">
+                            <div className="bg-black/60 backdrop-blur-md border border-white/10 px-4 py-2 rounded-lg flex items-center gap-4 shadow-lg">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_#ef4444]"></div>
+                                    <span className="text-xs font-black text-white tracking-widest uppercase">LIVE</span>
+                                </div>
+                                <div className="h-4 w-px bg-white/10"></div>
+                                <div className="text-[10px] font-mono text-cyan-400 tracking-wider uppercase">
+                                    {liveStream.roomName}
+                                </div>
+                            </div>
+                            
+                            {/* إحصائيات وهمية للمظهر */}
+                            <div className="flex gap-2 opacity-60 hover:opacity-100 transition-opacity">
+                                <div className="bg-black/40 px-2 py-1 rounded border border-white/5 text-[9px] font-mono text-green-500 flex items-center gap-1">
+                                    <IconWifi size={10}/> 24ms
+                                </div>
+                                <div className="bg-black/40 px-2 py-1 rounded border border-white/5 text-[9px] font-mono text-yellow-500 flex items-center gap-1">
+                                    <IconCpu size={10}/> STABLE
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* أدوات التحكم (يمين) */}
+                        <div className="flex items-center gap-2 pointer-events-auto bg-black/60 backdrop-blur-md border border-white/10 px-2 py-2 rounded-lg shadow-lg">
+                            <div className="px-2 hidden sm:block"><FakeAudioVisualizer /></div>
+                            
+                            {isRecording && <span className="font-mono text-red-400 text-xs font-bold px-2 animate-pulse">{timer}</span>}
+                            
+                            <div className="h-6 w-px bg-white/10 mx-1"></div>
+                            
+                            {/* زر التصغير اليدوي */}
+                            <button 
+                                onClick={() => { toggleMinimize(true); setCurrentView('home'); }} 
+                                className="p-2 hover:bg-white/10 text-white/70 hover:text-white rounded-md transition-colors group relative"
+                                title="Minimize"
+                            >
+                                <IconLayoutSidebarRightCollapse size={18}/>
+                            </button>
+
+                            {/* زر التسجيل */}
+                            <button 
+                                onClick={() => setIsRecording(!isRecording)} 
+                                className={`p-2 rounded-md transition-all ${isRecording ? 'text-red-500 bg-red-500/10' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
+                            >
+                                {isRecording ? <IconPlayerStop size={18}/> : <IconPlayerRecord size={18}/>}
+                            </button>
+
+                            {/* زر الإغلاق */}
+                            <button onClick={() => { stopLive(); setCurrentView('home'); }} className="bg-red-600/80 hover:bg-red-600 text-white p-2 rounded-md ml-1 shadow-lg transition-colors">
+                                <IconX size={18} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* زوايا تقنية (HUD Overlay) */}
+                    <div className="absolute top-0 left-0 w-full h-full opacity-20 pointer-events-none">
+                        <svg className="w-full h-full">
+                            <path d="M 40 40 L 80 40 M 40 40 L 40 80" stroke="#06b6d4" strokeWidth="2" fill="none" />
+                            <path d="M calc(100% - 40px) 40 L calc(100% - 80px) 40 M calc(100% - 40px) 40 L calc(100% - 40px) 80" stroke="#06b6d4" strokeWidth="2" fill="none" />
+                            <path d="M 40 calc(100% - 40px) L 80 calc(100% - 40px) M 40 calc(100% - 40px) L 40 calc(100% - 80px)" stroke="#06b6d4" strokeWidth="2" fill="none" />
+                            <path d="M calc(100% - 40px) calc(100% - 40px) L calc(100% - 80px) calc(100% - 40px) M calc(100% - 40px) calc(100% - 40px) L calc(100% - 40px) calc(100% - 80px)" stroke="#06b6d4" strokeWidth="2" fill="none" />
+                        </svg>
+                    </div>
+                </motion.div>
+            )}
+        </AnimatePresence>
+
+        {/* =========================================================
+            3. واجهة المشغل المصغر (Mini Player Controls)
+           ========================================================= */}
+        {liveState.isMinimized && (
+            <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }}
+                className="absolute top-0 left-0 w-full h-8 bg-black/80 backdrop-blur-md flex items-center justify-between px-3 z-30 border-b border-white/10 cursor-move"
+            >
+                <div className="flex items-center gap-2">
+                    <IconGripVertical size={12} className="text-white/20" />
+                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></div>
+                    <span className="text-[9px] font-mono text-cyan-500 uppercase truncate max-w-[80px]">
+                        {liveState.roomName}
+                    </span>
+                </div>
+                
+                {/* أزرار التحكم المصغرة - تظهر عند التحويم */}
+                <div className="flex items-center gap-1">
+                    <button 
+                        onClick={() => { toggleMinimize(false); setCurrentView('live'); }} 
+                        className="p-1 hover:bg-white/20 rounded text-white transition-colors"
+                        title="Maximize"
+                    >
+                        <IconMaximize size={12}/>
+                    </button>
+                    <button 
+                        onClick={stopLive} 
+                        className="p-1 hover:bg-red-500/20 text-red-500 rounded transition-colors"
+                        title="Close"
+                    >
+                        <IconX size={12}/>
+                    </button>
+                </div>
+            </motion.div>
+        )}
+    </motion.div>
   );
 }
 
@@ -4507,417 +4794,379 @@ export function HeroSection({ onStart, onOpenGame, user }) {
 FILE: src\components\features\live\RealLiveStream.jsx
 ------------------------------------------------------------------
 "use client";
-import React, { useState, useRef, useEffect } from "react";
-import dynamic from 'next/dynamic';
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState } from "react";
+import { motion } from "framer-motion";
 import { 
-  IconBroadcast, IconX, IconLoader, IconVideo, 
-  IconPlayerRecord, IconPlayerStop, IconMicrophone, 
-  IconWifi, IconLock, IconActivity, IconDeviceTv
+  IconBroadcast, IconLoader, IconDeviceTv, IconShieldCheck, IconWifi 
 } from "@tabler/icons-react";
+import { useUI } from "@/context/UIContext";
+import { useLanguage } from "@/hooks/useLanguage"; // استدعاء هوك اللغة
 
-// استيراد Jitsi بشكل ديناميكي لتجنب مشاكل SSR
-const JitsiMeeting = dynamic(
-  () => import('@jitsi/react-sdk').then((mod) => mod.JitsiMeeting),
-  { ssr: false }
-);
-
-export default function RealLiveStream({ user, onClose }) {
-  const [roomName, setRoomName] = useState("");
-  const [isJoined, setIsJoined] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
+export default function RealLiveStream() {
+  // 1. إصلاح الخطأ: استخراج liveState هنا
+  const { startBroadcast, liveState, toggleMinimize } = useUI(); 
+  const { t, dir } = useLanguage(); // استدعاء الترجمة
   
-  // Fake Terminal Logs for aesthetic
-  const [logs, setLogs] = useState(["Initializing uplink..."]);
+  const [roomName, setRoomName] = useState("");
+  const [status, setStatus] = useState("idle");
+  
+  // استخدام نصوص مترجمة للسجلات
+  const [logs, setLogs] = useState([`> ${t('live_log_ready')}`, `> ${t('live_log_waiting')}`]);
 
-  // --- Recording Logic ---
-  const mediaRecorderRef = useRef(null);
-  const chunksRef = useRef([]);
-
-  useEffect(() => {
-    if(!isJoined) {
-        const interval = setInterval(() => {
-            const msgs = ["Handshake protocol...", "Encrypting signal...", "Searching frequency...", "Ping: 12ms", "Packets: Secure"];
-            setLogs(prev => [...prev.slice(-3), msgs[Math.floor(Math.random() * msgs.length)]]);
-        }, 2000);
-        return () => clearInterval(interval);
-    }
-  }, [isJoined]);
+  const addLog = (msg) => setLogs(prev => [...prev.slice(-3), `> ${msg}`]);
 
   const handleJoin = () => {
     if (!roomName.trim()) return;
-    setLoading(true);
+    setStatus("scanning");
+    addLog(t('live_log_encrypt'));
+    
     setTimeout(() => {
-        setLoading(false);
-        setIsJoined(true);
+        addLog(t('live_log_established'));
+        startBroadcast(roomName); 
     }, 1500);
   };
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
+  // واجهة "تم الاتصال"
+  if (liveState.isActive) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full w-full text-center" dir={dir}>
+            <div className="w-24 h-24 rounded-full border-4 border-cyan-500/30 flex items-center justify-center animate-pulse mb-6">
+                <IconWifi size={40} className="text-cyan-500"/>
+            </div>
+            <h2 className="text-3xl font-black text-white tracking-tighter mb-2">{t('live_active_msg')}</h2>
+            <p className="text-white/40 font-mono text-sm mb-8">{t('live_secure_channel')}: {liveState.roomName}</p>
+            <div className="text-xs text-cyan-500/50 font-mono border border-cyan-500/20 px-4 py-2 rounded">
+                {t('live_active_desc')}
+            </div>
+        </div>
+      );
+  }
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) chunksRef.current.push(event.data);
-      };
-
-      mediaRecorder.onstop = () => {
-        saveVideo();
-        setIsRecording(false);
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch (err) {
-      alert("Permission denied or error starting recording.");
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-    }
-  };
-
-  const saveVideo = () => {
-    const blob = new Blob(chunksRef.current, { type: "video/webm" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    document.body.appendChild(a);
-    a.style = "display: none";
-    a.href = url;
-    a.download = `mission-record-${new Date().toISOString().slice(0,10)}.webm`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
+  // واجهة الدخول (Lobby)
   return (
-    <div className="w-full h-full flex flex-col relative overflow-hidden font-sans">
-      
-      {/* Background Ambience (Radar Effect) */}
-      {!isJoined && (
-          <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none opacity-20">
-              <div className="w-[50vw] h-[50vw] border border-[var(--accent-color)] rounded-full animate-[ping_4s_linear_infinite]"></div>
-              <div className="w-[30vw] h-[30vw] border border-[var(--accent-color)] rounded-full animate-[ping_4s_linear_infinite_1s] absolute"></div>
-          </div>
-      )}
-
-      <AnimatePresence mode="wait">
-        {!isJoined ? (
-            /* --- LOBBY SCREEN (SECURE TERMINAL) --- */
-            <motion.div 
-                key="lobby"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.1, filter: "blur(10px)" }}
-                className="flex-1 flex items-center justify-center p-4 z-10"
-            >
-                <div className="w-full max-w-lg bg-[var(--bg-secondary)]/80 backdrop-blur-2xl border border-[var(--text-muted)]/20 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
-                    
-                    {/* Top Tech Decoration */}
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[var(--accent-color)] to-transparent opacity-50"></div>
-                    
-                    <div className="text-center mb-8 relative">
-                        <div className="w-20 h-20 bg-[var(--accent-color)]/10 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-[var(--accent-color)]/20 shadow-[0_0_30px_rgba(var(--accent-rgb),0.2)]">
-                            <IconBroadcast size={40} className="text-[var(--accent-color)] animate-pulse" />
-                        </div>
-                        <h2 className="text-3xl font-black text-[var(--text-main)] tracking-tighter uppercase mb-1">
-                            Live <span className="text-[var(--accent-color)]">Ops</span> Center
-                        </h2>
-                        <p className="text-[var(--text-muted)] text-xs font-mono tracking-[0.3em] uppercase">Secure Video Uplink V.9</p>
-                    </div>
-
-                    <div className="space-y-6">
-                        {/* Status Indicators */}
-                        <div className="flex justify-between px-4 py-2 bg-[var(--bg-primary)]/50 rounded-xl border border-[var(--text-muted)]/10 text-[10px] font-mono text-[var(--text-muted)] uppercase">
-                            <span className="flex items-center gap-1"><IconWifi size={12} className="text-green-500"/> Signal: Strong</span>
-                            <span className="flex items-center gap-1"><IconLock size={12} className="text-yellow-500"/> Encrypted</span>
-                        </div>
-
-                        {/* Input Field */}
-                        <div className="relative group">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <IconDeviceTv className="text-[var(--text-muted)] group-focus-within:text-[var(--accent-color)] transition-colors" size={20} />
-                            </div>
-                            <input 
-                                value={roomName}
-                                onChange={(e) => setRoomName(e.target.value)}
-                                placeholder="ENTER FREQUENCY ID (ROOM NAME)..."
-                                className="w-full bg-[var(--bg-primary)] border border-[var(--text-muted)]/20 rounded-2xl py-4 pl-12 pr-4 text-[var(--text-main)] placeholder-[var(--text-muted)]/40 outline-none focus:border-[var(--accent-color)] focus:shadow-[0_0_20px_rgba(var(--accent-rgb),0.15)] transition-all font-mono text-sm uppercase tracking-wide"
-                            />
-                        </div>
-
-                        {/* Connect Button */}
-                        <button 
-                            onClick={handleJoin}
-                            disabled={!roomName || loading}
-                            className="w-full py-4 bg-[var(--accent-color)] hover:brightness-110 text-white font-bold rounded-2xl shadow-lg shadow-[var(--accent-color)]/30 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed group overflow-hidden relative"
-                        >
-                            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                            {loading ? (
-                                <IconLoader className="animate-spin" />
-                            ) : (
-                                <>
-                                    <span className="tracking-[0.2em] relative z-10">ESTABLISH LINK</span>
-                                    <IconArrowRight className="group-hover:translate-x-1 transition-transform relative z-10" size={18} />
-                                </>
-                            )}
-                        </button>
-
-                        {/* Fake Logs */}
-                        <div className="h-16 overflow-hidden flex flex-col justify-end text-[9px] font-mono text-[var(--text-muted)] opacity-60 border-t border-[var(--text-muted)]/10 pt-2">
-                            {logs.map((log, i) => (
-                                <motion.div key={i} initial={{opacity:0, x:-10}} animate={{opacity:1, x:0}}>{`> ${log}`}</motion.div>
-                            ))}
-                        </div>
-                    </div>
+    <div className="w-full h-full flex flex-col relative font-sans overflow-hidden items-center justify-center" dir={dir}>
+        <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-md bg-[#0a0a0a]/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-8 shadow-2xl relative overflow-hidden"
+        >
+            <div className="text-center mb-10">
+                <div className="w-20 h-20 bg-gradient-to-tr from-cyan-900 to-black rounded-2xl flex items-center justify-center mx-auto mb-6 border border-cyan-500/30 shadow-[0_0_40px_rgba(6,182,212,0.2)]">
+                    <IconBroadcast size={40} className="text-cyan-400" />
                 </div>
-            </motion.div>
-        ) : (
-            /* --- ACTIVE STREAM UI --- */
-            <motion.div 
-                key="stream"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="w-full h-full flex flex-col relative bg-black rounded-3xl overflow-hidden shadow-2xl border border-[var(--accent-color)]/20"
-            >
-                {/* Floating Control Bar */}
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-black/60 backdrop-blur-md border border-white/10 px-4 py-2 rounded-full shadow-2xl transition-opacity duration-300 hover:bg-black/80">
-                    
-                    {/* Status Badge */}
-                    <div className="flex items-center gap-2 pr-3 border-r border-white/10">
-                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_red]"></div>
-                        <span className="text-[10px] font-bold text-white tracking-widest uppercase">Live</span>
-                    </div>
-
-                    <div className="text-xs font-mono text-white/80 uppercase tracking-wider px-2">
-                        {roomName}
-                    </div>
-
-                    {/* Controls */}
-                    <div className="flex items-center gap-2 pl-3 border-l border-white/10">
-                        <button 
-                            onClick={isRecording ? stopRecording : startRecording}
-                            className={`p-2 rounded-full transition-all ${
-                                isRecording 
-                                ? 'bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/50' 
-                                : 'bg-white/5 text-white/70 hover:text-white hover:bg-white/10'
-                            }`}
-                            title={isRecording ? "Stop Recording" : "Start Recording"}
-                        >
-                            {isRecording ? <IconPlayerStop size={16}/> : <IconPlayerRecord size={16}/>}
-                        </button>
-                        
-                        <button 
-                            onClick={onClose} 
-                            className="p-2 bg-red-600/80 hover:bg-red-600 text-white rounded-full transition-all shadow-lg"
-                            title="Disconnect"
-                        >
-                            <IconX size={16}/>
-                        </button>
-                    </div>
+                <h2 className="text-3xl font-black text-white tracking-tight mb-2">NEURAL LINK</h2>
+                <div className="flex items-center justify-center gap-2 text-[10px] font-mono text-cyan-500/60 uppercase tracking-[0.2em]">
+                    Secure Gateway V.4.0
                 </div>
+            </div>
 
-                {/* Video Area */}
-                <div className="flex-1 w-full h-full relative">
-                    <JitsiMeeting
-                        domain="meet.jit.si"
-                        roomName={`RussianMaster_Secure_${roomName}`}
-                        configOverwrite={{
-                            startWithAudioMuted: false,
-                            disableThirdPartyRequests: true,
-                            prejoinPageEnabled: false,
-                            toolbarButtons: [
-                                'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
-                                'fodeviceselection', 'hangup', 'chat', 'raisehand',
-                                'videoquality', 'tileview', 'select-background'
-                            ]
-                        }}
-                        interfaceConfigOverwrite={{
-                            SHOW_JITSI_WATERMARK: false,
-                            SHOW_WATERMARK_FOR_GUESTS: false,
-                            DEFAULT_BACKGROUND: '#000000',
-                            TOOLBAR_ALWAYS_VISIBLE: false, // Hide toolbar to use our custom header mostly
-                        }}
-                        userInfo={{
-                            displayName: user?.displayName || user?.email?.split('@')[0] || "Operative"
-                        }}
-                        getIFrameRef={(iframeRef) => {
-                            iframeRef.style.height = '100%';
-                            iframeRef.style.width = '100%';
-                            iframeRef.style.border = 'none';
-                            iframeRef.style.background = 'black';
-                        }}
+            <div className="space-y-6 relative z-10">
+                <div className="relative group/input">
+                    <IconDeviceTv className={`absolute top-1/2 -translate-y-1/2 text-white/30 group-focus-within/input:text-cyan-400 transition-colors ${dir === 'rtl' ? 'right-4' : 'left-4'}`} size={20} />
+                    <input 
+                        value={roomName}
+                        onChange={(e) => setRoomName(e.target.value.toUpperCase())}
+                        placeholder={t('live_enter_id')}
+                        className={`w-full bg-black/50 border border-white/10 rounded-xl py-4 ${dir === 'rtl' ? 'pr-12 pl-4' : 'pl-12 pr-4'} text-white outline-none focus:border-cyan-500 focus:bg-cyan-950/10 transition-all font-mono text-sm uppercase tracking-widest`}
+                        disabled={status === "scanning"}
+                        onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
                     />
-                    
-                    {/* Tech Corners Overlay */}
-                    <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-[var(--accent-color)]/30 pointer-events-none"></div>
-                    <div className="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-[var(--accent-color)]/30 pointer-events-none"></div>
-                    <div className="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-[var(--accent-color)]/30 pointer-events-none"></div>
-                    <div className="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-[var(--accent-color)]/30 pointer-events-none"></div>
                 </div>
-            </motion.div>
-        )}
-      </AnimatePresence>
+
+                <button 
+                    onClick={handleJoin}
+                    disabled={!roomName || status === "scanning"}
+                    className="w-full py-4 bg-white text-black font-black rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+                >
+                    {status === "scanning" ? <IconLoader className="animate-spin" size={20} /> : <IconShieldCheck size={20} />}
+                    <span className="tracking-widest text-xs">
+                        {status === "scanning" ? t('live_connecting') : t('live_connect_btn')}
+                    </span>
+                </button>
+                
+                {/* Console Logs */}
+                <div className="bg-black/40 rounded-lg p-3 h-20 overflow-hidden font-mono text-[9px] text-green-500/60 border border-white/5 flex flex-col justify-end text-left" dir="ltr">
+                    {logs.map((l, i) => <div key={i}>{l}</div>)}
+                </div>
+            </div>
+        </motion.div>
     </div>
   );
 }
-
-// Icon helper since I used ArrowRight inside the button
-const IconArrowRight = ({className, size}) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} width={size} height={size} viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round">
-      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-      <path d="M5 12l14 0" />
-      <path d="M13 18l6 -6" />
-      <path d="M13 6l6 6" />
-    </svg>
-);
 
 ------------------------------------------------------------------
 FILE: src\components\features\profile\CyberDeck.jsx
 ------------------------------------------------------------------
 "use client";
-import React from "react";
+import React, { useMemo } from "react";
 import { motion } from "framer-motion";
 import { 
   IconUser, IconTrophy, IconFlame, IconTarget, 
-  IconActivity, IconLock, IconClock, IconMedal, IconCrown 
+  IconActivity, IconLock, IconMedal, IconCrown, 
+  IconDna, IconChartRadar
 } from "@tabler/icons-react";
+import { useLanguage } from "@/hooks/useLanguage";
 
-// (RANKS array code remains the same as before...)
+// --- تكوين الرتب (Global Ranks Config) ---
 const RANKS = [
-    { name: "RECRUIT (مجند)", min: 0, color: "text-gray-400", icon: <IconUser /> },
-    { name: "SOLDIER (جندي)", min: 100, color: "text-green-400", icon: <IconTarget /> },
-    { name: "HACKER (هاكر)", min: 500, color: "text-cyan-400", icon: <IconActivity /> },
-    { name: "ELITE (نخبة)", min: 1500, color: "text-purple-400", icon: <IconMedal /> },
-    { name: "COMMANDER (قائد)", min: 3000, color: "text-orange-400", icon: <IconTrophy /> },
-    { name: "LEGEND (أسطورة)", min: 5000, color: "text-yellow-400", icon: <IconCrown /> },
-    { name: "CYBER GOD (إله سيبراني)", min: 10000, color: "text-red-500", icon: <IconFlame /> },
+    { name: "RECRUIT", min: 0, color: "text-zinc-400", bg: "bg-zinc-500", icon: <IconUser /> },
+    { name: "SOLDIER", min: 100, color: "text-emerald-400", bg: "bg-emerald-500", icon: <IconTarget /> },
+    { name: "HACKER", min: 500, color: "text-cyan-400", bg: "bg-cyan-500", icon: <IconActivity /> },
+    { name: "ELITE", min: 1500, color: "text-violet-400", bg: "bg-violet-500", icon: <IconMedal /> },
+    { name: "COMMANDER", min: 3000, color: "text-orange-400", bg: "bg-orange-500", icon: <IconTrophy /> },
+    { name: "LEGEND", min: 5000, color: "text-yellow-400", bg: "bg-yellow-500", icon: <IconCrown /> },
+    { name: "CYBER GOD", min: 10000, color: "text-red-500", bg: "bg-red-500", icon: <IconFlame /> },
 ];
 
-export default function CyberDeck({ user, stats, cards }) {
-  const xp = stats?.xp || 0;
-  const streak = stats?.streak || 0;
-  
-  const currentRankIndex = RANKS.findIndex((r, i) => {
-      const next = RANKS[i + 1];
-      return xp >= r.min && (!next || xp < next.min);
-  });
-  const rank = RANKS[currentRankIndex] || RANKS[0];
-  const nextRank = RANKS[currentRankIndex + 1];
+// --- مكون مخطط الرادار (Skill Radar) ---
+const SkillRadar = ({ stats }) => {
+  // تحويل القيم إلى مقياس 0-100 للرسم البياني
+  const values = [
+    Math.min(100, (stats.totalCards / 100) * 100), // سعة الذاكرة (هدف أولي 100 كلمة)
+    Math.min(100, (stats.streak / 30) * 100),      // الاستمرارية (هدف شهري)
+    Math.min(100, (stats.xp / 5000) * 100),        // الخبرة (نسبة من رتبة Legend)
+    Math.min(100, stats.masteryRate),              // معدل الإتقان الفعلي
+    Math.min(100, stats.activityScore)             // نشاط التعلم
+  ];
 
-  let progress = 100;
-  if (nextRank) {
-      const totalNeeded = nextRank.min - rank.min;
-      const currentEarned = xp - rank.min;
-      progress = Math.min(100, Math.max(0, (currentEarned / totalNeeded) * 100));
-  }
-
-  const masteredWords = cards.filter(c => c.level >= 5).length;
-  const estimatedMinutes = Math.floor(xp * 1.5); 
-  const hoursPlayed = (estimatedMinutes / 60).toFixed(1);
+  const points = values.map((val, i) => {
+    const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
+    const r = (val / 100) * 45; 
+    const x = 50 + r * Math.cos(angle);
+    const y = 50 + r * Math.sin(angle);
+    return `${x},${y}`;
+  }).join(" ");
 
   return (
-    // تم إزالة overflow-y-auto من هنا لأن الحاوية الأم في CyberLayout تقوم بذلك الآن
-    <div className="w-full pb-10">
-        <div className="max-w-4xl mx-auto space-y-8">
+    <div className="relative w-full aspect-square max-w-[180px] mx-auto my-4">
+      <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100">
+        {/* شبكة الخلفية */}
+        {[20, 40, 60, 80, 100].map((r, i) => (
+            <polygon key={i} points={[0,1,2,3,4].map(j => {
+                const angle = (Math.PI * 2 * j) / 5 - Math.PI / 2;
+                const rad = (r / 100) * 45;
+                return `${50 + rad * Math.cos(angle)},${50 + rad * Math.sin(angle)}`;
+            }).join(" ")} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+        ))}
+        
+        {/* المحاور */}
+        {[0,1,2,3,4].map(i => {
+             const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
+             return <line key={i} x1="50" y1="50" x2={50 + 45 * Math.cos(angle)} y2={50 + 45 * Math.sin(angle)} stroke="rgba(255,255,255,0.1)" />;
+        })}
+
+        {/* مضلع البيانات */}
+        <motion.polygon 
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 0.6, scale: 1 }}
+          transition={{ duration: 1 }}
+          points={points} 
+          fill="rgba(6, 182, 212, 0.2)" 
+          stroke="#06b6d4" 
+          strokeWidth="2" 
+        />
+        
+        {/* نقاط التقاطع */}
+        {values.map((val, i) => {
+             const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
+             const r = (val / 100) * 45;
+             return <circle key={i} cx={50 + r * Math.cos(angle)} cy={50 + r * Math.sin(angle)} r="2" fill="#fff" />;
+        })}
+      </svg>
+      
+      {/* التسميات التوضيحية */}
+      <div className="absolute inset-0 pointer-events-none text-[8px] font-bold text-white/50 font-mono">
+          <span className="absolute top-0 left-1/2 -translate-x-1/2 bg-black/50 px-1">MEMORY</span>
+          <span className="absolute top-[35%] right-0 translate-x-2">STREAK</span>
+          <span className="absolute bottom-0 right-0 translate-x-1">XP</span>
+          <span className="absolute bottom-0 left-0 -translate-x-1">MASTERY</span>
+          <span className="absolute top-[35%] left-0 -translate-x-4">ACTIVITY</span>
+      </div>
+    </div>
+  );
+};
+
+// --- المكون الرئيسي ---
+export default function CyberDeck({ user, stats, cards = [] }) {
+  const { t, dir } = useLanguage();
+
+  // 1. معالجة البيانات الحقيقية (Memoized Calculations)
+  const analytics = useMemo(() => {
+    const xp = stats?.xp || 0;
+    const streak = stats?.streak || 0;
+    const totalCards = cards.length;
+    
+    // حساب البطاقات المتقنة (مستوى 5) والجديدة
+    const masteredCards = cards.filter(c => c.level >= 5).length;
+    const learningCards = cards.filter(c => c.level > 0 && c.level < 5).length;
+    
+    // نسبة الإتقان
+    const masteryRate = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
+    
+    // تحديد الرتبة الحالية والقادمة
+    const rankIndex = RANKS.findIndex((r, i) => {
+        const next = RANKS[i + 1];
+        return xp >= r.min && (!next || xp < next.min);
+    });
+    const currentRank = RANKS[rankIndex] || RANKS[0];
+    const nextRank = RANKS[rankIndex + 1];
+    
+    // نسبة التقدم للرتبة التالية
+    let rankProgress = 100;
+    if (nextRank) {
+        const totalNeeded = nextRank.min - currentRank.min;
+        const currentEarned = xp - currentRank.min;
+        rankProgress = Math.min(100, Math.max(0, (currentEarned / totalNeeded) * 100));
+    }
+
+    // درجة النشاط (معادلة بسيطة)
+    const activityScore = Math.min(100, learningCards * 5 + masteredCards * 2 + streak * 2);
+
+    return {
+        xp, streak, totalCards, masteredCards, learningCards,
+        masteryRate, currentRank, nextRank, rankProgress, activityScore
+    };
+  }, [user, stats, cards]);
+
+  return (
+    <div className="w-full pb-20 font-sans p-4 md:p-0" dir={dir}>
+        
+        {/* --- GRID LAYOUT --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            {/* بطاقة الهوية */}
-            <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="relative bg-black/20 backdrop-blur-md border border-white/10 rounded-3xl p-6 md:p-10 overflow-hidden shadow-xl"
-            >
-                <div className="relative z-10 flex flex-col md:flex-row gap-8 items-center">
-                    
-                    <div className="relative shrink-0">
-                        <div className={`w-32 h-32 rounded-2xl bg-black/40 border-2 border-dashed ${rank.color.replace('text-', 'border-')} flex items-center justify-center`}>
-                            <div className={`scale-[2.5] ${rank.color} drop-shadow-lg`}>
-                                {rank.icon}
+            {/* 1. Identity Card (بطاقة الهوية) */}
+            <div className="lg:col-span-8 bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden relative group">
+                {/* خلفية متحركة خفيفة */}
+                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
+                <div className="absolute top-0 right-0 p-32 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+                <div className="p-8 relative z-10">
+                    <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
+                        {/* إطار الصورة */}
+                        <div className="relative">
+                            <div className="w-32 h-32 rounded-2xl p-[2px] bg-gradient-to-br from-white/20 to-transparent">
+                                <div className="w-full h-full rounded-xl overflow-hidden bg-black">
+                                    <img src={user?.photoURL || '/avatars/avatar1.png'} className="w-full h-full object-cover" alt="Avatar"/>
+                                </div>
+                            </div>
+                            {/* شارة المستوى */}
+                            <div className="absolute -bottom-3 inset-x-0 flex justify-center">
+                                <span className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest bg-[#111] border border-white/10 ${analytics.currentRank.color}`}>
+                                    {t('profile_lvl')}.{Math.floor(analytics.xp / 500) + 1}
+                                </span>
                             </div>
                         </div>
-                        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#111] border border-white/20 px-3 py-1 rounded-full text-[10px] uppercase font-bold text-white whitespace-nowrap">
-                            LVL {currentRankIndex + 1}
+
+                        {/* معلومات المستخدم */}
+                        <div className={`flex-1 text-center ${dir === 'rtl' ? 'md:text-right' : 'md:text-left'} w-full`}>
+                            <div className={`flex items-center justify-center ${dir === 'rtl' ? 'md:justify-start' : 'md:justify-start'} gap-2 mb-2`}>
+                                <span className={`w-2 h-2 rounded-full ${analytics.currentRank.bg}`}></span>
+                                <span className={`text-xs font-bold tracking-[0.2em] uppercase ${analytics.currentRank.color}`}>
+                                    {analytics.currentRank.name} {t('profile_class')}
+                                </span>
+                            </div>
+                            <h1 className="text-4xl font-black text-white tracking-tighter mb-4 truncate">
+                                {user?.displayName || "OPERATIVE"}
+                            </h1>
+
+                            {/* شريط الخبرة */}
+                            <div className="relative pt-2">
+                                <div className="flex justify-between text-[10px] font-mono text-white/40 mb-1">
+                                    <span>{t('profile_exp')}: {analytics.xp}</span>
+                                    <span>{t('profile_next')}: {analytics.nextRank ? analytics.nextRank.min : "MAX"}</span>
+                                </div>
+                                <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                                    <motion.div 
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${analytics.rankProgress}%` }}
+                                        transition={{ duration: 1.5, ease: "circOut" }}
+                                        className={`h-full ${analytics.currentRank.bg}`}
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex-1 text-center md:text-left w-full">
-                        <div className="flex flex-col md:flex-row justify-between items-center mb-2">
-                            <h2 className="text-sm font-bold text-white/40 tracking-[0.3em] uppercase">Operative ID</h2>
-                            <span className={`text-xs font-bold px-2 py-1 rounded bg-white/5 border border-white/10 ${rank.color}`}>
-                                {rank.name}
-                            </span>
-                        </div>
-                        
-                        <h1 className="text-3xl md:text-5xl font-black text-white mb-2 truncate max-w-full">
-                            {user?.displayName || user?.email?.split('@')[0].toUpperCase() || "UNKNOWN"}
-                        </h1>
-                        
-                        <div className="mt-6">
-                            <div className="flex justify-between text-xs font-mono text-[var(--accent-color)] mb-1">
-                                <span>CURRENT XP: {xp}</span>
-                                <span>NEXT: {nextRank ? nextRank.min : "MAX"}</span>
-                            </div>
-                            <div className="h-3 w-full bg-gray-900 rounded-full overflow-hidden border border-white/5 relative">
-                                <motion.div 
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${progress}%` }}
-                                    transition={{ duration: 1.5, ease: "easeOut" }}
-                                    className="h-full bg-gradient-to-r from-[var(--accent-color)] to-purple-500"
-                                />
-                            </div>
-                        </div>
+                    {/* صف الإحصائيات السريعة */}
+                    <div className="grid grid-cols-3 gap-4 mt-8 pt-8 border-t border-white/5">
+                        <StatItem label={t('profile_stats_cards')} value={analytics.totalCards} color="text-white" icon={<IconDna size={16}/>} />
+                        <StatItem label={t('profile_stats_mastered')} value={analytics.masteredCards} color="text-yellow-400" icon={<IconCrown size={16}/>} />
+                        <StatItem label={t('profile_stats_streak')} value={analytics.streak} color="text-orange-400" icon={<IconFlame size={16}/>} />
                     </div>
                 </div>
-            </motion.div>
-
-            {/* الإحصائيات */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatBox icon={<IconFlame size={24}/>} value={streak} label="Day Streak" color="text-orange-500" />
-                <StatBox icon={<IconTarget size={24}/>} value={cards.length} label="Total Words" color="text-blue-500" />
-                <StatBox icon={<IconTrophy size={24}/>} value={masteredWords} label="Mastered" color="text-yellow-500" />
-                <StatBox icon={<IconClock size={24}/>} value={`${hoursPlayed}h`} label="Training Time" color="text-emerald-500" />
             </div>
 
-            {/* الإنجازات */}
-            <div className="pt-6">
-                <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-                    <IconMedal className="text-purple-500" /> MISSION BADGES
-                </h3>
+            {/* 2. Neural Scan (تحليل الأداء) */}
+            <div className="lg:col-span-4 bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 flex flex-col items-center justify-center relative min-h-[300px]">
+                <div className={`flex items-center gap-2 absolute top-6 text-cyan-500/50 ${dir === 'rtl' ? 'right-6' : 'left-6'}`}>
+                    <IconChartRadar size={18}/>
+                    <span className="text-[10px] font-black tracking-widest uppercase">{t('profile_metrics')}</span>
+                </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {RANKS.map((r, i) => {
-                        const isUnlocked = xp >= r.min;
-                        if (i === 0) return null;
-                        return (
-                            <div key={i} className={`flex items-center gap-4 p-4 rounded-xl border transition-all duration-500 ${isUnlocked ? 'bg-black/30 border-white/10' : 'bg-black/10 border-white/5 opacity-50 grayscale'}`}>
-                                <div className={`w-12 h-12 rounded-full flex items-center justify-center border ${isUnlocked ? `bg-white/5 ${r.color.replace('text-', 'border-')}` : 'border-white/10 bg-white/5'}`}>
-                                    {isUnlocked ? r.icon : <IconLock size={18} />}
-                                </div>
-                                <div>
-                                    <h4 className={`font-bold ${isUnlocked ? 'text-white' : 'text-white/30'}`}>{r.name}</h4>
-                                    <p className="text-xs text-white/30">Required: {r.min} XP</p>
-                                </div>
-                            </div>
-                        );
-                    })}
+                <SkillRadar stats={analytics} />
+                
+                <div className="mt-4 text-center">
+                    <div className="text-3xl font-black text-white">{analytics.masteryRate}%</div>
+                    <div className="text-[10px] text-white/30 uppercase tracking-widest">{t('profile_efficiency')}</div>
                 </div>
             </div>
         </div>
+
+        {/* 3. Badges Grid (شبكة الأوسمة) */}
+        <div className="mt-8">
+            <div className={`flex items-center gap-3 mb-6 px-2 ${dir === 'rtl' ? 'flex-row-reverse' : 'flex-row'}`}>
+                <IconMedal className="text-white/20" size={24} />
+                <h3 className="text-xl font-black text-white tracking-wide">{t('profile_badges')}</h3>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {RANKS.map((r, i) => {
+                    if (i === 0) return null; // تخطي رتبة المبتدئ
+                    const isUnlocked = analytics.xp >= r.min;
+                    
+                    return (
+                        <div key={i} className={`p-4 rounded-2xl border transition-all ${
+                            isUnlocked 
+                            ? 'bg-[#111] border-white/10 hover:border-white/20' 
+                            : 'bg-black border-white/5 opacity-40'
+                        }`}>
+                            <div className="flex items-center gap-4">
+                                {/* أيقونة الرتبة */}
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isUnlocked ? r.bg + '/20 ' + r.color : 'bg-white/5 text-white/20'}`}>
+                                    {isUnlocked ? r.icon : <IconLock size={18}/>}
+                                </div>
+                                {/* تفاصيل الرتبة */}
+                                <div>
+                                    <h4 className={`text-sm font-bold ${isUnlocked ? 'text-white' : 'text-white/30'}`}>{r.name}</h4>
+                                    <p className="text-[10px] font-mono text-white/30">
+                                        {isUnlocked ? t('profile_unlocked') : `${t('profile_requires')} ${r.min} XP`}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            {/* شريط صغير أسفل البطاقة للمفتوحين */}
+                            {isUnlocked && (
+                                <div className="mt-3 h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                                    <div className={`h-full ${r.bg} w-full`}></div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+
     </div>
   );
 }
 
-const StatBox = ({ icon, value, label, color }) => (
-    <div className="bg-black/20 border border-white/5 p-6 rounded-2xl flex flex-col items-center justify-center text-center hover:bg-black/30 transition-colors backdrop-blur-sm">
-        <div className={`${color} mb-3`}>{icon}</div>
-        <div className="text-3xl font-black text-white mb-1">{value}</div>
-        <div className="text-[10px] text-white/30 uppercase tracking-widest font-bold">{label}</div>
+// --- مكون مساعد للإحصائيات الصغيرة ---
+const StatItem = ({ label, value, color, icon }) => (
+    <div className="text-center">
+        <div className="flex items-center justify-center gap-1 text-[10px] text-white/30 font-bold uppercase mb-1">
+            {icon} {label}
+        </div>
+        <div className={`text-xl md:text-2xl font-black ${color} font-mono`}>{value}</div>
     </div>
 );
 
@@ -5031,80 +5280,185 @@ export default function RankSystem({ xp }) {
 FILE: src\components\features\study\CategorySelect.jsx
 ------------------------------------------------------------------
 "use client";
-import React from "react";
-import { motion } from "framer-motion";
-import { IconCpu, IconServer, IconArrowRight, IconDatabase } from "@tabler/icons-react";
+import React, { useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  IconCpu, IconSearch, IconDatabase, IconBolt, 
+  IconArrowRight, IconVersions, IconHash
+} from "@tabler/icons-react";
+import { useSettings } from "@/context/SettingsContext";
+import { useLanguage } from "@/hooks/useLanguage"; // استدعاء الهوك
 
-// إضافة قيمة افتراضية لـ categories لتجنب الانهيار
-export function CategorySelect({ categories = [], activeCategory, onSelect }) {
-  
-  // حماية إضافية في حالة عدم وجود بيانات
-  const safeCategories = Array.isArray(categories) ? categories : [];
+// ... (TechCorners, SegmentedProgress, DataModuleCard components remain the same, just paste them here)
+// تأكد من نسخ المكونات الفرعية TechCorners و SegmentedProgress و DataModuleCard من الإجابة السابقة
+// سأضع هنا التعديل على المكون الرئيسي CategorySelect فقط للاختصار، لكن يجب أن يكون الملف كاملاً
+
+// ... (افترض وجود المكونات الفرعية هنا) ...
+const TechCorners = ({ color }) => (
+  <>
+    <div className={`absolute top-0 left-0 w-3 h-3 border-l-2 border-t-2 ${color} rounded-tl-sm`}></div>
+    <div className={`absolute top-0 right-0 w-3 h-3 border-r-2 border-t-2 ${color} rounded-tr-sm`}></div>
+    <div className={`absolute bottom-0 left-0 w-3 h-3 border-l-2 border-b-2 ${color} rounded-bl-sm`}></div>
+    <div className={`absolute bottom-0 right-0 w-3 h-3 border-r-2 border-b-2 ${color} rounded-br-sm`}></div>
+  </>
+);
+
+const SegmentedProgress = ({ percent, color, emptyColor }) => {
+  const segments = 10;
+  const activeSegments = Math.ceil((percent / 100) * segments);
+  return (
+    <div className="flex gap-1 h-1.5 w-full mt-4">
+      {[...Array(segments)].map((_, i) => (
+        <div key={i} className={`flex-1 rounded-sm ${i < activeSegments ? color : emptyColor}`}/>
+      ))}
+    </div>
+  );
+};
+
+const DataModuleCard = React.memo(({ category, stats, onClick, index, isDark }) => {
+  const percentage = stats.total > 0 ? Math.round((stats.mastered / stats.total) * 100) : 0;
+  const isMastered = percentage === 100;
+  const theme = isMastered 
+    ? { text: "text-emerald-500", bg: "bg-emerald-500", border: isDark ? "border-emerald-500/30" : "border-emerald-500/50", glow: "group-hover:shadow-emerald-900/20" }
+    : percentage > 50 
+    ? { text: "text-cyan-500", bg: "bg-cyan-500", border: isDark ? "border-cyan-500/30" : "border-cyan-500/50", glow: "group-hover:shadow-cyan-900/20" }
+    : { text: "text-violet-500", bg: "bg-violet-500", border: isDark ? "border-violet-500/30" : "border-violet-500/50", glow: "group-hover:shadow-violet-900/20" };
+
+  const cardBg = isDark ? "bg-[#09090b]" : "bg-white/80 backdrop-blur-md shadow-sm";
+  const cardBorder = isDark ? "border-white/5" : "border-black/5";
+  const textColor = isDark ? "text-white" : "text-gray-800";
+  const subTextColor = isDark ? "text-white/40" : "text-gray-500";
+  const emptyBarColor = isDark ? "bg-white/5" : "bg-black/10";
 
   return (
-    <div className="w-full h-screen flex flex-col font-sans overflow-hidden bg-transparent relative">
+    <motion.button
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.2, delay: index * 0.03 }}
+      onClick={onClick}
+      className={`group relative w-full h-[160px] text-left p-5 ${cardBg} ${cardBorder} border rounded-xl hover:border-opacity-50 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${theme.glow} overflow-hidden`}
+    >
+      <TechCorners color={theme.border} />
+      <div className={`absolute top-0 right-0 w-32 h-32 ${theme.bg} opacity-5 blur-[60px] group-hover:opacity-15 transition-opacity duration-500`}></div>
+      <div className="relative z-10 flex flex-col h-full justify-between">
+        <div className="flex justify-between items-start">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${isDark ? 'bg-white/5' : 'bg-black/5'} ${theme.text}`}><IconVersions size={22} /></div>
+            <div>
+              <span className={`block text-[9px] ${subTextColor} font-mono tracking-widest uppercase`}>SEQ_ID: {index + 1}</span>
+              <h3 className={`text-lg font-bold ${textColor} leading-none mt-1`}>{category}</h3>
+            </div>
+          </div>
+          <div className={`text-xs font-mono font-bold px-2 py-1 rounded ${isDark ? 'bg-white/5' : 'bg-black/5'} ${theme.text}`}>{percentage}%</div>
+        </div>
+        <div>
+          <div className={`flex justify-between text-[10px] ${subTextColor} font-mono uppercase mb-1`}>
+            <span className="flex items-center gap-1"><IconDatabase size={10}/> {stats.total}</span>
+            <span>{isMastered ? "COMPLETED" : "IN PROGRESS"}</span>
+          </div>
+          <SegmentedProgress percent={percentage} color={theme.bg} emptyColor={emptyBarColor} />
+        </div>
+        <div className={`absolute bottom-0 right-0 w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0`}>
+            <IconArrowRight size={14} className={theme.text} />
+        </div>
+      </div>
+    </motion.button>
+  );
+});
+DataModuleCard.displayName = "DataModuleCard";
+
+export function CategorySelect({ categories = [], cards = [], activeCategory, onSelect }) {
+  const [search, setSearch] = useState("");
+  const { isDark } = useSettings();
+  const { t, dir } = useLanguage(); // استخدام الترجمة
+
+  const filteredCategories = useMemo(() => {
+    const safeCategories = Array.isArray(categories) ? categories : [];
+    const withStats = safeCategories.map(cat => {
+      const catCards = cards.filter(c => c.category === cat);
+      return {
+        name: cat,
+        total: catCards.length,
+        mastered: catCards.filter(c => c.level >= 5).length,
+      };
+    });
+    return withStats.filter(item => 
+      item.name.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [categories, cards, search]);
+
+  const titleColor = isDark ? "text-white" : "text-emerald-600";
+  const subtitleColor = isDark ? "text-white/20" : "text-emerald-600/50";
+  const searchBg = isDark ? "bg-[#09090b]" : "bg-white border-black/10 shadow-sm";
+  const searchBorder = isDark ? "border-white/10" : "border-black/5";
+  const searchPlaceholder = isDark ? "placeholder-white/20" : "placeholder-gray-400";
+  const searchInputColor = isDark ? "text-white" : "text-gray-900";
+  const emptyStateColor = isDark ? "text-white/30" : "text-gray-400";
+
+  return (
+    <div className="w-full h-full flex flex-col font-sans relative px-4 md:px-8 pt-4 pb-0" dir={dir}>
       
-      {/* HEADER FIXED */}
-      <div className="shrink-0 p-6 pt-10 pb-4 z-10">
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
-            <div className="flex justify-center mb-4">
-                <div className="p-3 bg-cyan-900/20 border border-cyan-500/30 rounded-xl">
-                    <IconServer size={32} className="text-cyan-400 animate-pulse"/>
+      <div className="shrink-0 mb-8 space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-end gap-6">
+            <motion.div 
+                initial={{opacity:0, x: dir === 'rtl' ? 20 : -20}} 
+                animate={{opacity:1, x:0}} 
+                className="relative"
+            >
+                <div className={`absolute ${dir === 'rtl' ? '-right-6' : '-left-6'} top-2 w-1 h-12 bg-cyan-500 hidden md:block`}></div>
+                
+                <h2 className={`text-5xl md:text-6xl font-black tracking-tighter leading-none ${titleColor}`}>
+                    {t('modules_title_1')} <span className={subtitleColor}>{t('modules_title_2')}</span>
+                </h2>
+                
+                <div className="flex items-center gap-3 mt-2 text-cyan-500/60 font-mono text-xs">
+                    <IconCpu size={14}/>
+                    <span>{t('modules_system_ready')}</span>
+                    <span className="w-1 h-1 bg-cyan-500 rounded-full"></span>
+                    <span>{filteredCategories.length} {t('modules_available')}</span>
+                </div>
+            </motion.div>
+
+            <div className="w-full md:w-80 group">
+                <div className={`relative flex items-center ${searchBg} ${searchBorder} border-b-2 group-focus-within:border-cyan-500 transition-colors py-3 px-2 rounded-t-lg`}>
+                    <IconSearch size={20} className={`${isDark ? 'text-white/30' : 'text-gray-400'} ${dir === 'rtl' ? 'ml-3' : 'mr-3'} group-focus-within:text-cyan-500 transition-colors`}/>
+                    <input 
+                        type="text"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder={t('modules_search_placeholder')}
+                        className={`w-full bg-transparent border-none outline-none ${searchInputColor} text-sm font-mono ${searchPlaceholder} uppercase`}
+                    />
+                    <div className={`text-[10px] ${isDark ? 'text-white/20 bg-white/5' : 'text-gray-500 bg-gray-200'} px-1.5 py-0.5 rounded ${dir === 'rtl' ? 'mr-2' : 'ml-2'}`}>{t('modules_esc')}</div>
                 </div>
             </div>
-            <h2 className="text-3xl md:text-5xl font-black text-white mb-2 tracking-tighter">
-              NEURAL <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">MODULES</span>
-            </h2>
-            <p className="text-white/30 tracking-[0.3em] text-[10px] uppercase font-bold">Select Data Vector</p>
-        </motion.div>
+        </div>
       </div>
 
-      {/* SCROLLABLE AREA */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-32">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-5xl mx-auto">
-          {safeCategories.length === 0 ? (
-              <div className="text-center text-white/40 col-span-2 py-10">NO DATA MODULES FOUND</div>
-          ) : (
-              safeCategories.map((cat, i) => {
-                const isActive = activeCategory === cat;
-                return (
-                  <motion.button
-                    key={cat}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    onClick={() => onSelect(cat)}
-                    className={`group relative h-24 w-full rounded-xl border flex items-center justify-between px-6 transition-all duration-200 overflow-hidden ${
-                      isActive 
-                      ? 'bg-cyan-950/40 border-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.15)]' 
-                      : 'bg-black/30 border-white/5 hover:border-cyan-500/30 hover:bg-white/5'
-                    }`}
-                  >
-                    <div className="flex items-center gap-5 z-10">
-                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center border transition-colors ${isActive ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-black text-white/20 border-white/10 group-hover:text-cyan-400'}`}>
-                            {isActive ? <IconDatabase size={24} /> : <IconCpu size={24} />}
-                        </div>
-                        
-                        <div className="text-left">
-                            <h3 className={`text-lg font-bold font-mono uppercase tracking-tight ${isActive ? 'text-white' : 'text-white/60 group-hover:text-white'}`}>
-                                {cat}
-                            </h3>
-                            <div className="flex items-center gap-2 text-[10px] text-white/20 font-mono mt-1">
-                                <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-gray-700'}`}></span>
-                                <span>{isActive ? 'CONNECTED' : 'STANDBY'}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className={`z-10 transition-transform duration-300 ${isActive ? 'translate-x-0 text-cyan-400' : 'translate-x-10 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 text-white/50'}`}>
-                        <IconArrowRight size={24} />
-                    </div>
-                  </motion.button>
-                );
-              })
-          )}
-          <div className="h-20 w-full"></div>
-        </div>
+      <div className={`flex-1 overflow-y-auto custom-scrollbar pb-32 ${dir === 'rtl' ? '-ml-3 pl-3' : '-mr-3 pr-3'}`}>
+        {filteredCategories.length === 0 ? (
+            <div className="h-full w-full flex flex-col items-center justify-center opacity-50">
+                <IconHash size={64} className={`mb-4 ${isDark ? 'text-white/20' : 'text-gray-300'}`}/>
+                <p className={`font-mono text-sm tracking-widest ${emptyStateColor}`}>{t('modules_no_data')}</p>
+            </div>
+        ) : (
+            <motion.div layout className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
+                <AnimatePresence mode="popLayout">
+                    {filteredCategories.map((cat, index) => (
+                        <DataModuleCard 
+                            key={cat.name} 
+                            category={cat.name} 
+                            stats={{ total: cat.total, mastered: cat.mastered }}
+                            index={index}
+                            onClick={() => onSelect(cat.name)}
+                            isDark={isDark}
+                        />
+                    ))}
+                </AnimatePresence>
+            </motion.div>
+        )}
       </div>
     </div>
   );
@@ -5472,13 +5826,19 @@ FILE: src\components\layout\CyberLayout.jsx
 "use client";
 import React from 'react';
 import { CosmicBackground } from '../ui/CosmicBackground';
+import GlobalLiveManager from '../features/live/GlobalLiveManager';
 
 export default function CyberLayout({ children }) {
   return (
     <div className="relative h-screen w-full overflow-hidden font-sans text-[var(--text-main)] bg-transparent">
       
+      {/* الخلفية */}
       <CosmicBackground />
       
+      {/* مدير البث المباشر (يبقى حياً دائماً) */}
+      <GlobalLiveManager />
+      
+      {/* المحتوى الرئيسي */}
       <main className="relative z-10 w-full h-full flex flex-col pt-20 md:pt-24 pb-32 md:pb-10 px-3 md:px-6 overflow-y-auto custom-scrollbar scroll-smooth">
           <div className="w-full max-w-7xl mx-auto h-full flex flex-col">
             {children}
@@ -6108,222 +6468,482 @@ export default function DailyReward({ user, onClose }) {
 FILE: src\components\ui\DarkVeil.css
 ------------------------------------------------------------------
 .darkveil-container {
+    width: 100%;
+    height: 100%;
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
     z-index: -1;
-    pointer-events: none;
+    overflow: hidden;
+    background-color: #000;
 }
 
-.darkveil-canvas {
+.darkveil-container canvas {
     display: block;
-    width: 100%;
-    height: 100%;
 }
 
 ------------------------------------------------------------------
 FILE: src\components\ui\DarkVeil.jsx
 ------------------------------------------------------------------
 "use client";
-import React, { useRef, useEffect } from 'react';
-import { Renderer, Program, Mesh, Triangle, Vec2 } from 'ogl';
-import { useSettings } from '@/context/SettingsContext';
+import React, { useEffect, useRef, useMemo } from 'react';
+import {
+  Scene,
+  OrthographicCamera,
+  WebGLRenderer,
+  PlaneGeometry,
+  Mesh,
+  ShaderMaterial,
+  Vector3,
+  Vector2,
+  Clock
+} from 'three';
+import { useSettings } from '@/context/SettingsContext'; // 1. استيراد هوك الإعدادات
 import './DarkVeil.css';
 
-const vertex = `
-attribute vec2 position;
-void main() {
-    gl_Position = vec4(position, 0.0, 1.0);
-}
-`;
-
-const fragment = `
-#ifdef GL_ES
+const vertexShader = `
 precision highp float;
-#endif
-
-uniform vec2 uResolution;
-uniform float uTime;
-uniform float uHueShift;
-uniform float uNoise;
-uniform float uScan;
-uniform float uScanFreq;
-uniform float uWarp;
-// متغير للتحقق من الوضع (0 = ليلي، 1 = نهاري)
-uniform float uIsLight; 
-
-#define iTime uTime
-#define iResolution uResolution
-
-vec4 buf[8];
-
-float rand(vec2 c){
-    return fract(sin(dot(c,vec2(12.9898,78.233)))*43758.5453);
-}
-
-mat3 rgb2yiq = mat3(0.299, 0.587, 0.114, 0.596, -0.274, -0.322, 0.211, -0.523, 0.312);
-mat3 yiq2rgb = mat3(1.0, 0.956, 0.621, 1.0, -0.272, -0.647, 1.0, -1.106, 1.703);
-
-vec3 hueShiftRGB(vec3 col, float deg){
-    vec3 yiq = rgb2yiq * col;
-    float rad = radians(deg);
-    float cosh = cos(rad);
-    float sinh = sin(rad);
-    vec3 yiqShift = vec3(yiq.x, yiq.y*cosh - yiq.z*sinh, yiq.y*sinh + yiq.z*cosh);
-    return clamp(yiq2rgb * yiqShift, 0.0, 1.0);
-}
-
-vec4 sigmoid(vec4 x){
-    return 1.0 / (1.0 + exp(-x));
-}
-
-vec4 cppn_fn(vec2 coordinate, float in0, float in1, float in2){
-    buf[6] = vec4(coordinate.x, coordinate.y, 0.3948333106474662 + in0, 0.36 + in1);
-    // التصحيح الرياضي: إضافة علامة الضرب *
-    buf[7] = vec4(0.14 + in2, sqrt(coordinate.x * coordinate.x + coordinate.y * coordinate.y), 0.0, 0.0);
-    
-    buf[0] = mat4(vec4(6.5404263,-3.6126034,0.7590882,-1.13613),vec4(2.4582713,3.1660357,1.2219609,0.06276096),vec4(-5.478085,-6.159632,1.8701609,-4.7742867),vec4(6.039214,-5.542865,-0.90925294,3.251348)) * buf[6] + 
-             mat4(vec4(0.8473259,-5.722911,3.975766,1.6522468),vec4(-0.24321538,0.5839259,-1.7661959,-5.350116),vec4(0.,0.,0.,0.),vec4(0.,0.,0.,0.)) * buf[7] + 
-             vec4(0.21808943,1.1243913,-1.7969975,5.0294676);
-             
-    buf[1] = mat4(vec4(-3.3522482,-6.0612736,0.55641043,-4.4719114),vec4(0.8631464,1.7432913,5.643898,1.6106541),vec4(2.4941394,-3.5012043,1.7184316,6.357333),vec4(3.310376,8.209261,1.1355612,-1.165539)) * buf[6] + 
-             mat4(vec4(5.24046,-13.034365,0.009859298,15.870829),vec4(2.987511,3.129433,-0.89023495,-1.6822904),vec4(0.,0.,0.,0.),vec4(0.,0.,0.,0.)) * buf[7] + 
-             vec4(-5.9457836,-6.573602,-0.8812491,1.5436668);
-             
-    buf[0] = sigmoid(buf[0]);
-    buf[1] = sigmoid(buf[1]);
-    
-    // معادلة مبسطة لضمان الأداء
-    buf[4] = mat4(vec4(5.2,-7.1,2.7,2.6), vec4(-5.6,-25.3,4.0,0.4), vec4(-10.5,24.2,21.1,37.5), vec4(4.3,-1.9,2.3,-1.3)) * buf[0] + 
-             vec4(-7.6, 15.9, 1.3, -1.6);
-             
-    buf[4] = sigmoid(buf[4]);
-    
-    return vec4(buf[4].x, buf[4].y, buf[4].z, 1.0);
-}
-
-void mainImage(out vec4 fragColor, in vec2 fragCoord){
-    vec2 uv = fragCoord / uResolution.xy * 2.0 - 1.0;
-    uv.y *= -1.0;
-    
-    // Warp effect
-    uv += uWarp * vec2(sin(uv.y * 6.283 + uTime * 0.5), cos(uv.x * 6.283 + uTime * 0.5)) * 0.05;
-    
-    fragColor = cppn_fn(uv, 0.1 * sin(0.3 * uTime), 0.1 * sin(0.69 * uTime), 0.1 * sin(0.44 * uTime));
-}
-
-void main(){
-    vec4 col;
-    mainImage(col, gl_FragCoord.xy);
-    
-    // تطبيق التأثيرات
-    col.rgb = hueShiftRGB(col.rgb, uHueShift);
-    
-    float scanline_val = sin(gl_FragCoord.y * uScanFreq) * 0.5 + 0.5;
-    col.rgb *= 1.0 - (scanline_val * scanline_val) * uScan;
-    
-    col.rgb += (rand(gl_FragCoord.xy + uTime) - 0.5) * uNoise;
-    
-    // === المنطق السحري للوضع النهاري ===
-    // إذا كان الوضع نهاري، نقلب الألوان ليصبح الأساس أبيض
-    if (uIsLight > 0.5) {
-        col.rgb = 1.0 - col.rgb; 
-    }
-    
-    gl_FragColor = vec4(clamp(col.rgb, 0.0, 1.0), 1.0);
+void main() {
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }
 `;
 
-export default function DarkVeil({
-  hueShift = 20,
-  noiseIntensity = 0.05,
-  scanlineIntensity = 0.1,
-  speed = 0.3,
-  scanlineFrequency = 0.5,
-  warpAmount = 0.5,
-  resolutionScale = 0.8
-}) {
-  const ref = useRef(null);
-  const { isDark } = useSettings(); // استدعاء حالة الثيم
+const fragmentShader = `
+precision highp float;
+
+uniform float iTime;
+uniform vec3  iResolution;
+uniform float animationSpeed;
+uniform float uIsLight; // متغير جديد للوضع النهاري
+
+uniform bool enableTop;
+uniform bool enableMiddle;
+uniform bool enableBottom;
+
+uniform int topLineCount;
+uniform int middleLineCount;
+uniform int bottomLineCount;
+
+uniform float topLineDistance;
+uniform float middleLineDistance;
+uniform float bottomLineDistance;
+
+uniform vec3 topWavePosition;
+uniform vec3 middleWavePosition;
+uniform vec3 bottomWavePosition;
+
+uniform vec2 iMouse;
+uniform bool interactive;
+uniform float bendRadius;
+uniform float bendStrength;
+uniform float bendInfluence;
+
+uniform bool parallax;
+uniform float parallaxStrength;
+uniform vec2 parallaxOffset;
+
+uniform vec3 lineGradient[8];
+uniform int lineGradientCount;
+
+const vec3 BLACK = vec3(0.0);
+const vec3 PINK  = vec3(233.0, 71.0, 245.0) / 255.0;
+const vec3 BLUE  = vec3(47.0,  75.0, 162.0) / 255.0;
+
+mat2 rotate(float r) {
+  return mat2(cos(r), sin(r), -sin(r), cos(r));
+}
+
+vec3 background_color(vec2 uv) {
+  vec3 col = vec3(0.0);
+  float y = sin(uv.x - 0.2) * 0.3 - 0.1;
+  float m = uv.y - y;
+  
+  // الألوان الأساسية للموجات الخلفية
+  col += mix(BLUE, BLACK, smoothstep(0.0, 1.0, abs(m)));
+  col += mix(PINK, BLACK, smoothstep(0.0, 1.0, abs(m - 0.8)));
+  
+  return col * 0.5;
+}
+
+vec3 getLineColor(float t, vec3 baseColor) {
+  if (lineGradientCount <= 0) {
+    return baseColor;
+  }
+  vec3 gradientColor;
+  if (lineGradientCount == 1) {
+    gradientColor = lineGradient[0];
+  } else {
+    float clampedT = clamp(t, 0.0, 0.9999);
+    float scaled = clampedT * float(lineGradientCount - 1);
+    int idx = int(floor(scaled));
+    float f = fract(scaled);
+    int idx2 = min(idx + 1, lineGradientCount - 1);
+    vec3 c1 = lineGradient[idx];
+    vec3 c2 = lineGradient[idx2];
+    gradientColor = mix(c1, c2, f);
+  }
+  return gradientColor * 0.5;
+}
+
+float wave(vec2 uv, float offset, vec2 screenUv, vec2 mouseUv, bool shouldBend) {
+  float time = iTime * animationSpeed;
+  float x_offset   = offset;
+  float x_movement = time * 0.1;
+  float amp        = sin(offset + time * 0.2) * 0.3;
+  float y          = sin(uv.x + x_offset + x_movement) * amp;
+
+  if (shouldBend) {
+    vec2 d = screenUv - mouseUv;
+    float influence = exp(-dot(d, d) * bendRadius);
+    float bendOffset = (mouseUv.y - screenUv.y) * influence * bendStrength * bendInfluence;
+    y += bendOffset;
+  }
+
+  float m = uv.y - y;
+  return 0.0175 / max(abs(m) + 0.01, 1e-3) + 0.01;
+}
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+  vec2 baseUv = (2.0 * fragCoord - iResolution.xy) / iResolution.y;
+  baseUv.y *= -1.0;
+  
+  if (parallax) {
+    baseUv += parallaxOffset;
+  }
+
+  vec3 col = vec3(0.0);
+  vec3 b = lineGradientCount > 0 ? vec3(0.0) : background_color(baseUv);
+
+  vec2 mouseUv = vec2(0.0);
+  if (interactive) {
+    mouseUv = (2.0 * iMouse - iResolution.xy) / iResolution.y;
+    mouseUv.y *= -1.0;
+  }
+  
+  if (enableBottom) {
+    for (int i = 0; i < bottomLineCount; ++i) {
+      float fi = float(i);
+      float t = fi / max(float(bottomLineCount - 1), 1.0);
+      vec3 lineCol = getLineColor(t, b);
+      float angle = bottomWavePosition.z * log(length(baseUv) + 1.0);
+      vec2 ruv = baseUv * rotate(angle);
+      col += lineCol * wave(
+        ruv + vec2(bottomLineDistance * fi + bottomWavePosition.x, bottomWavePosition.y),
+        1.5 + 0.2 * fi,
+        baseUv,
+        mouseUv,
+        interactive
+      ) * 0.2;
+    }
+  }
+
+  if (enableMiddle) {
+    for (int i = 0; i < middleLineCount; ++i) {
+      float fi = float(i);
+      float t = fi / max(float(middleLineCount - 1), 1.0);
+      vec3 lineCol = getLineColor(t, b);
+      float angle = middleWavePosition.z * log(length(baseUv) + 1.0);
+      vec2 ruv = baseUv * rotate(angle);
+      col += lineCol * wave(
+        ruv + vec2(middleLineDistance * fi + middleWavePosition.x, middleWavePosition.y),
+        2.0 + 0.15 * fi,
+        baseUv,
+        mouseUv,
+        interactive
+      );
+    }
+  }
+
+  if (enableTop) {
+    for (int i = 0; i < topLineCount; ++i) {
+      float fi = float(i);
+      float t = fi / max(float(topLineCount - 1), 1.0);
+      vec3 lineCol = getLineColor(t, b);
+      float angle = topWavePosition.z * log(length(baseUv) + 1.0);
+      vec2 ruv = baseUv * rotate(angle);
+      ruv.x *= -1.0;
+      col += lineCol * wave(
+        ruv + vec2(topLineDistance * fi + topWavePosition.x, topWavePosition.y),
+        1.0 + 0.2 * fi,
+        baseUv,
+        mouseUv,
+        interactive
+      ) * 0.1;
+    }
+  }
+
+  // === السحر هنا ===
+  // إذا كان الوضع نهاري (uIsLight > 0.5) نقوم بقلب الألوان
+  // الأسود (0) يصبح أبيض (1)، والألوان المضيئة تصبح داكنة
+  if (uIsLight > 0.5) {
+      col = vec3(0.98) - col; // 0.98 ليكون أبيض ناعم وليس ساطع جداً
+  }
+
+  fragColor = vec4(col, 1.0);
+}
+
+void main() {
+  vec4 color = vec4(0.0);
+  mainImage(color, gl_FragCoord.xy);
+  gl_FragColor = color;
+}
+`;
+
+const MAX_GRADIENT_STOPS = 8;
+
+function hexToVec3(hex) {
+  let value = hex.trim();
+  if (value.startsWith('#')) {
+    value = value.slice(1);
+  }
+  let r = 255;
+  let g = 255;
+  let b = 255;
+  if (value.length === 3) {
+    r = parseInt(value[0] + value[0], 16);
+    g = parseInt(value[1] + value[1], 16);
+    b = parseInt(value[2] + value[2], 16);
+  } else if (value.length === 6) {
+    r = parseInt(value.slice(0, 2), 16);
+    g = parseInt(value.slice(2, 4), 16);
+    b = parseInt(value.slice(4, 6), 16);
+  }
+  return new Vector3(r / 255, g / 255, b / 255);
+}
+
+const DarkVeil = ({
+  linesGradient = [], 
+  enabledWaves = ['top', 'middle', 'bottom'],
+  lineCount = [6],
+  lineDistance = [5],
+  topWavePosition,
+  middleWavePosition,
+  bottomWavePosition = { x: 2.0, y: -0.7, rotate: -1 },
+  animationSpeed = 1,
+  interactive = true,
+  bendRadius = 5.0,
+  bendStrength = -0.5,
+  mouseDamping = 0.05,
+  parallax = true,
+  parallaxStrength = 0.2
+}) => {
+  const containerRef = useRef(null);
+  const { isDark } = useSettings(); // 2. الحصول على حالة الثيم
+
+  const targetMouseRef = useRef(new Vector2(-1000, -1000));
+  const currentMouseRef = useRef(new Vector2(-1000, -1000));
+  const targetInfluenceRef = useRef(0);
+  const currentInfluenceRef = useRef(0);
+  const targetParallaxRef = useRef(new Vector2(0, 0));
+  const currentParallaxRef = useRef(new Vector2(0, 0));
+
+  // useMemo
+  const topLineCount = useMemo(() => enabledWaves.includes('top') ? (typeof lineCount === 'number' ? lineCount : lineCount[enabledWaves.indexOf('top')] ?? 6) : 0, [enabledWaves, lineCount]);
+  const middleLineCount = useMemo(() => enabledWaves.includes('middle') ? (typeof lineCount === 'number' ? lineCount : lineCount[enabledWaves.indexOf('middle')] ?? 6) : 0, [enabledWaves, lineCount]);
+  const bottomLineCount = useMemo(() => enabledWaves.includes('bottom') ? (typeof lineCount === 'number' ? lineCount : lineCount[enabledWaves.indexOf('bottom')] ?? 6) : 0, [enabledWaves, lineCount]);
+
+  const topLineDistance = useMemo(() => enabledWaves.includes('top') ? (typeof lineDistance === 'number' ? lineDistance : lineDistance[enabledWaves.indexOf('top')] ?? 0.1) * 0.01 : 0.01, [enabledWaves, lineDistance]);
+  const middleLineDistance = useMemo(() => enabledWaves.includes('middle') ? (typeof lineDistance === 'number' ? lineDistance : lineDistance[enabledWaves.indexOf('middle')] ?? 0.1) * 0.01 : 0.01, [enabledWaves, lineDistance]);
+  const bottomLineDistance = useMemo(() => enabledWaves.includes('bottom') ? (typeof lineDistance === 'number' ? lineDistance : lineDistance[enabledWaves.indexOf('bottom')] ?? 0.1) * 0.01 : 0.01, [enabledWaves, lineDistance]);
 
   useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas) return;
+    if (!containerRef.current) return;
+
+    while (containerRef.current.firstChild) {
+      containerRef.current.removeChild(containerRef.current.firstChild);
+    }
+
+    const scene = new Scene();
+    const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    camera.position.z = 1;
+
+    const renderer = new WebGLRenderer({ 
+        antialias: false,
+        alpha: false,
+        powerPreference: "high-performance"
+    });
     
-    const parent = canvas.parentElement;
+    renderer.setPixelRatio(1); 
+    
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
+    containerRef.current.appendChild(renderer.domElement);
 
-    const renderer = new Renderer({
-      dpr: Math.min(window.devicePixelRatio, 2),
-      alpha: false, 
-      canvas
+    const uniforms = {
+      iTime: { value: 0 },
+      iResolution: { value: new Vector3(1, 1, 1) },
+      animationSpeed: { value: animationSpeed },
+      // 3. تمرير حالة الثيم إلى الشيدر (0 لليلي، 1 للنهاري)
+      uIsLight: { value: isDark ? 0.0 : 1.0 }, 
+
+      enableTop: { value: enabledWaves.includes('top') },
+      enableMiddle: { value: enabledWaves.includes('middle') },
+      enableBottom: { value: enabledWaves.includes('bottom') },
+      topLineCount: { value: topLineCount },
+      middleLineCount: { value: middleLineCount },
+      bottomLineCount: { value: bottomLineCount },
+      topLineDistance: { value: topLineDistance },
+      middleLineDistance: { value: middleLineDistance },
+      bottomLineDistance: { value: bottomLineDistance },
+      topWavePosition: {
+        value: new Vector3(topWavePosition?.x ?? 10.0, topWavePosition?.y ?? 0.5, topWavePosition?.rotate ?? -0.4)
+      },
+      middleWavePosition: {
+        value: new Vector3(
+          middleWavePosition?.x ?? 5.0,
+          middleWavePosition?.y ?? 0.0,
+          middleWavePosition?.rotate ?? 0.2
+        )
+      },
+      bottomWavePosition: {
+        value: new Vector3(
+          bottomWavePosition?.x ?? 2.0,
+          bottomWavePosition?.y ?? -0.7,
+          bottomWavePosition?.rotate ?? 0.4
+        )
+      },
+      iMouse: { value: new Vector2(-1000, -1000) },
+      interactive: { value: interactive },
+      bendRadius: { value: bendRadius },
+      bendStrength: { value: bendStrength },
+      bendInfluence: { value: 0 },
+      parallax: { value: parallax },
+      parallaxStrength: { value: parallaxStrength },
+      parallaxOffset: { value: new Vector2(0, 0) },
+      lineGradient: {
+        value: Array.from({ length: MAX_GRADIENT_STOPS }, () => new Vector3(1, 1, 1))
+      },
+      lineGradientCount: { value: 0 }
+    };
+
+    if (linesGradient && linesGradient.length > 0) {
+      const stops = linesGradient.slice(0, MAX_GRADIENT_STOPS);
+      uniforms.lineGradientCount.value = stops.length;
+      stops.forEach((hex, i) => {
+        const color = hexToVec3(hex);
+        uniforms.lineGradient.value[i].set(color.x, color.y, color.z);
+      });
+    }
+
+    const material = new ShaderMaterial({
+      uniforms,
+      vertexShader,
+      fragmentShader,
+      depthWrite: false,
+      depthTest: false
     });
 
-    const gl = renderer.gl;
-    const geometry = new Triangle(gl);
+    const geometry = new PlaneGeometry(2, 2);
+    const mesh = new Mesh(geometry, material);
+    scene.add(mesh);
 
-    const program = new Program(gl, {
-      vertex,
-      fragment,
-      uniforms: {
-        uTime: { value: 0 },
-        uResolution: { value: new Vec2() },
-        uHueShift: { value: hueShift },
-        uNoise: { value: noiseIntensity },
-        uScan: { value: scanlineIntensity },
-        uScanFreq: { value: scanlineFrequency },
-        uWarp: { value: warpAmount },
-        // تمرير حالة الثيم للشيدر (0 لليلي، 1 للنهاري)
-        uIsLight: { value: isDark ? 0.0 : 1.0 } 
+    const clock = new Clock();
+
+    const setSize = () => {
+      if (!containerRef.current) return;
+      const el = containerRef.current;
+      const width = el.clientWidth || 1;
+      const height = el.clientHeight || 1;
+      renderer.setSize(width, height, false);
+      const canvasWidth = renderer.domElement.width;
+      const canvasHeight = renderer.domElement.height;
+      uniforms.iResolution.value.set(canvasWidth, canvasHeight, 1);
+    };
+
+    setSize();
+
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(setSize) : null;
+    if (ro && containerRef.current) {
+      ro.observe(containerRef.current);
+    }
+
+    const handlePointerMove = event => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      const dpr = 1; 
+      targetMouseRef.current.set(x * dpr, (rect.height - y) * dpr);
+      targetInfluenceRef.current = 1.0;
+      if (parallax) {
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        const offsetX = (x - centerX) / rect.width;
+        const offsetY = -(y - centerY) / rect.height;
+        targetParallaxRef.current.set(offsetX * parallaxStrength, offsetY * parallaxStrength);
       }
-    });
-
-    const mesh = new Mesh(gl, { geometry, program });
-
-    const resize = () => {
-      if (!parent) return;
-      const w = parent.clientWidth;
-      const h = parent.clientHeight;
-      renderer.setSize(w * resolutionScale, h * resolutionScale);
-      program.uniforms.uResolution.value.set(w, h);
     };
 
-    window.addEventListener('resize', resize);
-    resize();
+    const handlePointerLeave = () => {
+      targetInfluenceRef.current = 0.0;
+    };
 
-    let animationId;
-    const start = performance.now();
+    if (interactive) {
+      renderer.domElement.addEventListener('pointermove', handlePointerMove);
+      renderer.domElement.addEventListener('pointerleave', handlePointerLeave);
+    }
 
-    const loop = () => {
-      program.uniforms.uTime.value = ((performance.now() - start) / 1000) * speed;
-      program.uniforms.uHueShift.value = hueShift;
-      program.uniforms.uNoise.value = noiseIntensity;
-      program.uniforms.uScan.value = scanlineIntensity;
-      program.uniforms.uScanFreq.value = scanlineFrequency;
-      program.uniforms.uWarp.value = warpAmount;
+    let raf = 0;
+    const renderLoop = () => {
+      uniforms.iTime.value = clock.getElapsedTime();
       
-      // تحديث القيمة ديناميكياً عند تغيير الثيم
-      program.uniforms.uIsLight.value = isDark ? 0.0 : 1.0;
-
-      renderer.render({ scene: mesh });
-      animationId = requestAnimationFrame(loop);
+      // 4. تحديث قيمة الثيم في كل فريم (لضمان السلاسة عند التبديل)
+      // نستخدم isDark من الـ Hook مباشرة هنا
+      // ملاحظة: بما أن useEffect سيعاد تشغيله عند تغير isDark، 
+      // فهذا التحديث داخل الـ Loop قد لا يكون ضرورياً جداً لكنه يضمن التزامن.
+      // لكن الأهم هو إعادة بناء الـ Shader عند تغير الثيم وهو ما يفعله useEffect
+      
+      if (interactive) {
+        currentMouseRef.current.lerp(targetMouseRef.current, mouseDamping);
+        uniforms.iMouse.value.copy(currentMouseRef.current);
+        currentInfluenceRef.current += (targetInfluenceRef.current - currentInfluenceRef.current) * mouseDamping;
+        uniforms.bendInfluence.value = currentInfluenceRef.current;
+      }
+      if (parallax) {
+        currentParallaxRef.current.lerp(targetParallaxRef.current, mouseDamping);
+        uniforms.parallaxOffset.value.copy(currentParallaxRef.current);
+      }
+      renderer.render(scene, camera);
+      raf = requestAnimationFrame(renderLoop);
     };
-
-    loop();
+    renderLoop();
 
     return () => {
-      cancelAnimationFrame(animationId);
-      window.removeEventListener('resize', resize);
+      cancelAnimationFrame(raf);
+      if (ro && containerRef.current) {
+        ro.disconnect();
+      }
+      if (interactive) {
+        renderer.domElement.removeEventListener('pointermove', handlePointerMove);
+        renderer.domElement.removeEventListener('pointerleave', handlePointerLeave);
+      }
+      geometry.dispose();
+      material.dispose();
+      renderer.dispose();
+      if (renderer.domElement.parentElement) {
+        renderer.domElement.parentElement.removeChild(renderer.domElement);
+      }
     };
-  }, [hueShift, noiseIntensity, scanlineIntensity, speed, scanlineFrequency, warpAmount, resolutionScale, isDark]);
+  }, [
+    // إضافة isDark للقائمة ليعاد بناء الخلفية عند التغيير
+    isDark,
+    linesGradient, enabledWaves, lineCount, lineDistance, topWavePosition, 
+    middleWavePosition, bottomWavePosition, animationSpeed, interactive, 
+    bendRadius, bendStrength, mouseDamping, parallax, parallaxStrength,
+    topLineCount, middleLineCount, bottomLineCount, topLineDistance, 
+    middleLineDistance, bottomLineDistance
+  ]);
 
   return (
-    <div className="darkveil-container">
-        <canvas ref={ref} className="darkveil-canvas" />
-    </div>
+    <div
+      ref={containerRef}
+      className="darkveil-container"
+      // إزالة mixBlendMode هنا لأننا نتحكم بالألوان داخل الشيدر الآن
+      // هذا يمنع اختفاء الخلفية عند الوضع النهاري
+    />
   );
 }
+
+export default React.memo(DarkVeil);
 
 ------------------------------------------------------------------
 FILE: src\components\ui\DecryptText.jsx
@@ -6650,9 +7270,10 @@ export default ErrorBoundary;
 FILE: src\components\ui\floating-dock.jsx
 ------------------------------------------------------------------
 "use client";
+import React, { useRef, useState } from "react"; // <--- تم إضافة React هنا
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { useRef, useState } from "react";
+import { useSettings } from "@/context/SettingsContext";
 
 export const FloatingDock = ({ items, className }) => {
   return (
@@ -6664,6 +7285,7 @@ export const FloatingDock = ({ items, className }) => {
 
 const FloatingDockBar = ({ items }) => {
   let mouseX = useMotionValue(Infinity);
+  const { isDark } = useSettings(); 
   
   return (
     <motion.div
@@ -6672,17 +7294,21 @@ const FloatingDockBar = ({ items }) => {
       className={cn(
         "smart-dock mx-auto flex h-16 md:h-20 gap-2 md:gap-4 items-end rounded-2xl px-2 md:px-4 pb-2 md:pb-3",
         "shadow-2xl shadow-black/40 max-w-[95vw] overflow-x-auto no-scrollbar touch-pan-x" 
-        // overflow-x-auto + touch-pan-x: يسمح بالسكرول الأفقي في الهواتف
       )}
     >
       {items.map((item) => (
-        <IconContainer mouseX={mouseX} key={item.title} {...item} />
+        <IconContainer 
+            mouseX={mouseX} 
+            key={item.title} 
+            {...item} 
+            isDark={isDark} 
+        />
       ))}
     </motion.div>
   );
 };
 
-function IconContainer({ mouseX, title, icon, onClick }) {
+function IconContainer({ mouseX, title, icon, onClick, isDark }) {
   let ref = useRef(null);
 
   let distance = useTransform(mouseX, (val) => {
@@ -6690,8 +7316,6 @@ function IconContainer({ mouseX, title, icon, onClick }) {
     return val - bounds.x - bounds.width / 2;
   });
 
-  // أحجام مختلفة للهاتف (أصغر) والحاسوب
-  // Mobile base width: 40, Desktop base width: 50
   let widthTransform = useTransform(distance, [-150, 0, 150], [40, 65, 40]);
   let heightTransform = useTransform(distance, [-150, 0, 150], [40, 65, 40]);
 
@@ -6700,14 +7324,21 @@ function IconContainer({ mouseX, title, icon, onClick }) {
 
   const [hovered, setHovered] = useState(false);
 
+  const iconClass = (title === "Base" && !isDark) 
+    ? "text-neutral-700" 
+    : "text-neutral-300";
+
   return (
-    <div onClick={onClick} className="shrink-0"> {/* shrink-0 مهم لمنع الانكماش */}
+    <div onClick={onClick} className="shrink-0">
       <motion.div
         ref={ref}
         style={{ width, height }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        className="aspect-square rounded-full bg-white/5 flex items-center justify-center relative cursor-pointer border border-white/10 hover:bg-white/10 transition-colors will-change-transform"
+        className={cn(
+            "aspect-square rounded-full flex items-center justify-center relative cursor-pointer border transition-colors will-change-transform",
+            isDark ? "bg-white/5 border-white/10 hover:bg-white/10" : "bg-gray-100 border-gray-200 hover:bg-gray-200"
+        )}
       >
         <AnimatePresence>
           {hovered && (
@@ -6715,14 +7346,24 @@ function IconContainer({ mouseX, title, icon, onClick }) {
               initial={{ opacity: 0, y: 10, x: "-50%" }}
               animate={{ opacity: 1, y: -10, x: "-50%" }}
               exit={{ opacity: 0, y: 2, x: "-50%" }}
-              className="hidden md:block px-2 py-0.5 whitespace-pre rounded-md bg-black/90 border border-white/20 text-white absolute left-1/2 -translate-x-1/2 -top-8 w-fit text-xs font-bold z-50 pointer-events-none"
+              className={cn(
+                  "hidden md:block px-2 py-0.5 whitespace-pre rounded-md border absolute left-1/2 -translate-x-1/2 -top-8 w-fit text-xs font-bold z-50 pointer-events-none",
+                  isDark ? "bg-black/90 border-white/20 text-white" : "bg-white border-gray-200 text-black shadow-md"
+              )}
             >
               {title}
             </motion.div>
           )}
         </AnimatePresence>
-        <div className="flex items-center justify-center text-neutral-300 w-5 h-5 md:w-6 md:h-6">
-            {icon}
+        
+        <div className={cn("flex items-center justify-center w-5 h-5 md:w-6 md:h-6", iconClass)}>
+            {/* هنا كان سبب الخطأ، الآن سيعمل لأننا استوردنا React */}
+            {React.isValidElement(icon) 
+                ? React.cloneElement(icon, { 
+                    className: cn(icon.props.className, title === "Base" && !isDark ? "text-neutral-700" : "") 
+                  }) 
+                : icon
+            }
         </div>
       </motion.div>
     </div>
@@ -7253,35 +7894,37 @@ export default function DataView({ cards, addCard, deleteCard, updateCard }) {
 FILE: src\components\views\GamesView.jsx
 ------------------------------------------------------------------
 "use client";
-import React from 'react';
-// هذا هو السطر الذي كان ناقصاً ويسبب المشكلة 👇
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { useUI } from '../../context/UIContext';
+import { useUI } from '@/context/UIContext';
+import { useLanguage } from '@/hooks/useLanguage'; // إضافة الهوك
 import { IconClock, IconTarget, IconMagnet, IconScale, IconPlayerPlay } from "@tabler/icons-react";
 
 export default function GamesView() {
   const { setActiveOverlayGame } = useUI();
+  const { t, dir } = useLanguage(); // استخدام الترجمة
 
-  const GAMES = [
+  // استخدام useMemo لإعادة حساب المصفوفة عند تغيير اللغة
+  const GAMES = useMemo(() => [
     { 
-      id: 'time_traveler', title: 'CHRONO MASTER', desc: 'Learn Russian time system.', color: 'text-amber-400', icon: <IconClock size={40} />, bg: 'bg-amber-500/10'
+      id: 'time_traveler', title: t('game_chrono_title'), desc: t('game_chrono_desc'), color: 'text-amber-400', icon: <IconClock size={40} />, bg: 'bg-amber-500/10'
     },
     { 
-      id: 'gravity', title: 'GRAVITY PROTOCOL', desc: 'Master Russian prepositions.', color: 'text-cyan-400', icon: <IconTarget size={40} />, bg: 'bg-cyan-500/10'
+      id: 'gravity', title: t('game_gravity_title'), desc: t('game_gravity_desc'), color: 'text-cyan-400', icon: <IconTarget size={40} />, bg: 'bg-cyan-500/10'
     },
     { 
-      id: 'magnet', title: 'MAGNETIC FIELD', desc: 'Extract word roots.', color: 'text-purple-400', icon: <IconMagnet size={40} />, bg: 'bg-purple-500/10'
+      id: 'magnet', title: t('game_magnet_title'), desc: t('game_magnet_desc'), color: 'text-purple-400', icon: <IconMagnet size={40} />, bg: 'bg-purple-500/10'
     },
     { 
-      id: 'scale', title: 'WORD SCALE', desc: 'Balance category weights.', color: 'text-emerald-400', icon: <IconScale size={40} />, bg: 'bg-emerald-500/10'
+      id: 'scale', title: t('game_scale_title'), desc: t('game_scale_desc'), color: 'text-emerald-400', icon: <IconScale size={40} />, bg: 'bg-emerald-500/10'
     }
-  ];
+  ], [t]);
 
   return (
-    <div className="w-full h-full p-6 overflow-y-auto custom-scrollbar pb-32">
+    <div className="w-full h-full p-6 overflow-y-auto custom-scrollbar pb-32" dir={dir}>
         <header className="mb-10 text-center">
-            <h1 className="text-4xl font-black text-white mb-2">NEURAL ARCADE</h1>
-            <p className="text-white/40 font-mono text-xs tracking-widest uppercase">Select Training Module</p>
+            <h1 className="text-4xl font-black text-white mb-2">{t('games_title')}</h1>
+            <p className="text-white/40 font-mono text-xs tracking-widest uppercase">{t('games_subtitle')}</p>
         </header>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto">
@@ -7361,17 +8004,18 @@ FILE: src\components\views\SettingsView.jsx
 ------------------------------------------------------------------
 "use client";
 import React, { useState, useRef } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { useSettings } from '../../context/SettingsContext'; 
+import { useAuth } from '@/context/AuthContext';
+import { useSettings } from '@/context/SettingsContext'; 
+import { useLanguage } from '@/hooks/useLanguage';
 import { updateProfile } from "firebase/auth";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import { 
   IconMoon, IconSun, IconDeviceDesktop, 
-  IconLogout, IconCheck, IconCamera, IconUser, IconDeviceFloppy
+  IconLogout, IconCheck, IconCamera, IconUser, IconDeviceFloppy,
+  IconWorld, IconVocabulary
 } from '@tabler/icons-react';
-import { motion } from 'framer-motion';
 
 // قائمة الأفاتارات الجاهزة
 const AVATARS = [
@@ -7383,38 +8027,53 @@ const AVATARS = [
   '/avatars/avatar6.png',
 ];
 
+// لغات النظام
+const SYSTEM_LANGUAGES = [
+  { code: 'ar', label: 'العربية', flag: '🇸🇦' },
+  { code: 'en', label: 'English', flag: '🇺🇸' },
+  { code: 'ru', label: 'Русский', flag: '🇷🇺' },
+];
+
+// لغات البطاقات (مستقبلاً)
+const CARD_LANGUAGES = [
+  { code: 'ar', label: 'Arabic', sub: 'العربية' },
+  { code: 'en', label: 'English', sub: 'الإنجليزية' },
+];
+
 export default function SettingsView() {
+  // استدعاء الهوكس (Contexts)
   const { user, logout, userData } = useAuth();
-  const { settings, updateSettings } = useSettings();
+  const { settings, updateSettings, isDark } = useSettings();
+  const { t, dir } = useLanguage(); 
   
+  // الحالة المحلية (Local State)
   const [displayName, setDisplayName] = useState(user?.displayName || userData?.displayName || "");
   const [photoURL, setPhotoURL] = useState(user?.photoURL || userData?.photoURL || "/avatars/avatar1.png");
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // دالة الحفظ
+  // --- دالة حفظ الملف الشخصي ---
   const handleSaveProfile = async () => {
     if (!user) return;
     setLoading(true);
     try {
-        // تحديث Auth
+        // تحديث في Authentication
         await updateProfile(user, { displayName, photoURL });
-        // تحديث Firestore
+        // تحديث في قاعدة البيانات Firestore
         await updateDoc(doc(db, "users", user.uid), { displayName, photoURL });
-        alert("تم تحديث الملف الشخصي بنجاح!");
+        alert(t('alert_saved'));
     } catch (error) {
         console.error(error);
-        alert("حدث خطأ أثناء الحفظ");
+        alert(t('alert_error'));
     } finally {
         setLoading(false);
     }
   };
 
-  // رفع صورة خاصة
+  // --- دالة رفع الصورة الخاصة ---
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || !user) return;
-
     setLoading(true);
     try {
         const storage = getStorage();
@@ -7422,84 +8081,109 @@ export default function SettingsView() {
         await uploadBytes(storageRef, file);
         const url = await getDownloadURL(storageRef);
         setPhotoURL(url);
-    } catch (error) {
-        console.error("Upload failed", error);
+    } catch (error) { 
+        console.error("Upload failed", error); 
         alert("فشل رفع الصورة");
-    } finally {
-        setLoading(false);
+    } finally { 
+        setLoading(false); 
     }
   };
 
-  const ThemeButton = ({ value, icon: Icon, label }) => {
-    const isActive = settings.theme === value;
-    return (
-        <button
-            onClick={() => updateSettings('theme', value)}
-            className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-200 group w-full
-            ${isActive 
-                ? 'border-indigo-500 bg-indigo-500/20 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)]' 
-                : 'border-white/10 bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'}`}
-        >
-            <div className="flex items-center gap-3">
-                <Icon size={20} className={isActive ? "text-indigo-400" : "text-gray-500"} />
-                <span className="text-sm font-bold">{label}</span>
-            </div>
-            {isActive && <IconCheck size={18} className="text-indigo-400" />}
-        </button>
-    );
-  };
+  // --- مكون فرعي: زر الخيارات (للثيم ولغة البطاقات) ---
+  const OptionButton = ({ isActive, onClick, icon: Icon, label }) => (
+    <button
+        onClick={onClick}
+        className={`flex items-center gap-3 p-3 rounded-xl border transition-all duration-200 w-full
+        ${isActive 
+            ? 'border-cyan-500 bg-cyan-500/10 text-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.2)]' 
+            : `border-transparent ${isDark ? 'bg-white/5 hover:bg-white/10 text-gray-400' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}`}
+    >
+        {Icon && <Icon size={20} />}
+        <span className="text-sm font-bold">{label}</span>
+        {isActive && <IconCheck size={16} className="ml-auto" />}
+    </button>
+  );
+
+  // --- مكون فرعي: زر اللغة الكبير ---
+  const LangButton = ({ isActive, onClick, title, sub, flag }) => (
+    <button
+        onClick={onClick}
+        className={`relative flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-300 w-full h-24
+        ${isActive 
+            ? 'border-emerald-500 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.15)]' 
+            : `border-transparent ${isDark ? 'bg-[#1a1a1a] hover:bg-[#252525]' : 'bg-white shadow-sm hover:bg-gray-50'} opacity-60 hover:opacity-100`}`}
+    >
+        <span className="text-2xl mb-1">{flag}</span>
+        <span className={`text-sm font-bold ${isActive ? 'text-emerald-500' : isDark ? 'text-white' : 'text-gray-800'}`}>{title}</span>
+        {sub && <span className="text-[10px] opacity-50">{sub}</span>}
+    </button>
+  );
+
+  // متغيرات الألوان حسب الثيم
+  const textColor = isDark ? "text-white" : "text-gray-900";
+  const subTextColor = isDark ? "text-white/40" : "text-gray-500";
+  const sectionBg = isDark ? "bg-[#0a0a0a]/80 border-white/10" : "bg-white/80 border-black/5 shadow-xl";
 
   return (
-    <div className="w-full max-w-3xl mx-auto p-6 pb-40 font-sans bg-transparent">
+    <div className="w-full max-w-5xl mx-auto p-4 md:p-8 font-sans pb-32" dir={dir}>
       
-      <div className="mb-10 text-center">
-          <h2 className="text-4xl font-black italic tracking-tighter text-white drop-shadow-lg mb-2">
-              IDENTITY CONFIG
+      {/* العنوان الرئيسي */}
+      <div className="mb-10">
+          <h2 className={`text-4xl font-black tracking-tighter ${textColor}`}>
+              {t('settings_title')}
           </h2>
+          <p className={`text-sm font-mono mt-2 ${subTextColor}`}>// {t('settings_subtitle')}</p>
       </div>
 
-      <div className="space-y-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
-          {/* 1. قسم الملف الشخصي (تمت إعادته) */}
-          <section className="flex flex-col md:flex-row gap-6 items-center md:items-start p-6 rounded-3xl border border-white/5 bg-white/5 backdrop-blur-sm">
-              {/* الصورة */}
-              <div className="relative group">
-                  <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-indigo-500/30 shadow-lg">
-                      <img src={photoURL} alt="Profile" className="w-full h-full object-cover" />
-                  </div>
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full cursor-pointer"
-                  >
-                      <IconCamera className="text-white" />
-                  </button>
-                  <input ref={fileInputRef} type="file" hidden onChange={handleFileUpload} accept="image/*" />
+          {/* === القسم الأول: الهوية (Identity) === */}
+          <section className={`rounded-3xl border p-6 md:p-8 backdrop-blur-xl ${sectionBg}`}>
+              <div className="flex items-center gap-3 mb-6">
+                  <IconUser className="text-cyan-500" size={24} />
+                  <h3 className={`text-xl font-bold ${textColor}`}>{t('identity_title')}</h3>
               </div>
 
-              {/* البيانات */}
-              <div className="flex-1 w-full space-y-4">
+              {/* صورة البروفايل */}
+              <div className="flex flex-col items-center mb-8">
+                  <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                      <div className={`w-32 h-32 rounded-full overflow-hidden border-4 ${isDark ? 'border-[#1a1a1a]' : 'border-gray-100'} shadow-2xl relative z-10`}>
+                          <img src={photoURL} alt="Profile" className="w-full h-full object-cover" />
+                      </div>
+                      {/* تأثيرات بصرية */}
+                      <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-cyan-500 to-purple-500 blur opacity-50 group-hover:opacity-100 transition-opacity"></div>
+                      <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                          <IconCamera className="text-white" size={32}/>
+                      </div>
+                      <input ref={fileInputRef} type="file" hidden onChange={handleFileUpload} accept="image/*" />
+                  </div>
+                  <p className={`text-xs mt-3 font-mono ${subTextColor}`}>{t('identity_upload')}</p>
+              </div>
+
+              <div className="space-y-6">
+                  {/* حقل الاسم */}
                   <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase ml-1 block mb-1">Display Name</label>
+                      <label className={`text-xs font-bold uppercase tracking-wider mb-2 block ${subTextColor}`}>{t('identity_name_label')}</label>
                       <div className="relative">
                           <input 
                             value={displayName} 
                             onChange={(e) => setDisplayName(e.target.value)}
-                            className="w-full bg-black/30 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:border-indigo-500 outline-none transition-colors"
-                            placeholder="Enter your codename..."
+                            className={`w-full rounded-xl py-3 px-10 outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all font-bold ${isDark ? 'bg-black/50 border border-white/10 text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'}`}
+                            placeholder={t('identity_name_placeholder')}
                           />
-                          <IconUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
+                          <IconUser className={`absolute top-1/2 -translate-y-1/2 text-gray-400 ${dir === 'rtl' ? 'right-3' : 'left-3'}`} size={18}/>
                       </div>
                   </div>
 
-                  {/* شبكة الأفاتار */}
+                  {/* اختيار الأفاتار */}
                   <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase ml-1 block mb-2">Select Avatar</label>
-                      <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                      <label className={`text-xs font-bold uppercase tracking-wider mb-3 block ${subTextColor}`}>{t('identity_avatar_label')}</label>
+                      <div className="grid grid-cols-6 gap-2">
                           {AVATARS.map((avi, i) => (
                               <button 
                                 key={i} 
                                 onClick={() => setPhotoURL(avi)}
-                                className={`w-10 h-10 rounded-full border-2 overflow-hidden shrink-0 transition-all ${photoURL === avi ? 'border-indigo-500 scale-110' : 'border-transparent opacity-50 hover:opacity-100'}`}
+                                className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${photoURL === avi ? 'border-cyan-500 scale-110 shadow-lg shadow-cyan-500/20' : 'border-transparent opacity-60 hover:opacity-100 hover:scale-105'}`}
                               >
                                   <img src={avi} className="w-full h-full object-cover" />
                               </button>
@@ -7507,39 +8191,105 @@ export default function SettingsView() {
                       </div>
                   </div>
 
+                  {/* زر الحفظ */}
                   <button 
                     onClick={handleSaveProfile}
                     disabled={loading}
-                    className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50"
+                    className="w-full py-4 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                      {loading ? "Saving..." : <><IconDeviceFloppy size={16}/> Save Changes</>}
+                      {loading ? t('identity_saving') : <><IconDeviceFloppy size={20}/> {t('identity_save_btn')}</>}
                   </button>
               </div>
           </section>
 
-          {/* 2. قسم المظهر (بدون خلفية مظللة كما طلبت) */}
-          <section>
-              <div className="flex items-center gap-2 mb-4 px-2 text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">
-                  <IconDeviceDesktop size={16} /> Interface
-              </div>
-              <div className="flex flex-col gap-3">
-                  <ThemeButton value="dark" icon={IconMoon} label="Cyber Dark" />
-                  <ThemeButton value="light" icon={IconSun} label="Pro Light" />
-                  <ThemeButton value="system" icon={IconDeviceDesktop} label="Auto Sync" />
-              </div>
-          </section>
+          {/* === القسم الثاني: النظام (System) === */}
+          <div className="space-y-6">
+              
+              {/* إعدادات اللغة (Localization) */}
+              <section className={`rounded-3xl border p-6 md:p-8 backdrop-blur-xl ${sectionBg}`}>
+                  <div className="flex items-center gap-3 mb-6">
+                      <IconWorld className="text-emerald-500" size={24} />
+                      <h3 className={`text-xl font-bold ${textColor}`}>{t('system_lang_title')}</h3>
+                  </div>
 
-          {/* 3. زر الخروج */}
-          <section className="pt-4">
+                  {/* لغة النظام */}
+                  <div className="mb-6">
+                      <label className={`text-xs font-bold uppercase tracking-wider mb-3 block ${subTextColor}`}>{t('lang_system_label')}</label>
+                      <div className="grid grid-cols-3 gap-3">
+                          {SYSTEM_LANGUAGES.map((lang) => (
+                              <LangButton 
+                                  key={lang.code}
+                                  title={lang.code.toUpperCase()}
+                                  sub={lang.label}
+                                  flag={lang.flag}
+                                  isActive={settings.systemLanguage === lang.code}
+                                  onClick={() => updateSettings('systemLanguage', lang.code)}
+                              />
+                          ))}
+                      </div>
+                  </div>
+
+                  {/* لغة البطاقات (تجريبي) */}
+                  <div>
+                      <div className="flex justify-between items-center mb-3">
+                          <label className={`text-xs font-bold uppercase tracking-wider block ${subTextColor}`}>{t('lang_target_label')}</label>
+                          <span className="text-[10px] bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded font-mono">SOON</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 opacity-70">
+                          {CARD_LANGUAGES.map((lang) => (
+                              <OptionButton 
+                                  key={lang.code}
+                                  icon={IconVocabulary}
+                                  label={lang.label}
+                                  isActive={settings.cardLanguage === lang.code}
+                                  onClick={() => updateSettings('cardLanguage', lang.code)}
+                              />
+                          ))}
+                      </div>
+                  </div>
+              </section>
+
+              {/* إعدادات المظهر (Theme) */}
+              <section className={`rounded-3xl border p-6 md:p-8 backdrop-blur-xl ${sectionBg}`}>
+                  <div className="flex items-center gap-3 mb-6">
+                      <IconDeviceDesktop className="text-purple-500" size={24} />
+                      <h3 className={`text-xl font-bold ${textColor}`}>{t('theme_title')}</h3>
+                  </div>
+                  <div className="space-y-3">
+                      <OptionButton 
+                          icon={IconMoon} 
+                          label={t('theme_dark')} 
+                          isActive={settings.theme === 'dark'} 
+                          onClick={() => updateSettings('theme', 'dark')} 
+                      />
+                      <OptionButton 
+                          icon={IconSun} 
+                          label={t('theme_light')} 
+                          isActive={settings.theme === 'light'} 
+                          onClick={() => updateSettings('theme', 'light')} 
+                      />
+                      <OptionButton 
+                          icon={IconDeviceDesktop} 
+                          label={t('theme_auto')} 
+                          isActive={settings.theme === 'system'} 
+                          onClick={() => updateSettings('theme', 'system')} 
+                      />
+                  </div>
+              </section>
+
+              {/* زر الخروج */}
               <button 
                 onClick={logout} 
-                className="w-full py-4 rounded-xl border border-red-500/20 bg-red-500/5 text-red-500 font-bold hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider group"
+                className={`w-full py-4 rounded-xl border font-bold transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider group
+                ${isDark 
+                    ? 'border-red-500/20 bg-red-500/5 text-red-500 hover:bg-red-500 hover:text-white' 
+                    : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white'}`}
               >
                   <IconLogout size={18} className="group-hover:-translate-x-1 transition-transform" /> 
-                  Terminate Session
+                  {t('logout_btn')}
               </button>
-          </section>
 
+          </div>
       </div>
     </div>
   );
@@ -7860,10 +8610,11 @@ const DEFAULT_SETTINGS = {
   sound: true,
   sfx: true,
   theme: 'dark', // dark, light, system
-  language: 'ar',
+  systemLanguage: 'ar', // ar, en, ru (لغة الموقع)
+  cardLanguage: 'ar',   // ar, en (لغة ترجمة البطاقات)
 };
 
-const STORAGE_KEY = 'russian_master_config_v3';
+const STORAGE_KEY = 'russian_master_config_v4'; // تحديث الإصدار
 
 export const SettingsProvider = ({ children }) => {
   const [mounted, setMounted] = useState(false);
@@ -7891,6 +8642,13 @@ export const SettingsProvider = ({ children }) => {
       root.classList.add('light');
       root.classList.remove('dark');
     }
+    
+    // هنا يمكن لاحقاً إضافة منطق تغيير لغة الموقع (RTL/LTR)
+    // if (newSettings.systemLanguage === 'en' || newSettings.systemLanguage === 'ru') {
+    //   root.setAttribute('dir', 'ltr');
+    // } else {
+    //   root.setAttribute('dir', 'rtl');
+    // }
   };
 
   useEffect(() => {
@@ -7899,13 +8657,7 @@ export const SettingsProvider = ({ children }) => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // تنظيف الإعدادات القديمة (مثل quality)
-        const cleanSettings = {
-            sound: parsed.sound ?? true,
-            sfx: parsed.sfx ?? true,
-            theme: parsed.theme || 'dark',
-            language: 'ar'
-        };
+        const cleanSettings = { ...DEFAULT_SETTINGS, ...parsed };
         setSettings(cleanSettings);
         applySettings(cleanSettings);
       } catch(e) { applySettings(DEFAULT_SETTINGS); }
@@ -7948,20 +8700,56 @@ export const UIContext = createContext(null);
 export const UIProvider = ({ children }) => {
   const { user } = useAuth();
   
+  // --- حالات الواجهة الأساسية ---
   const [currentView, setCurrentView] = useState('home');
   const [activeCategory, setActiveCategory] = useState('All');
   const [showSupport, setShowSupport] = useState(false);
   const [activeOverlayGame, setActiveOverlayGame] = useState(null);
   const [notifications, setNotifications] = useState([]);
-  
+
+  // --- نظام البث المباشر (Global Live System) ---
+  const [liveStream, setLiveStream] = useState({
+    isActive: false,      // هل البث يعمل؟
+    roomName: null,       // اسم الغرفة
+    isMinimized: false    // هل هو مصغر حالياً؟
+  });
+
+  // دالة بدء البث (تستدعى من صفحة الدخول)
+  const startBroadcast = (room) => {
+    setLiveStream({ isActive: true, roomName: room, isMinimized: false });
+    setCurrentView('live'); // الانتقال لصفحة البث تلقائياً
+  };
+
+  // دالة إنهاء البث
+  const endBroadcast = () => {
+    setLiveStream({ isActive: false, roomName: null, isMinimized: false });
+  };
+
+  // دالة تبديل التصغير (يدوياً)
+  const toggleMinimize = (minimize) => {
+    setLiveStream(prev => ({ ...prev, isMinimized: minimize }));
+  };
+
+  // --- التأثير الذكي للتصغير التلقائي ---
+  // يراقب تغيير الصفحة: إذا خرجت من 'live'، يصغر الفيديو. إذا عدت، يكبره.
+  useEffect(() => {
+    if (liveStream.isActive) {
+      if (currentView !== 'live') {
+        setLiveStream(prev => ({ ...prev, isMinimized: true }));
+      } else {
+        setLiveStream(prev => ({ ...prev, isMinimized: false }));
+      }
+    }
+  }, [currentView, liveStream.isActive]);
+
+  // --- نظام الإشعارات (Firebase Realtime) ---
   useEffect(() => {
     if (!user) {
         setNotifications([]);
         return;
     }
     
-    // تم إزالة orderBy لتجنب خطأ "Requires an Index"
-    // سيتم ترتيب البيانات في الواجهة (Client Side) بدلاً من قاعدة البيانات
+    // 1. جلب إشعارات المستخدم الحالي
     const myNotifsQuery = query(
         collection(db, "notifications"),
         where("userId", "==", user.uid)
@@ -7969,15 +8757,19 @@ export const UIProvider = ({ children }) => {
 
     const unsubMy = onSnapshot(myNotifsQuery, (snap) => {
         const myData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        // نقوم بتحديث الحالة بذكاء لدمجها مع إشعارات الأدمن (إذا وجد)
         setNotifications(prev => {
+            // نحتفظ بإشعارات الأدمن الموجودة في الحالة الحالية ونحدث إشعاراتي
             const others = prev.filter(n => n.userId !== user.uid && n.target === 'admin');
             const all = [...others, ...myData];
+            // إزالة التكرار وترتيب حسب الوقت (الأحدث أولاً)
             const unique = Array.from(new Map(all.map(item => [item.id, item])).values());
-            // الترتيب هنا بدلاً من Firestore
             return unique.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
         });
     }, (e) => console.log("Notif error:", e));
 
+    // 2. إذا كان المستخدم هو "الماستر"، اجلب إشعارات النظام أيضاً
     let unsubAdmin = () => {};
     if (user.email === MASTER_EMAIL) {
         const adminQuery = query(
@@ -8005,16 +8797,22 @@ export const UIProvider = ({ children }) => {
     try {
         await deleteDoc(doc(db, "notifications", id));
         setNotifications(prev => prev.filter(n => n.id !== id));
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Remove notif failed", e); }
   };
 
   return (
     <UIContext.Provider value={{ 
+        // Navigation & State
         currentView, setCurrentView, 
         activeCategory, setActiveCategory,
         showSupport, setShowSupport,
         activeOverlayGame, setActiveOverlayGame,
-        notifications, removeNotification
+        
+        // Notifications
+        notifications, removeNotification,
+
+        // Live Stream System
+        liveStream, startBroadcast, endBroadcast, toggleMinimize
     }}>
       {children}
     </UIContext.Provider>
@@ -9152,6 +9950,307 @@ export const getRankUpRewards = (oldRankId, newRankId) => {
 };
 
 ------------------------------------------------------------------
+FILE: src\data\translations.js
+------------------------------------------------------------------
+// src/data/translations.js
+
+export const translations = {
+  // =================================================================
+  // العربية (Arabic)
+  // =================================================================
+  ar: {
+    // --- Navigation (القائمة السفلية) ---
+    nav_home: "القاعدة",
+    nav_games: "الألعاب",
+    nav_live: "بث حي",
+    nav_chat: "الكتيبة",
+    nav_study: "المهام",
+    nav_archive: "الأرشيف",
+    nav_rank: "السجل",
+    nav_settings: "الإعدادات",
+    nav_admin: "تحكم",
+    nav_support: "الدعم",
+
+    // --- Hero Section (الصفحة الرئيسية) ---
+    hero_status: "حالة النظام: متصل",
+    hero_welcome: "أهلاً بعودتك،",
+    hero_line1: "> الواجهة العصبية جاهزة.",
+    hero_line2: "> الأهداف تم تحميلها.",
+    hero_stat_words: "كلمة",
+    hero_stat_games: "ألعاب",
+    hero_stat_practice: "تمرين",
+    btn_start: "ابدأ المهمة",
+    btn_hacking: "اختراق عصبي",
+    hacking_sub: "بروتوكول الهجوم: جاهز",
+
+    // --- Data Modules (صفحة اختيار الأقسام) ---
+    modules_system_ready: "النظام جاهز",
+    modules_available: "وحدة متاحة",
+    modules_title_1: "أرشيف",
+    modules_title_2: "البيانات",
+    modules_search_placeholder: "بحث في السجلات...",
+    modules_no_data: "لا توجد بيانات مطابقة",
+    modules_esc: "خروج",
+    
+    // --- Games Page (صفحة الألعاب) ---
+    games_title: "صالة الألعاب",
+    games_subtitle: "اختر وحدة التدريب",
+    game_chrono_title: "مسافر عبر الزمن",
+    game_chrono_desc: "تعلم نظام الوقت الروسي.",
+    game_gravity_title: "بروتوكول الجاذبية",
+    game_gravity_desc: "أتقن حروف الجر.",
+    game_magnet_title: "المجال المغناطيسي",
+    game_magnet_desc: "استخرج جذور الكلمات.",
+    game_scale_title: "ميزان الكلمات",
+    game_scale_desc: "وازن فئات الكلمات.",
+
+    // --- Live Stream (صفحة البث) ---
+    live_enter_id: "أدخل معرف الغرفة...",
+    live_connect_btn: "بدء الاتصال",
+    live_connecting: "جاري التشفير...",
+    live_secure_channel: "قناة آمنة",
+    live_active_msg: "الإشارة نشطة",
+    live_active_desc: "يمكنك التنقل بحرية. سيتم تصغير النافذة تلقائياً.",
+    live_log_ready: "النظام جاهز",
+    live_log_waiting: "بانتظار الإدخال...",
+    live_log_encrypt: "تشفير البيانات...",
+    live_log_established: "تم تأسيس الاتصال.",
+
+    // --- Profile (صفحة البروفايل) ---
+    profile_lvl: "مستوى",
+    profile_class: "فئة",
+    profile_exp: "خبرة",
+    profile_next: "التالي",
+    profile_stats_cards: "إجمالي الكروت",
+    profile_stats_mastered: "تم الإتقان",
+    profile_stats_streak: "تتابع الأيام",
+    profile_rank_title: "سجل الرتب",
+    profile_metrics: "مقاييس الأداء",
+    profile_efficiency: "معدل الكفاءة",
+    profile_badges: "أوسمة الخدمة",
+    profile_unlocked: "مفتوح",
+    profile_requires: "يتطلب",
+
+    // --- Settings (صفحة الإعدادات) ---
+    settings_title: "إعدادات النظام",
+    settings_subtitle: "وحدة تفضيلات المستخدم",
+    identity_title: "هوية العميل",
+    identity_upload: "اضغط لرفع صورة جديدة",
+    identity_name_label: "الاسم الرمزي",
+    identity_name_placeholder: "أدخل اسمك...",
+    identity_avatar_label: "اختر الأفاتار",
+    identity_save_btn: "حفظ الهوية",
+    identity_saving: "جاري الحفظ...",
+    system_lang_title: "اللغة والموقع",
+    lang_system_label: "لغة النظام",
+    lang_target_label: "لغة التعلم (مستقبلاً)",
+    theme_title: "مظهر الواجهة",
+    theme_dark: "ليلي",
+    theme_light: "نهاري",
+    theme_auto: "تلقائي",
+    logout_btn: "إنهاء الجلسة",
+    alert_saved: "تم تحديث الهوية بنجاح",
+    alert_error: "فشل التحديث"
+  },
+  
+  // =================================================================
+  // English (الإنجليزية)
+  // =================================================================
+  en: {
+    // --- Navigation ---
+    nav_home: "Base",
+    nav_games: "Arcade",
+    nav_live: "Live",
+    nav_chat: "Squad",
+    nav_study: "Missions",
+    nav_archive: "Archive",
+    nav_rank: "ID Card",
+    nav_settings: "Config",
+    nav_admin: "Control",
+    nav_support: "Support",
+
+    // --- Hero Section ---
+    hero_status: "SYSTEM STATUS: ONLINE",
+    hero_welcome: "WELCOME BACK,",
+    hero_line1: "> Neural Interface Ready.",
+    hero_line2: "> Objectives Loaded.",
+    hero_stat_words: "Words",
+    hero_stat_games: "Games",
+    hero_stat_practice: "Practice",
+    btn_start: "START MISSION",
+    btn_hacking: "NEURAL BREACH",
+    hacking_sub: "HACKING PROTOCOL: READY",
+
+    // --- Data Modules ---
+    modules_system_ready: "SYSTEM_READY",
+    modules_available: "AVAILABLE",
+    modules_title_1: "DATA",
+    modules_title_2: "ARCHIVE",
+    modules_search_placeholder: "SEARCH PROTOCOLS...",
+    modules_no_data: "NO MATCHING DATA",
+    modules_esc: "ESC",
+
+    // --- Games Page ---
+    games_title: "NEURAL ARCADE",
+    games_subtitle: "SELECT TRAINING MODULE",
+    game_chrono_title: "CHRONO MASTER",
+    game_chrono_desc: "Learn Russian time system.",
+    game_gravity_title: "GRAVITY PROTOCOL",
+    game_gravity_desc: "Master Russian prepositions.",
+    game_magnet_title: "MAGNETIC FIELD",
+    game_magnet_desc: "Extract word roots.",
+    game_scale_title: "WORD SCALE",
+    game_scale_desc: "Balance category weights.",
+
+    // --- Live Stream ---
+    live_enter_id: "ENTER ROOM ID...",
+    live_connect_btn: "INITIALIZE UPLINK",
+    live_connecting: "ENCRYPTING...",
+    live_secure_channel: "SECURE CHANNEL",
+    live_active_msg: "SIGNAL ACTIVE",
+    live_active_desc: "YOU CAN NAVIGATE FREELY. CONNECTION WILL MINIMIZE AUTOMATICALLY.",
+    live_log_ready: "SYSTEM_READY",
+    live_log_waiting: "WAITING_INPUT...",
+    live_log_encrypt: "ENCRYPTING...",
+    live_log_established: "UPLINK ESTABLISHED.",
+
+    // --- Profile ---
+    profile_level: "LVL",
+    profile_class: "CLASS",
+    profile_exp: "EXP",
+    profile_next: "NEXT",
+    profile_stats_cards: "Total Cards",
+    profile_stats_mastered: "Mastered",
+    profile_stats_streak: "Day Streak",
+    profile_rank_title: "RANK PROGRESSION",
+    profile_metrics: "PERFORMANCE METRICS",
+    profile_efficiency: "Efficiency Rating",
+    profile_badges: "SERVICE BADGES",
+    profile_unlocked: "UNLOCKED",
+    profile_requires: "REQUIRES",
+
+    // --- Settings ---
+    settings_title: "SYSTEM CONFIG",
+    settings_subtitle: "USER_PREFERENCES_MODULE",
+    identity_title: "OPERATIVE IDENTITY",
+    identity_upload: "CLICK TO UPLOAD NEW AVATAR",
+    identity_name_label: "CODENAME",
+    identity_name_placeholder: "ENTER CODENAME...",
+    identity_avatar_label: "SELECT AVATAR PROTOCOL",
+    identity_save_btn: "SAVE IDENTITY",
+    identity_saving: "PROCESSING...",
+    system_lang_title: "LOCALIZATION",
+    lang_system_label: "SYSTEM LANGUAGE",
+    lang_target_label: "TARGET LANGUAGE (SOON)",
+    theme_title: "INTERFACE THEME",
+    theme_dark: "CYBER DARK",
+    theme_light: "PRO LIGHT",
+    theme_auto: "AUTO SYNC",
+    logout_btn: "TERMINATE SESSION",
+    alert_saved: "IDENTITY UPDATED SUCCESSFULLY",
+    alert_error: "UPDATE FAILED"
+  },
+
+  // =================================================================
+  // Russian (الروسية)
+  // =================================================================
+  ru: {
+    // --- Navigation ---
+    nav_home: "База",
+    nav_games: "Аркада",
+    nav_live: "Эфир",
+    nav_chat: "Отряд",
+    nav_study: "Миссии",
+    nav_archive: "Архив",
+    nav_rank: "ID Карта",
+    nav_settings: "Настр.",
+    nav_admin: "Контроль",
+    nav_support: "Помощь",
+
+    // --- Hero Section ---
+    hero_status: "СТАТУС: ОНЛАЙН",
+    hero_welcome: "С ВОЗВРАЩЕНИЕМ,",
+    hero_line1: "> Нейроинтерфейс готов.",
+    hero_line2: "> Цели загружены.",
+    hero_stat_words: "Слов",
+    hero_stat_games: "Игры",
+    hero_stat_practice: "Практика",
+    btn_start: "НАЧАТЬ МИССИЮ",
+    btn_hacking: "ВЗЛОМ",
+    hacking_sub: "ПРОТОКОЛ АТАКИ: ГОТОВ",
+
+    // --- Data Modules ---
+    modules_system_ready: "СИСТЕМА ГОТОВА",
+    modules_available: "ДОСТУПНО",
+    modules_title_1: "АРХИВ",
+    modules_title_2: "ДАННЫХ",
+    modules_search_placeholder: "ПОИСК ПРОТОКОЛОВ...",
+    modules_no_data: "НЕТ ДАННЫХ",
+    modules_esc: "ESC",
+
+    // --- Games Page ---
+    games_title: "НЕЙРО-АРКАДА",
+    games_subtitle: "ВЫБЕРИТЕ МОДУЛЬ",
+    game_chrono_title: "ХРОНО МАСТЕР",
+    game_chrono_desc: "Изучение системы времени.",
+    game_gravity_title: "ГРАВИТАЦИЯ",
+    game_gravity_desc: "Предлоги и падежи.",
+    game_magnet_title: "МАГНИТНОЕ ПОЛЕ",
+    game_magnet_desc: "Корни слов.",
+    game_scale_title: "ВЕСЫ СЛОВ",
+    game_scale_desc: "Баланс категорий.",
+
+    // --- Live Stream ---
+    live_enter_id: "ВВЕДИТЕ ID КОМНАТЫ...",
+    live_connect_btn: "НАЧАТЬ СОЕДИНЕНИЕ",
+    live_connecting: "ШИФРОВАНИЕ...",
+    live_secure_channel: "ЗАЩИЩЕННЫЙ КАНАЛ",
+    live_active_msg: "СИГНАЛ АКТИВЕН",
+    live_active_desc: "ВЫ МОЖЕТЕ ПЕРЕМЕЩАТЬСЯ. ОКНО СВЕРНЕТСЯ АВТОМАТИЧЕСКИ.",
+    live_log_ready: "СИСТЕМА ГОТОВА",
+    live_log_waiting: "ОЖИДАНИЕ ВВОДА...",
+    live_log_encrypt: "ШИФРОВАНИЕ...",
+    live_log_established: "СВЯЗЬ УСТАНОВЛЕНА.",
+
+    // --- Profile ---
+    profile_lvl: "УР",
+    profile_class: "КЛАСС",
+    profile_exp: "ОПЫТ",
+    profile_next: "СЛЕД",
+    profile_stats_cards: "Всего карт",
+    profile_stats_mastered: "Изучено",
+    profile_stats_streak: "Серия дней",
+    profile_rank_title: "ПРОГРЕСС РАНГА",
+    profile_metrics: "МЕТРИКИ",
+    profile_efficiency: "Эффективность",
+    profile_badges: "ЗНАКИ ОТЛИЧИЯ",
+    profile_unlocked: "ОТКРЫТО",
+    profile_requires: "ТРЕБУЕТСЯ",
+
+    // --- Settings ---
+    settings_title: "НАСТРОЙКИ",
+    settings_subtitle: "МОДУЛЬ ПОЛЬЗОВАТЕЛЯ",
+    identity_title: "ЛИЧНОСТЬ",
+    identity_upload: "ЗАГРУЗИТЬ АВАТАР",
+    identity_name_label: "ПОЗЫВНОЙ",
+    identity_name_placeholder: "ВВЕДИТЕ ИМЯ...",
+    identity_avatar_label: "ВЫБРАТЬ АВАТАР",
+    identity_save_btn: "СОХРАНИТЬ",
+    identity_saving: "СОХРАНЕНИЕ...",
+    system_lang_title: "ЯЗЫК",
+    lang_system_label: "ЯЗЫК СИСТЕМЫ",
+    lang_target_label: "ИЗУЧАЕМЫЙ ЯЗЫК",
+    theme_title: "ТЕМА",
+    theme_dark: "ТЕМНАЯ",
+    theme_light: "СВЕТЛАЯ",
+    theme_auto: "АВТО",
+    logout_btn: "ВЫХОД",
+    alert_saved: "СОХРАНЕНО",
+    alert_error: "ОШИБКА"
+  }
+};
+
+------------------------------------------------------------------
 FILE: src\hooks\useAudio.js
 ------------------------------------------------------------------
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -9276,6 +10375,30 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+};
+
+------------------------------------------------------------------
+FILE: src\hooks\useLanguage.js
+------------------------------------------------------------------
+// src/hooks/useLanguage.js
+"use client";
+import { useSettings } from "@/context/SettingsContext";
+import { translations } from "@/data/translations";
+
+export const useLanguage = () => {
+  const { settings } = useSettings();
+  const lang = settings.systemLanguage || 'ar'; // اللغة الافتراضية
+  
+  // دالة الترجمة
+  const t = (key) => {
+    return translations[lang][key] || key;
+  };
+
+  // اتجاه النص (عربي = يمين، الباقي = يسار)
+  const dir = lang === 'ar' ? 'rtl' : 'ltr';
+  const isRTL = lang === 'ar';
+
+  return { t, dir, isRTL, lang };
 };
 
 ------------------------------------------------------------------
