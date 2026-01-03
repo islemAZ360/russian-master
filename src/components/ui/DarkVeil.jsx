@@ -2,223 +2,226 @@
 import React, { useRef, useEffect } from 'react';
 import { Renderer, Program, Mesh, Triangle, Vec2 } from 'ogl';
 import { useSettings } from '@/context/SettingsContext';
-import './DarkVeil.css';
+
+// نضع الـ CSS مباشرة هنا لضمان عدم حدوث مشاكل في الاستيراد
+const styles = {
+  container: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: -1, // تأكيد أن الخلفية وراء كل العناصر
+    pointerEvents: 'none',
+    overflow: 'hidden',
+    backgroundColor: '#050505', // لون احتياطي
+  },
+  canvas: {
+    display: 'block',
+    width: '100%',
+    height: '100%',
+  }
+};
 
 const vertex = `
 attribute vec2 position;
+attribute vec2 uv;
+varying vec2 vUv;
 void main() {
+    vUv = uv;
     gl_Position = vec4(position, 0.0, 1.0);
 }
 `;
 
 const fragment = `
-#ifdef GL_ES
 precision highp float;
-#endif
 
-uniform vec2 uResolution;
 uniform float uTime;
+uniform vec2 uResolution;
 uniform float uHueShift;
-uniform float uNoise;
-uniform float uScan;
-uniform float uScanFreq;
-uniform float uWarp;
-// دعم الوضع النهاري
-uniform float uIsLight; 
+uniform float uIsLight;
 
-#define iTime uTime
-#define iResolution uResolution
-
-vec4 buf[8];
-
-float rand(vec2 c){
-    return fract(sin(dot(c,vec2(12.9898,78.233)))*43758.5453);
+// دالة ضجيج بسيطة وسريعة
+float random (in vec2 _st) {
+    return fract(sin(dot(_st.xy, vec2(12.9898,78.233))) * 43758.5453123);
 }
 
-mat3 rgb2yiq = mat3(0.299, 0.587, 0.114, 0.596, -0.274, -0.322, 0.211, -0.523, 0.312);
-mat3 yiq2rgb = mat3(1.0, 0.956, 0.621, 1.0, -0.272, -0.647, 1.0, -1.106, 1.703);
+// دالة ضجيج ثنائية الأبعاد
+float noise (in vec2 _st) {
+    vec2 i = floor(_st);
+    vec2 f = fract(_st);
 
-vec3 hueShiftRGB(vec3 col, float deg){
-    vec3 yiq = rgb2yiq * col;
-    float rad = radians(deg);
-    float cosh = cos(rad);
-    float sinh = sin(rad);
-    vec3 yiqShift = vec3(yiq.x, yiq.y*cosh - yiq.z*sinh, yiq.y*sinh + yiq.z*cosh);
-    return clamp(yiq2rgb * yiqShift, 0.0, 1.0);
+    float a = random(i);
+    float b = random(i + vec2(1.0, 0.0));
+    float c = random(i + vec2(0.0, 1.0));
+    float d = random(i + vec2(1.0, 1.0));
+
+    vec2 u = f * f * (3.0 - 2.0 * f);
+
+    return mix(a, b, u.x) +
+            (c - a)* u.y * (1.0 - u.x) +
+            (d - b) * u.x * u.y;
 }
 
-vec4 sigmoid(vec4 x){
-    return 1.0 / (1.0 + exp(-x));
-}
+#define NUM_OCTAVES 5
 
-// دالة توليد الأنماط العضوية
-vec4 cppn_fn(vec2 coordinate, float in0, float in1, float in2){
-    buf[6] = vec4(coordinate.x, coordinate.y, 0.3948333106474662 + in0, 0.36 + in1);
-    buf[7] = vec4(0.14 + in2, sqrt(coordinate.x * coordinate.x + coordinate.y * coordinate.y), 0.0, 0.0);
-    
-    buf[0] = mat4(vec4(6.5404263,-3.6126034,0.7590882,-1.13613),vec4(2.4582713,3.1660357,1.2219609,0.06276096),vec4(-5.478085,-6.159632,1.8701609,-4.7742867),vec4(6.039214,-5.542865,-0.90925294,3.251348)) * buf[6] + 
-             mat4(vec4(0.8473259,-5.722911,3.975766,1.6522468),vec4(-0.24321538,0.5839259,-1.7661959,-5.350116),vec4(0.,0.,0.,0.),vec4(0.,0.,0.,0.)) * buf[7] + 
-             vec4(0.21808943,1.1243913,-1.7969975,5.0294676);
-             
-    buf[1] = mat4(vec4(-3.3522482,-6.0612736,0.55641043,-4.4719114),vec4(0.8631464,1.7432913,5.643898,1.6106541),vec4(2.4941394,-3.5012043,1.7184316,6.357333),vec4(3.310376,8.209261,1.1355612,-1.165539)) * buf[6] + 
-             mat4(vec4(5.24046,-13.034365,0.009859298,15.870829),vec4(2.987511,3.129433,-0.89023495,-1.6822904),vec4(0.,0.,0.,0.),vec4(0.,0.,0.,0.)) * buf[7] + 
-             vec4(-5.9457836,-6.573602,-0.8812491,1.5436668);
-             
-    buf[0] = sigmoid(buf[0]);
-    buf[1] = sigmoid(buf[1]);
-    
-    // تبسيط المصفوفات للأداء
-    buf[4] = mat4(vec4(5.2,-7.1,2.7,2.6), vec4(-5.6,-25.3,4.0,0.4), vec4(-10.5,24.2,21.1,37.5), vec4(4.3,-1.9,2.3,-1.3)) * buf[0] + 
-             vec4(-7.6, 15.9, 1.3, -1.6);
-             
-    buf[4] = sigmoid(buf[4]);
-    
-    return vec4(buf[4].x, buf[4].y, buf[4].z, 1.0);
-}
-
-void mainImage(out vec4 fragColor, in vec2 fragCoord){
-    // تصحيح: استخدام uResolution الصحيح لتجنب القص
-    vec2 uv = fragCoord / uResolution.xy * 2.0 - 1.0;
-    
-    // تصحيح النسبة (Aspect Ratio) لمنع التمدد
-    uv.x *= uResolution.x / uResolution.y;
-    
-    // تصحيح الحجم: ضربنا في 3.0 لنرى التفاصيل بدلاً من موجة عملاقة واحدة
-    uv *= 3.0; 
-    
-    uv.y *= -1.0;
-    
-    // تأثير التموج (Warp)
-    uv += uWarp * vec2(sin(uv.y * 6.283 + uTime * 0.5), cos(uv.x * 6.283 + uTime * 0.5)) * 0.05;
-    
-    fragColor = cppn_fn(uv, 0.1 * sin(0.3 * uTime), 0.1 * sin(0.69 * uTime), 0.1 * sin(0.44 * uTime));
-}
-
-void main(){
-    vec4 col;
-    mainImage(col, gl_FragCoord.xy);
-    
-    // تطبيق تغيير اللون (Hue Shift)
-    col.rgb = hueShiftRGB(col.rgb, uHueShift);
-    
-    // تأثير خطوط المسح (Scanlines)
-    float scanline_val = sin(gl_FragCoord.y * uScanFreq) * 0.5 + 0.5;
-    col.rgb *= 1.0 - (scanline_val * scanline_val) * uScan;
-    
-    // تأثير الضجيج (Noise)
-    col.rgb += (rand(gl_FragCoord.xy + uTime) - 0.5) * uNoise;
-    
-    // قلب الألوان في الوضع النهاري
-    if (uIsLight > 0.5) {
-        col.rgb = 1.0 - col.rgb; 
-        col.rgb = mix(col.rgb, vec3(0.9, 0.9, 0.95), 0.5); // تخفيف التباين قليلاً في النهاري
-    } else {
-        // تعميق السواد في الوضع الليلي
-        col.rgb *= 0.8; 
+// ضجيج كسري (FBM) لإعطاء ملمس الغيوم/الدخان
+float fbm ( in vec2 _st) {
+    float v = 0.0;
+    float a = 0.5;
+    vec2 shift = vec2(100.0);
+    // تدوير لتقليل التكرار
+    mat2 rot = mat2(cos(0.5), sin(0.5),
+                    -sin(0.5), cos(0.50));
+    for (int i = 0; i < NUM_OCTAVES; ++i) {
+        v += a * noise(_st);
+        _st = rot * _st * 2.0 + shift;
+        a *= 0.5;
     }
+    return v;
+}
+
+vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
+void main() {
+    // توحيد الإحداثيات وحل مشكلة التموج العملاق
+    vec2 st = gl_FragCoord.xy / uResolution.xy;
+    st.x *= uResolution.x / uResolution.y; // تصحيح النسبة
     
-    gl_FragColor = vec4(clamp(col.rgb, 0.0, 1.0), 1.0);
+    // تحريك الكاميرا
+    vec2 q = vec2(0.);
+    q.x = fbm( st + 0.05 * uTime);
+    q.y = fbm( st + vec2(1.0));
+
+    vec2 r = vec2(0.);
+    r.x = fbm( st + 1.0 * q + vec2(1.7, 9.2) + 0.15 * uTime );
+    r.y = fbm( st + 1.0 * q + vec2(8.3, 2.8) + 0.126 * uTime);
+
+    float f = fbm(st + r);
+
+    // الألوان بناءً على الضجيج
+    vec3 color = vec3(0.0);
+    
+    // خلط الألوان لإنتاج تأثير النيون الغامض
+    // اللون الأساسي يتغير مع HueShift
+    float hue = uHueShift / 360.0;
+    
+    // تكوين اللون
+    vec3 baseColor = hsv2rgb(vec3(hue, 0.8, 0.8));
+    vec3 secondaryColor = hsv2rgb(vec3(fract(hue + 0.4), 0.8, 0.6));
+    
+    color = mix(vec3(0.1, 0.1, 0.16), // خلفية داكنة جداً
+                baseColor,
+                clamp((f*f)*4.0, 0.0, 1.0));
+
+    color = mix(color,
+                secondaryColor,
+                clamp(length(q), 0.0, 1.0));
+
+    color = mix(color,
+                vec3(0.9, 0.9, 0.9), // وميض أبيض خفيف
+                clamp(length(r.x), 0.0, 1.0));
+
+    // معالجة الوضع النهاري/الليلي
+    if (uIsLight > 0.5) {
+        // في النهار: نعكس الألوان ونخفف التشبع
+        color = 1.0 - color;
+        color = mix(color, vec3(0.95, 0.95, 0.98), 0.3);
+    } else {
+        // في الليل: نزيد التباين والظلام
+        color *= f * 1.8; 
+        color *= 0.8; // تعتيم عام
+    }
+
+    gl_FragColor = vec4(color, 1.0);
 }
 `;
 
 export default function DarkVeil({
-  hueShift = 20, // تعديل طفيف ليعطي ألوان نيون
-  noiseIntensity = 0.08,
-  scanlineIntensity = 0.15,
-  speed = 0.2, // أبطأ قليلاً ليكون أهدأ
-  scanlineFrequency = 0.5,
-  warpAmount = 0.8,
-  resolutionScale = 0.5 // تقليل الدقة قليلاً للأداء العالي (مثل الألعاب)
+  hueShift = 220, // أزرق/بنفسجي افتراضي
+  speed = 0.2
 }) {
-  const ref = useRef(null);
-  const { isDark } = useSettings(); // استدعاء حالة الثيم من السياق
+  const containerRef = useRef(null);
+  const { isDark } = useSettings();
 
   useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas) return;
-    
-    const parent = canvas.parentElement;
+    const container = containerRef.current;
+    if (!container) return;
 
+    // إعداد الـ Renderer
     const renderer = new Renderer({
-      dpr: Math.min(window.devicePixelRatio, 2),
-      alpha: false, 
-      canvas,
-      width: parent.clientWidth,
-      height: parent.clientHeight
+      alpha: false,
+      dpr: Math.min(window.devicePixelRatio, 2), // تحسين الأداء
+      width: container.clientWidth,
+      height: container.clientHeight,
     });
 
     const gl = renderer.gl;
+    // إضافة الكانفاس للـ DOM
+    container.appendChild(gl.canvas);
+    gl.clearColor(0, 0, 0, 1);
+
+    // إعداد الهندسة (مربع يغطي الشاشة)
     const geometry = new Triangle(gl);
 
+    // إعداد البرنامج (Shader)
     const program = new Program(gl, {
       vertex,
       fragment,
       uniforms: {
         uTime: { value: 0 },
-        uResolution: { value: new Vec2() },
+        uResolution: { value: new Vec2(gl.canvas.width, gl.canvas.height) },
         uHueShift: { value: hueShift },
-        uNoise: { value: noiseIntensity },
-        uScan: { value: scanlineIntensity },
-        uScanFreq: { value: scanlineFrequency },
-        uWarp: { value: warpAmount },
-        uIsLight: { value: isDark ? 0.0 : 1.0 } 
-      }
+        uIsLight: { value: isDark ? 0.0 : 1.0 }
+      },
     });
 
     const mesh = new Mesh(gl, { geometry, program });
 
-    const resize = () => {
-      if (!parent) return;
-      const w = parent.clientWidth;
-      const h = parent.clientHeight;
-      
-      // ضبط حجم الريندر (Buffer Size)
-      renderer.setSize(w * resolutionScale, h * resolutionScale);
-      
-      // *** التصحيح الحاسم *** 
-      // نرسل حجم الكانفاس الفعلي (بالبكسل) للشيدر حتى يعرف الحدود الصحيحة
-      // هذا يحل مشكلة الشاشة المقصوصة
-      program.uniforms.uResolution.value.set(gl.canvas.width, gl.canvas.height);
-    };
+    // دالة تغيير الحجم باستخدام ResizeObserver (أكثر دقة من window resize)
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        // تحديث حجم الـ Canvas الداخلي
+        renderer.setSize(width, height);
+        // تحديث متغير الدقة في الشيدر لإصلاح التمدد والقص
+        program.uniforms.uResolution.value.set(gl.drawingBufferWidth, gl.drawingBufferHeight);
+      }
+    });
 
-    window.addEventListener('resize', resize);
-    resize();
+    resizeObserver.observe(container);
 
     let animationId;
     const start = performance.now();
 
-    const loop = () => {
-      // الوقت
-      program.uniforms.uTime.value = ((performance.now() - start) / 1000) * speed;
+    const update = () => {
+      animationId = requestAnimationFrame(update);
       
-      // تحديث القيم
+      const time = (performance.now() - start) * 0.001 * speed;
+      program.uniforms.uTime.value = time;
       program.uniforms.uHueShift.value = hueShift;
-      program.uniforms.uNoise.value = noiseIntensity;
-      program.uniforms.uScan.value = scanlineIntensity;
-      program.uniforms.uScanFreq.value = scanlineFrequency;
-      program.uniforms.uWarp.value = warpAmount;
-      
-      // تحديث الوضع (ليلي/نهاري)
       program.uniforms.uIsLight.value = isDark ? 0.0 : 1.0;
 
       renderer.render({ scene: mesh });
-      animationId = requestAnimationFrame(loop);
     };
 
-    loop();
+    animationId = requestAnimationFrame(update);
 
+    // التنظيف عند الخروج
     return () => {
       cancelAnimationFrame(animationId);
-      window.removeEventListener('resize', resize);
-      // تنظيف WebGL context إن أمكن
-      const gl = renderer.gl;
-      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      resizeObserver.disconnect();
+      // محاولة تنظيف آمنة
+      if (container.contains(gl.canvas)) {
+        container.removeChild(gl.canvas);
+      }
+      // لا نستدعي loseContext يدوياً هنا لتجنب خطأ forEach، نترك المتصفح يدير الذاكرة
     };
-  }, [hueShift, noiseIntensity, scanlineIntensity, speed, scanlineFrequency, warpAmount, resolutionScale, isDark]);
+  }, [hueShift, speed, isDark]); // إعادة التشغيل فقط عند تغيير هذه القيم
 
-  return (
-    <div className="darkveil-container" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: -1, pointerEvents: 'none' }}>
-        <canvas ref={ref} className="darkveil-canvas" style={{ display: 'block', width: '100%', height: '100%' }} />
-    </div>
-  );
+  return <div ref={containerRef} style={styles.container} />;
 }
