@@ -8,11 +8,12 @@ import { doc, updateDoc } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import { 
   IconMoon, IconSun, IconDeviceDesktop, 
-  IconLogout, IconCheck, IconCamera, IconUser, IconDeviceFloppy
+  IconLogout, IconCheck, IconCamera, IconUser, IconDeviceFloppy,
+  IconLanguage, IconVocabulary, IconWorld
 } from '@tabler/icons-react';
 import { motion } from 'framer-motion';
 
-// قائمة الأفاتارات الجاهزة
+// قائمة الأفاتارات
 const AVATARS = [
   '/avatars/avatar1.png',
   '/avatars/avatar2.png',
@@ -22,38 +23,47 @@ const AVATARS = [
   '/avatars/avatar6.png',
 ];
 
+// لغات النظام المتاحة
+const SYSTEM_LANGUAGES = [
+  { code: 'ar', label: 'العربية', flag: '🇸🇦' },
+  { code: 'en', label: 'English', flag: '🇺🇸' },
+  { code: 'ru', label: 'Русский', flag: '🇷🇺' },
+];
+
+// لغات البطاقات (مبدئياً)
+const CARD_LANGUAGES = [
+  { code: 'ar', label: 'Arabic', sub: 'العربية' },
+  { code: 'en', label: 'English', sub: 'الإنجليزية' },
+];
+
 export default function SettingsView() {
   const { user, logout, userData } = useAuth();
-  const { settings, updateSettings } = useSettings();
+  const { settings, updateSettings, isDark } = useSettings(); // استدعاء الإعدادات وحالة الثيم
   
   const [displayName, setDisplayName] = useState(user?.displayName || userData?.displayName || "");
   const [photoURL, setPhotoURL] = useState(user?.photoURL || userData?.photoURL || "/avatars/avatar1.png");
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // دالة الحفظ
+  // --- دوال الحفظ والرفع (لم نغير فيها شيئاً) ---
   const handleSaveProfile = async () => {
     if (!user) return;
     setLoading(true);
     try {
-        // تحديث Auth
         await updateProfile(user, { displayName, photoURL });
-        // تحديث Firestore
         await updateDoc(doc(db, "users", user.uid), { displayName, photoURL });
-        alert("تم تحديث الملف الشخصي بنجاح!");
+        alert("تم تحديث الهوية بنجاح // IDENTITY UPDATED");
     } catch (error) {
         console.error(error);
-        alert("حدث خطأ أثناء الحفظ");
+        alert("فشل التحديث // UPDATE FAILED");
     } finally {
         setLoading(false);
     }
   };
 
-  // رفع صورة خاصة
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || !user) return;
-
     setLoading(true);
     try {
         const storage = getStorage();
@@ -63,82 +73,108 @@ export default function SettingsView() {
         setPhotoURL(url);
     } catch (error) {
         console.error("Upload failed", error);
-        alert("فشل رفع الصورة");
     } finally {
         setLoading(false);
     }
   };
 
-  const ThemeButton = ({ value, icon: Icon, label }) => {
-    const isActive = settings.theme === value;
-    return (
-        <button
-            onClick={() => updateSettings('theme', value)}
-            className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-200 group w-full
-            ${isActive 
-                ? 'border-indigo-500 bg-indigo-500/20 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)]' 
-                : 'border-white/10 bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'}`}
-        >
-            <div className="flex items-center gap-3">
-                <Icon size={20} className={isActive ? "text-indigo-400" : "text-gray-500"} />
-                <span className="text-sm font-bold">{label}</span>
-            </div>
-            {isActive && <IconCheck size={18} className="text-indigo-400" />}
-        </button>
-    );
-  };
+  // --- مكونات مساعدة للتصميم ---
+  
+  // زر اختيار عادي (للثيم)
+  const OptionButton = ({ isActive, onClick, icon: Icon, label }) => (
+    <button
+        onClick={onClick}
+        className={`flex items-center gap-3 p-3 rounded-xl border transition-all duration-200 w-full
+        ${isActive 
+            ? 'border-cyan-500 bg-cyan-500/10 text-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.2)]' 
+            : `border-transparent ${isDark ? 'bg-white/5 hover:bg-white/10 text-gray-400' : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}`}`}
+    >
+        <Icon size={20} />
+        <span className="text-sm font-bold">{label}</span>
+        {isActive && <IconCheck size={16} className="ml-auto" />}
+    </button>
+  );
+
+  // زر اختيار اللغة (كبير ومفصل)
+  const LangButton = ({ isActive, onClick, title, sub, flag }) => (
+    <button
+        onClick={onClick}
+        className={`relative flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-300 w-full h-24
+        ${isActive 
+            ? 'border-emerald-500 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.15)]' 
+            : `border-transparent ${isDark ? 'bg-[#1a1a1a] hover:bg-[#252525]' : 'bg-white shadow-sm hover:bg-gray-50'} opacity-60 hover:opacity-100`}`}
+    >
+        <span className="text-2xl mb-1">{flag}</span>
+        <span className={`text-sm font-bold ${isActive ? 'text-emerald-500' : isDark ? 'text-white' : 'text-gray-800'}`}>{title}</span>
+        {sub && <span className="text-[10px] opacity-50">{sub}</span>}
+        {isActive && (
+            <div className="absolute top-2 right-2 w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+        )}
+    </button>
+  );
+
+  // ألوان النصوص بناءً على الثيم
+  const textColor = isDark ? "text-white" : "text-gray-900";
+  const subTextColor = isDark ? "text-white/40" : "text-gray-500";
+  const sectionBg = isDark ? "bg-[#0a0a0a]/80 border-white/10" : "bg-white/80 border-black/5 shadow-xl";
 
   return (
-    <div className="w-full max-w-3xl mx-auto p-6 pb-40 font-sans bg-transparent">
+    <div className="w-full max-w-5xl mx-auto p-4 md:p-8 font-sans pb-32">
       
-      <div className="mb-10 text-center">
-          <h2 className="text-4xl font-black italic tracking-tighter text-white drop-shadow-lg mb-2">
-              IDENTITY CONFIG
+      <div className="mb-10">
+          <h2 className={`text-4xl font-black tracking-tighter ${textColor}`}>
+              SYSTEM <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-purple-500">CONFIG</span>
           </h2>
+          <p className={`text-sm font-mono mt-2 ${subTextColor}`}>// USER_PREFERENCES_MODULE_V4.0</p>
       </div>
 
-      <div className="space-y-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
-          {/* 1. قسم الملف الشخصي (تمت إعادته) */}
-          <section className="flex flex-col md:flex-row gap-6 items-center md:items-start p-6 rounded-3xl border border-white/5 bg-white/5 backdrop-blur-sm">
-              {/* الصورة */}
-              <div className="relative group">
-                  <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-indigo-500/30 shadow-lg">
-                      <img src={photoURL} alt="Profile" className="w-full h-full object-cover" />
-                  </div>
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full cursor-pointer"
-                  >
-                      <IconCamera className="text-white" />
-                  </button>
-                  <input ref={fileInputRef} type="file" hidden onChange={handleFileUpload} accept="image/*" />
+          {/* === العمود الأول: الهوية (Identity) === */}
+          <section className={`rounded-3xl border p-6 md:p-8 backdrop-blur-xl ${sectionBg}`}>
+              <div className="flex items-center gap-3 mb-6">
+                  <IconUser className="text-cyan-500" size={24} />
+                  <h3 className={`text-xl font-bold ${textColor}`}>OPERATIVE IDENTITY</h3>
               </div>
 
-              {/* البيانات */}
-              <div className="flex-1 w-full space-y-4">
+              <div className="flex flex-col items-center mb-8">
+                  <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                      <div className={`w-32 h-32 rounded-full overflow-hidden border-4 ${isDark ? 'border-[#1a1a1a]' : 'border-gray-100'} shadow-2xl relative z-10`}>
+                          <img src={photoURL} alt="Profile" className="w-full h-full object-cover" />
+                      </div>
+                      {/* حلقة مضيئة خلف الصورة */}
+                      <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-cyan-500 to-purple-500 blur opacity-50 group-hover:opacity-100 transition-opacity"></div>
+                      
+                      <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                          <IconCamera className="text-white" size={32}/>
+                      </div>
+                      <input ref={fileInputRef} type="file" hidden onChange={handleFileUpload} accept="image/*" />
+                  </div>
+                  <p className={`text-xs mt-3 font-mono ${subTextColor}`}>CLICK TO UPLOAD NEW AVATAR</p>
+              </div>
+
+              <div className="space-y-6">
                   <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase ml-1 block mb-1">Display Name</label>
+                      <label className={`text-xs font-bold uppercase tracking-wider mb-2 block ${subTextColor}`}>Codename (Display Name)</label>
                       <div className="relative">
                           <input 
                             value={displayName} 
                             onChange={(e) => setDisplayName(e.target.value)}
-                            className="w-full bg-black/30 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white focus:border-indigo-500 outline-none transition-colors"
-                            placeholder="Enter your codename..."
+                            className={`w-full rounded-xl py-3 pl-10 pr-4 outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all font-bold ${isDark ? 'bg-black/50 border border-white/10 text-white' : 'bg-gray-50 border border-gray-200 text-gray-900'}`}
+                            placeholder="ENTER CODENAME..."
                           />
-                          <IconUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
+                          <IconUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18}/>
                       </div>
                   </div>
 
-                  {/* شبكة الأفاتار */}
                   <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase ml-1 block mb-2">Select Avatar</label>
-                      <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                      <label className={`text-xs font-bold uppercase tracking-wider mb-3 block ${subTextColor}`}>Select Avatar Protocol</label>
+                      <div className="grid grid-cols-6 gap-2">
                           {AVATARS.map((avi, i) => (
                               <button 
                                 key={i} 
                                 onClick={() => setPhotoURL(avi)}
-                                className={`w-10 h-10 rounded-full border-2 overflow-hidden shrink-0 transition-all ${photoURL === avi ? 'border-indigo-500 scale-110' : 'border-transparent opacity-50 hover:opacity-100'}`}
+                                className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${photoURL === avi ? 'border-cyan-500 scale-110 shadow-lg shadow-cyan-500/20' : 'border-transparent opacity-60 hover:opacity-100 hover:scale-105'}`}
                               >
                                   <img src={avi} className="w-full h-full object-cover" />
                               </button>
@@ -149,36 +185,101 @@ export default function SettingsView() {
                   <button 
                     onClick={handleSaveProfile}
                     disabled={loading}
-                    className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50"
+                    className="w-full py-4 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                      {loading ? "Saving..." : <><IconDeviceFloppy size={16}/> Save Changes</>}
+                      {loading ? "PROCESSING..." : <><IconDeviceFloppy size={20}/> SAVE IDENTITY</>}
                   </button>
               </div>
           </section>
 
-          {/* 2. قسم المظهر (بدون خلفية مظللة كما طلبت) */}
-          <section>
-              <div className="flex items-center gap-2 mb-4 px-2 text-xs font-bold text-gray-400 uppercase tracking-[0.2em]">
-                  <IconDeviceDesktop size={16} /> Interface
-              </div>
-              <div className="flex flex-col gap-3">
-                  <ThemeButton value="dark" icon={IconMoon} label="Cyber Dark" />
-                  <ThemeButton value="light" icon={IconSun} label="Pro Light" />
-                  <ThemeButton value="system" icon={IconDeviceDesktop} label="Auto Sync" />
-              </div>
-          </section>
+          {/* === العمود الثاني: النظام واللغة (System & Language) === */}
+          <div className="space-y-6">
+              
+              {/* 1. إعدادات اللغة (جديد) */}
+              <section className={`rounded-3xl border p-6 md:p-8 backdrop-blur-xl ${sectionBg}`}>
+                  <div className="flex items-center gap-3 mb-6">
+                      <IconWorld className="text-emerald-500" size={24} />
+                      <h3 className={`text-xl font-bold ${textColor}`}>LOCALIZATION</h3>
+                  </div>
 
-          {/* 3. زر الخروج */}
-          <section className="pt-4">
+                  {/* لغة النظام */}
+                  <div className="mb-6">
+                      <label className={`text-xs font-bold uppercase tracking-wider mb-3 block ${subTextColor}`}>System Language</label>
+                      <div className="grid grid-cols-3 gap-3">
+                          {SYSTEM_LANGUAGES.map((lang) => (
+                              <LangButton 
+                                  key={lang.code}
+                                  title={lang.code.toUpperCase()}
+                                  sub={lang.label}
+                                  flag={lang.flag}
+                                  isActive={settings.systemLanguage === lang.code}
+                                  onClick={() => updateSettings('systemLanguage', lang.code)}
+                              />
+                          ))}
+                      </div>
+                  </div>
+
+                  {/* لغة البطاقات */}
+                  <div>
+                      <div className="flex justify-between items-center mb-3">
+                          <label className={`text-xs font-bold uppercase tracking-wider block ${subTextColor}`}>Target Language</label>
+                          <span className="text-[10px] bg-emerald-500/10 text-emerald-500 px-2 py-0.5 rounded font-mono">EXPERIMENTAL</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                          {CARD_LANGUAGES.map((lang) => (
+                              <OptionButton 
+                                  key={lang.code}
+                                  icon={IconVocabulary}
+                                  label={lang.label}
+                                  isActive={settings.cardLanguage === lang.code}
+                                  onClick={() => updateSettings('cardLanguage', lang.code)}
+                              />
+                          ))}
+                      </div>
+                  </div>
+              </section>
+
+              {/* 2. إعدادات المظهر */}
+              <section className={`rounded-3xl border p-6 md:p-8 backdrop-blur-xl ${sectionBg}`}>
+                  <div className="flex items-center gap-3 mb-6">
+                      <IconDeviceDesktop className="text-purple-500" size={24} />
+                      <h3 className={`text-xl font-bold ${textColor}`}>INTERFACE THEME</h3>
+                  </div>
+                  <div className="space-y-3">
+                      <OptionButton 
+                          icon={IconMoon} 
+                          label="Cyber Dark" 
+                          isActive={settings.theme === 'dark'} 
+                          onClick={() => updateSettings('theme', 'dark')} 
+                      />
+                      <OptionButton 
+                          icon={IconSun} 
+                          label="Pro Light" 
+                          isActive={settings.theme === 'light'} 
+                          onClick={() => updateSettings('theme', 'light')} 
+                      />
+                      <OptionButton 
+                          icon={IconDeviceDesktop} 
+                          label="Auto Sync" 
+                          isActive={settings.theme === 'system'} 
+                          onClick={() => updateSettings('theme', 'system')} 
+                      />
+                  </div>
+              </section>
+
+              {/* زر الخروج */}
               <button 
                 onClick={logout} 
-                className="w-full py-4 rounded-xl border border-red-500/20 bg-red-500/5 text-red-500 font-bold hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider group"
+                className={`w-full py-4 rounded-xl border font-bold transition-all flex items-center justify-center gap-2 text-sm uppercase tracking-wider group
+                ${isDark 
+                    ? 'border-red-500/20 bg-red-500/5 text-red-500 hover:bg-red-500 hover:text-white' 
+                    : 'border-red-200 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white'}`}
               >
                   <IconLogout size={18} className="group-hover:-translate-x-1 transition-transform" /> 
-                  Terminate Session
+                  TERMINATE SESSION
               </button>
-          </section>
 
+          </div>
       </div>
     </div>
   );

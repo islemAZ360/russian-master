@@ -7,10 +7,11 @@ const DEFAULT_SETTINGS = {
   sound: true,
   sfx: true,
   theme: 'dark', // dark, light, system
-  language: 'ar',
+  systemLanguage: 'ar', // ar, en, ru (لغة الموقع)
+  cardLanguage: 'ar',   // ar, en (لغة ترجمة البطاقات)
 };
 
-const STORAGE_KEY = 'russian_master_config_v3';
+const STORAGE_KEY = 'russian_master_config_v4'; // تحديث الإصدار
 
 export const SettingsProvider = ({ children }) => {
   const [mounted, setMounted] = useState(false);
@@ -38,6 +39,13 @@ export const SettingsProvider = ({ children }) => {
       root.classList.add('light');
       root.classList.remove('dark');
     }
+    
+    // هنا يمكن لاحقاً إضافة منطق تغيير لغة الموقع (RTL/LTR)
+    // if (newSettings.systemLanguage === 'en' || newSettings.systemLanguage === 'ru') {
+    //   root.setAttribute('dir', 'ltr');
+    // } else {
+    //   root.setAttribute('dir', 'rtl');
+    // }
   };
 
   useEffect(() => {
@@ -46,13 +54,7 @@ export const SettingsProvider = ({ children }) => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // تنظيف الإعدادات القديمة (مثل quality)
-        const cleanSettings = {
-            sound: parsed.sound ?? true,
-            sfx: parsed.sfx ?? true,
-            theme: parsed.theme || 'dark',
-            language: 'ar'
-        };
+        const cleanSettings = { ...DEFAULT_SETTINGS, ...parsed };
         setSettings(cleanSettings);
         applySettings(cleanSettings);
       } catch(e) { applySettings(DEFAULT_SETTINGS); }

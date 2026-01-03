@@ -1,8 +1,8 @@
 "use client";
+import React, { useRef, useState } from "react"; // <--- تم إضافة React هنا
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { useRef, useState } from "react";
-import { useSettings } from "@/context/SettingsContext"; // استيراد الإعدادات
+import { useSettings } from "@/context/SettingsContext";
 
 export const FloatingDock = ({ items, className }) => {
   return (
@@ -14,7 +14,7 @@ export const FloatingDock = ({ items, className }) => {
 
 const FloatingDockBar = ({ items }) => {
   let mouseX = useMotionValue(Infinity);
-  const { isDark } = useSettings(); // الحصول على حالة الثيم
+  const { isDark } = useSettings(); 
   
   return (
     <motion.div
@@ -30,7 +30,7 @@ const FloatingDockBar = ({ items }) => {
             mouseX={mouseX} 
             key={item.title} 
             {...item} 
-            isDark={isDark} // تمرير الحالة
+            isDark={isDark} 
         />
       ))}
     </motion.div>
@@ -53,9 +53,6 @@ function IconContainer({ mouseX, title, icon, onClick, isDark }) {
 
   const [hovered, setHovered] = useState(false);
 
-  // تحديد لون الأيقونة
-  // إذا كانت الأيقونة "Base" (Home) والوضع نهاري (!isDark)، نستخدم لوناً داكناً
-  // باقي الأيقونات تبقى كما هي (تحتوي على ألوانها الخاصة في المصفوفة الأصلية) أو تأخذ الرمادي الفاتح
   const iconClass = (title === "Base" && !isDark) 
     ? "text-neutral-700" 
     : "text-neutral-300";
@@ -69,7 +66,6 @@ function IconContainer({ mouseX, title, icon, onClick, isDark }) {
         onMouseLeave={() => setHovered(false)}
         className={cn(
             "aspect-square rounded-full flex items-center justify-center relative cursor-pointer border transition-colors will-change-transform",
-            // تغيير خلفية الدائرة في الوضع النهاري لتكون واضحة
             isDark ? "bg-white/5 border-white/10 hover:bg-white/10" : "bg-gray-100 border-gray-200 hover:bg-gray-200"
         )}
       >
@@ -89,11 +85,8 @@ function IconContainer({ mouseX, title, icon, onClick, isDark }) {
           )}
         </AnimatePresence>
         
-        {/* نطبق كلاس اللون فقط إذا لم يكن العنصر يحتوي على لون خاص به مسبقاً (مثل الـ svg الممرر) */}
-        {/* في الكود الأصلي في page.js، أيقونة Home لديها كلاس text-white/80. */}
-        {/* هنا نقوم بتغليف الأيقونة في div ونطبق اللون عليه لفرض التغيير */}
         <div className={cn("flex items-center justify-center w-5 h-5 md:w-6 md:h-6", iconClass)}>
-            {/* نقوم باستنساخ الأيقونة لتمرير الكلاس الجديد إذا لزم الأمر، أو نعتمد على الـ div المحيط */}
+            {/* هنا كان سبب الخطأ، الآن سيعمل لأننا استوردنا React */}
             {React.isValidElement(icon) 
                 ? React.cloneElement(icon, { 
                     className: cn(icon.props.className, title === "Base" && !isDark ? "text-neutral-700" : "") 
