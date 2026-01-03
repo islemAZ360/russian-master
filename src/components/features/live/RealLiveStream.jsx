@@ -1,46 +1,60 @@
 "use client";
-import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   IconBroadcast, IconX, IconLoader, IconPlayerRecord, 
   IconPlayerStop, IconMicrophone, IconWifi, IconLock, 
-  IconDeviceTv, IconShieldCheck, IconActivity
+  IconDeviceTv, IconShieldCheck, IconActivity, IconCpu, IconServer
 } from "@tabler/icons-react";
 
-// استيراد ديناميكي مع إيقاف SSR لتسريع التحميل الأولي
+// استيراد Jitsi ديناميكيًا لتقليل وقت التحميل الأولي
 const JitsiMeeting = dynamic(
   () => import('@jitsi/react-sdk').then((mod) => mod.JitsiMeeting),
-  { ssr: false, loading: () => <CustomLoader /> }
+  { ssr: false, loading: () => <div className="bg-black w-full h-full" /> }
 );
 
-// --- مكون التحميل المخصص (خفيف جداً) ---
-const CustomLoader = () => (
-  <div className="flex flex-col items-center justify-center h-full w-full bg-black text-cyan-500">
-    <div className="relative w-16 h-16">
-      <div className="absolute inset-0 border-4 border-cyan-500/30 rounded-full"></div>
-      <div className="absolute inset-0 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
-    </div>
-    <div className="mt-4 text-xs font-mono tracking-[0.3em] animate-pulse">ESTABLISHING UPLINK...</div>
+// --- 1. مكون الموجات الصوتية الوهمية (CSS Pure Performance) ---
+// هذا المكون يعطي انطباع تحليل الصوت دون استهلاك المعالج
+const FakeAudioVisualizer = () => (
+  <div className="flex items-end gap-[2px] h-4">
+    {[...Array(5)].map((_, i) => (
+      <div 
+        key={i} 
+        className="w-1 bg-cyan-500/80 rounded-t-sm animate-pulse"
+        style={{ 
+            height: `${Math.random() * 100}%`,
+            animationDuration: `${0.4 + Math.random() * 0.5}s` 
+        }} 
+      />
+    ))}
   </div>
 );
 
-// --- مكون الفيديو المعزول (Jitsi) ---
-// نستخدم React.memo هنا بصرامة لمنع إعادة التحميل عند تغيير حالة التسجيل أو الأزرار
+// --- 2. سجل النظام (Terminal Log) ---
+const SystemLog = ({ logs }) => (
+  <div className="font-mono text-[9px] text-green-500/60 h-16 overflow-hidden flex flex-col justify-end pointer-events-none">
+    {logs.map((log, i) => (
+      <motion.div 
+        key={i} 
+        initial={{ opacity: 0, x: -10 }} 
+        animate={{ opacity: 1, x: 0 }}
+        className="truncate"
+      >
+        {`> ${log}`}
+      </motion.div>
+    ))}
+  </div>
+);
+
+// --- 3. مكون الفيديو المعزول (Memoized for Performance) ---
 const SecureMeeting = React.memo(({ roomName, userName, onReadyToClose }) => {
-  
-  // تثبيت الإعدادات في الذاكرة لمنع أي وميض أو إعادة تحميل
   const configOverwrite = useMemo(() => ({
     startWithAudioMuted: true,
     startWithVideoMuted: true,
-    disableThirdPartyRequests: true, // تسريع الاتصال
-    prejoinPageEnabled: false, // الدخول المباشر
-    resolution: 720, // دقة متوازنة للأداء
-    constraints: {
-        video: {
-            height: { ideal: 720, max: 720, min: 240 }
-        }
-    },
+    disableThirdPartyRequests: true,
+    prejoinPageEnabled: false,
+    resolution: 720,
     toolbarButtons: [
        'microphone', 'camera', 'desktop', 'fullscreen',
        'fodeviceselection', 'hangup', 'chat', 'raisehand',
@@ -52,14 +66,12 @@ const SecureMeeting = React.memo(({ roomName, userName, onReadyToClose }) => {
     SHOW_JITSI_WATERMARK: false,
     SHOW_WATERMARK_FOR_GUESTS: false,
     DEFAULT_BACKGROUND: '#000000',
-    DEFAULT_LOCAL_DISPLAY_NAME: 'Me',
     TOOLBAR_ALWAYS_VISIBLE: false,
-    filmStripOnly: false,
-    DISABLE_JOIN_LEAVE_NOTIFICATIONS: true, // تقليل الضجيج
+    DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
   }), []);
 
   return (
-    <div className="w-full h-full bg-black rounded-2xl overflow-hidden relative z-0">
+    <div className="w-full h-full bg-black relative z-0">
       <JitsiMeeting
         domain="meet.jit.si"
         roomName={`RM_SECURE_${roomName}`}
@@ -76,243 +88,241 @@ const SecureMeeting = React.memo(({ roomName, userName, onReadyToClose }) => {
       />
     </div>
   );
-}, (prev, next) => prev.roomName === next.roomName); // إعادة التصيير فقط إذا تغير اسم الغرفة
+}, (prev, next) => prev.roomName === next.roomName);
 
 SecureMeeting.displayName = "SecureMeeting";
 
 // --- المكون الرئيسي ---
 export default function RealLiveStream({ user, onClose }) {
   const [roomName, setRoomName] = useState("");
-  const [isJoined, setIsJoined] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false); // مرحلة تحليل الشبكة
+  const [status, setStatus] = useState("idle"); // idle, scanning, connected
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
+  const [logs, setLogs] = useState(["SYSTEM_READY", "WAITING FOR INPUT..."]);
+  const [timer, setTimer] = useState("00:00");
   
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
-  const timerRef = useRef(null);
+  const timerInterval = useRef(null);
 
-  // منطق المؤقت (Timer Logic)
-  useEffect(() => {
-    if (isRecording) {
-      timerRef.current = setInterval(() => setRecordingTime(p => p + 1), 1000);
-    } else {
-      clearInterval(timerRef.current);
-      setRecordingTime(0);
-    }
-    return () => clearInterval(timerRef.current);
-  }, [isRecording]);
+  // إضافة سجلات وهمية للمظهر الاحترافي
+  const addLog = (msg) => setLogs(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString().split(' ')[0]} ${msg}`]);
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const handleJoinSequence = () => {
+  const handleJoin = () => {
     if (!roomName.trim()) return;
-    setIsAnalyzing(true);
-    // محاكاة فحص الشبكة لإعطاء طابع احترافي
+    setStatus("scanning");
+    addLog("INITIATING HANDSHAKE...");
+    
+    // تسلسل دخول سينمائي
+    setTimeout(() => addLog("ENCRYPTING TRAFFIC (AES-256)..."), 500);
+    setTimeout(() => addLog("ESTABLISHING P2P BRIDGE..."), 1000);
     setTimeout(() => {
-        setIsAnalyzing(false);
-        setIsJoined(true);
-    }, 1500);
+        setStatus("connected");
+        addLog("CONNECTION SECURE.");
+    }, 1800);
   };
 
-  // تسجيل الشاشة بجودة عالية
+  // منطق التسجيل
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ 
-        video: { cursor: "always" }, 
-        audio: true 
-      });
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) chunksRef.current.push(event.data);
-      };
-
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       mediaRecorder.onstop = () => {
-        saveVideo();
+        const blob = new Blob(chunksRef.current, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.style = "display: none";
+        a.href = url;
+        a.download = `Mission_Log_${roomName}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
         setIsRecording(false);
-        stream.getTracks().forEach(track => track.stop()); // إيقاف مشاركة الشاشة
+        clearInterval(timerInterval.current);
+        stream.getTracks().forEach(track => track.stop());
       };
 
       mediaRecorder.start();
       setIsRecording(true);
+      
+      // Timer Logic
+      let seconds = 0;
+      timerInterval.current = setInterval(() => {
+          seconds++;
+          const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+          const s = (seconds % 60).toString().padStart(2, '0');
+          setTimer(`${m}:${s}`);
+      }, 1000);
+
     } catch (err) {
-      console.error("Recording error:", err);
-      alert("Recording permission denied or canceled.");
+      console.error(err);
+      addLog("REC_ERROR: PERMISSION DENIED");
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-    }
-  };
-
-  const saveVideo = () => {
-    const blob = new Blob(chunksRef.current, { type: "video/webm" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    document.body.appendChild(a);
-    a.style = "display: none";
-    a.href = url;
-    a.download = `Mission_Log_${roomName}_${new Date().toISOString().slice(0,10)}.webm`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    if (mediaRecorderRef.current && isRecording) mediaRecorderRef.current.stop();
   };
 
   return (
-    <div className="w-full h-full flex flex-col relative font-sans overflow-hidden">
+    <div className="w-full h-full flex flex-col relative font-sans overflow-hidden bg-black">
       
       <AnimatePresence mode="wait">
-        {!isJoined ? (
-            /* === LOBBY: THE SECURE TERMINAL === */
+        {status !== "connected" ? (
+            /* === LOBBY: SECURE TERMINAL === */
             <motion.div 
                 key="lobby"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.05, filter: "blur(20px)" }}
-                className="absolute inset-0 z-50 flex items-center justify-center p-6"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, scale: 1.1, filter: "blur(10px)" }}
+                className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-opacity-10"
             >
-                <div className="w-full max-w-md bg-[#0a0a0a]/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-8 shadow-2xl relative overflow-hidden group">
-                    {/* Dynamic Border Gradient */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 pointer-events-none"></div>
-                    
-                    <div className="text-center mb-10">
-                        <div className="w-20 h-20 bg-gradient-to-tr from-cyan-900 to-black rounded-2xl flex items-center justify-center mx-auto mb-6 border border-cyan-500/30 shadow-[0_0_40px_rgba(6,182,212,0.2)]">
-                            <IconBroadcast size={40} className="text-cyan-400" />
-                        </div>
-                        <h2 className="text-3xl font-black text-white tracking-tight mb-2">NEURAL LINK</h2>
-                        <div className="flex items-center justify-center gap-2 text-[10px] font-mono text-cyan-500/60 uppercase tracking-[0.2em]">
-                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                            Secure Gateway V.4.0
-                        </div>
-                    </div>
+                {/* Background Tech Rings */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
+                    <div className="w-[600px] h-[600px] border border-cyan-500/20 rounded-full animate-[spin_10s_linear_infinite]"></div>
+                    <div className="w-[450px] h-[450px] border border-dashed border-cyan-500/20 rounded-full animate-[spin_15s_linear_infinite_reverse]"></div>
+                </div>
 
-                    <div className="space-y-6 relative z-10">
-                        <div className="relative group/input">
-                            <IconDeviceTv className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within/input:text-cyan-400 transition-colors" size={20} />
-                            <input 
-                                value={roomName}
-                                onChange={(e) => setRoomName(e.target.value)}
-                                placeholder="ENTER FREQUENCY ID..."
-                                className="w-full bg-black/50 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white outline-none focus:border-cyan-500 focus:bg-cyan-950/10 transition-all font-mono text-sm uppercase"
-                                onKeyDown={(e) => e.key === 'Enter' && handleJoinSequence()}
-                            />
-                        </div>
-
-                        <button 
-                            onClick={handleJoinSequence}
-                            disabled={!roomName || isAnalyzing}
-                            className="w-full py-4 bg-white text-black font-black rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(255,255,255,0.1)]"
-                        >
-                            {isAnalyzing ? (
-                                <>
-                                    <IconLoader className="animate-spin" size={20} />
-                                    <span className="tracking-widest text-xs">ENCRYPTING...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <IconShieldCheck size={20} />
-                                    <span className="tracking-widest text-xs">INITIALIZE UPLINK</span>
-                                </>
-                            )}
-                        </button>
+                <div className="w-full max-w-md bg-[#050505]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-1 overflow-hidden shadow-2xl">
+                    <div className="bg-[#0a0a0a] rounded-xl p-8 border border-white/5 relative overflow-hidden">
                         
-                        {/* Network Status Indicators */}
-                        <div className="grid grid-cols-2 gap-2 mt-4 opacity-50">
-                            <div className="bg-white/5 rounded-lg p-2 flex items-center justify-center gap-2 border border-white/5">
-                                <IconWifi size={14} className="text-green-500"/> <span className="text-[9px] text-white font-mono">LATENCY: 12ms</span>
+                        {/* Scanning Line Effect */}
+                        {status === "scanning" && (
+                            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-500/10 to-transparent h-1/2 w-full animate-[scan_2s_linear_infinite] pointer-events-none"></div>
+                        )}
+
+                        <div className="flex justify-between items-start mb-8">
+                            <div>
+                                <h2 className="text-2xl font-black text-white tracking-tighter">SECURE <span className="text-cyan-500">UPLINK</span></h2>
+                                <p className="text-[10px] text-white/40 font-mono tracking-[0.2em]">SATELLITE V.9.2</p>
                             </div>
-                            <div className="bg-white/5 rounded-lg p-2 flex items-center justify-center gap-2 border border-white/5">
-                                <IconLock size={14} className="text-yellow-500"/> <span className="text-[9px] text-white font-mono">AES-256</span>
+                            <IconBroadcast className={`text-cyan-500 ${status === 'scanning' ? 'animate-pulse' : ''}`} size={32} />
+                        </div>
+
+                        <div className="space-y-6 relative z-10">
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <IconDeviceTv className="text-white/30 group-focus-within:text-cyan-400 transition-colors" size={20} />
+                                </div>
+                                <input 
+                                    value={roomName}
+                                    onChange={(e) => setRoomName(e.target.value.toUpperCase())}
+                                    placeholder="FREQUENCY ID..."
+                                    className="w-full bg-black border border-white/10 rounded-lg py-4 pl-12 pr-4 text-white outline-none focus:border-cyan-500/50 transition-all font-mono text-sm tracking-widest placeholder-white/20"
+                                    disabled={status === "scanning"}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
+                                />
                             </div>
+
+                            <button 
+                                onClick={handleJoin}
+                                disabled={!roomName || status === "scanning"}
+                                className="w-full py-4 bg-white text-black font-black text-xs tracking-[0.2em] rounded-lg hover:bg-cyan-50 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {status === "scanning" ? <IconLoader className="animate-spin" size={16} /> : <IconShieldCheck size={16} />}
+                                {status === "scanning" ? "ESTABLISHING..." : "INITIALIZE"}
+                            </button>
+                            
+                            <div className="h-px w-full bg-white/5"></div>
+                            
+                            <SystemLog logs={logs} />
                         </div>
                     </div>
                 </div>
             </motion.div>
         ) : (
-            /* === ACTIVE STREAM UI === */
+            /* === ACTIVE STREAM HUD === */
             <motion.div 
                 key="stream"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="relative w-full h-full flex flex-col bg-black overflow-hidden"
             >
-                {/* 1. Header Control Bar (Floating) */}
-                <motion.div 
-                    initial={{ y: -50, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                    className="absolute top-4 left-0 w-full flex justify-center z-[100] pointer-events-none"
-                >
-                    <div className="pointer-events-auto bg-[#1a1a1a]/90 backdrop-blur-md border border-white/10 px-6 py-2 rounded-full shadow-2xl flex items-center gap-6">
+                {/* 1. HUD Top Bar */}
+                <div className="absolute top-4 left-4 right-4 z-50 flex justify-between items-start pointer-events-none">
+                    {/* Left Info */}
+                    <div className="flex flex-col gap-2 pointer-events-auto">
+                        <div className="bg-black/60 backdrop-blur-md border border-white/10 px-4 py-2 rounded-lg flex items-center gap-4 shadow-lg">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_#ef4444]"></div>
+                                <span className="text-xs font-black text-white tracking-widest">LIVE</span>
+                            </div>
+                            <div className="h-4 w-px bg-white/10"></div>
+                            <div className="text-[10px] font-mono text-cyan-400 tracking-wider">
+                                {roomName}
+                            </div>
+                        </div>
                         
-                        {/* Status */}
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_10px_red]"></div>
-                            <span className="text-xs font-black text-white uppercase tracking-widest">LIVE</span>
+                        {/* Fake Stats */}
+                        <div className="flex gap-2">
+                            <div className="bg-black/40 px-2 py-1 rounded border border-white/5 text-[9px] font-mono text-green-500 flex items-center gap-1">
+                                <IconWifi size={10}/> 24ms
+                            </div>
+                            <div className="bg-black/40 px-2 py-1 rounded border border-white/5 text-[9px] font-mono text-yellow-500 flex items-center gap-1">
+                                <IconCpu size={10}/> OPTIMAL
+                            </div>
                         </div>
+                    </div>
 
-                        <div className="h-4 w-[1px] bg-white/10"></div>
-
-                        {/* Room Info */}
-                        <div className="flex items-center gap-2 text-white/50">
-                            <IconActivity size={14} className="text-cyan-500"/>
-                            <span className="text-xs font-mono uppercase">{roomName}</span>
+                    {/* Right Controls */}
+                    <div className="flex items-center gap-2 pointer-events-auto bg-black/60 backdrop-blur-md border border-white/10 px-2 py-2 rounded-lg shadow-lg">
+                        {/* Audio Viz */}
+                        <div className="px-2 hidden sm:block">
+                            <FakeAudioVisualizer />
                         </div>
+                        
+                        {isRecording && (
+                            <span className="font-mono text-red-400 text-xs font-bold px-2 animate-pulse">
+                                {timer}
+                            </span>
+                        )}
 
-                        <div className="h-4 w-[1px] bg-white/10"></div>
+                        <div className="h-6 w-px bg-white/10 mx-1"></div>
 
-                        {/* Recording Controls */}
-                        <div className="flex items-center gap-3">
-                            {isRecording && (
-                                <span className="font-mono text-red-400 text-xs font-bold animate-pulse">
-                                    {formatTime(recordingTime)}
-                                </span>
-                            )}
-                            <button 
-                                onClick={isRecording ? stopRecording : startRecording}
-                                className={`p-2 rounded-full transition-all ${
-                                    isRecording 
-                                    ? 'bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white' 
-                                    : 'bg-white/5 text-white hover:bg-white/20'
-                                }`}
-                                title={isRecording ? "Stop Recording" : "Start Recording"}
-                            >
-                                {isRecording ? <IconPlayerStop size={18}/> : <IconPlayerRecord size={18}/>}
-                            </button>
-                        </div>
-
-                        {/* Close */}
+                        <button 
+                            onClick={isRecording ? stopRecording : startRecording}
+                            className={`p-2 rounded-md transition-all ${
+                                isRecording 
+                                ? 'bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white' 
+                                : 'bg-white/5 text-white hover:bg-white/20'
+                            }`}
+                            title={isRecording ? "Stop Recording" : "Start Recording"}
+                        >
+                            {isRecording ? <IconPlayerStop size={18}/> : <IconPlayerRecord size={18}/>}
+                        </button>
+                        
                         <button 
                             onClick={onClose}
-                            className="bg-red-600 hover:bg-red-500 text-white p-2 rounded-full transition-colors ml-2 shadow-lg"
+                            className="bg-red-600 hover:bg-red-500 text-white p-2 rounded-md transition-colors ml-1"
                         >
                             <IconX size={18} />
                         </button>
                     </div>
-                </motion.div>
+                </div>
 
-                {/* 2. The Meeting Container (Memoized) */}
+                {/* 2. The Meeting Container */}
                 <div className="flex-1 w-full h-full relative">
                     <SecureMeeting 
                         roomName={roomName}
                         userName={user?.displayName || user?.email?.split('@')[0]}
                         onReadyToClose={onClose}
                     />
+                    
+                    {/* HUD Decorative Corners (Overlay) */}
+                    <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10">
+                        <svg className="w-full h-full opacity-30" preserveAspectRatio="none">
+                            <path d="M 20 20 L 50 20 L 50 21 L 21 21 L 21 50 L 20 50 Z" fill="#06b6d4" />
+                            <path d="M 20 20 L 30 30" stroke="#06b6d4" strokeWidth="1" />
+                            
+                            <path d="M 98% 20 L 95% 20" stroke="#06b6d4" strokeWidth="1" strokeDasharray="2,2"/>
+                            
+                            <path d="M 20 95% L 20 98%" stroke="#06b6d4" strokeWidth="1" strokeDasharray="2,2"/>
+                        </svg>
+                    </div>
                 </div>
-
-                {/* 3. Aesthetic Overlays (Corners) */}
-                <div className="absolute top-6 left-6 w-16 h-16 border-t-2 border-l-2 border-white/20 rounded-tl-2xl pointer-events-none z-10"></div>
-                <div className="absolute top-6 right-6 w-16 h-16 border-t-2 border-r-2 border-white/20 rounded-tr-2xl pointer-events-none z-10"></div>
-                <div className="absolute bottom-6 left-6 w-16 h-16 border-b-2 border-l-2 border-white/20 rounded-bl-2xl pointer-events-none z-10"></div>
-                <div className="absolute bottom-6 right-6 w-16 h-16 border-b-2 border-r-2 border-white/20 rounded-br-2xl pointer-events-none z-10"></div>
 
             </motion.div>
         )}
