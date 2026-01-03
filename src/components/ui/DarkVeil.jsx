@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react'; // أضفنا useMemo و React.memo
 import {
   Scene,
   OrthographicCamera,
@@ -213,7 +213,8 @@ function hexToVec3(hex) {
   return new Vector3(r / 255, g / 255, b / 255);
 }
 
-export default function DarkVeil({
+// 1. تحويل المكون إلى دالة عادية أولاً ليمكننا تغليفها بـ React.memo لاحقاً
+const DarkVeil = ({
   linesGradient = [], 
   enabledWaves = ['top', 'middle', 'bottom'],
   lineCount = [6],
@@ -229,7 +230,7 @@ export default function DarkVeil({
   parallax = true,
   parallaxStrength = 0.2,
   mixBlendMode = 'screen'
-}) {
+}) => {
   const containerRef = useRef(null);
   const targetMouseRef = useRef(new Vector2(-1000, -1000));
   const currentMouseRef = useRef(new Vector2(-1000, -1000));
@@ -238,32 +239,18 @@ export default function DarkVeil({
   const targetParallaxRef = useRef(new Vector2(0, 0));
   const currentParallaxRef = useRef(new Vector2(0, 0));
 
-  const getLineCount = waveType => {
-    if (typeof lineCount === 'number') return lineCount;
-    if (!enabledWaves.includes(waveType)) return 0;
-    const index = enabledWaves.indexOf(waveType);
-    return lineCount[index] ?? 6;
-  };
+  // useMemo للحسابات البسيطة لتقليل العبء
+  const topLineCount = useMemo(() => enabledWaves.includes('top') ? (typeof lineCount === 'number' ? lineCount : lineCount[enabledWaves.indexOf('top')] ?? 6) : 0, [enabledWaves, lineCount]);
+  const middleLineCount = useMemo(() => enabledWaves.includes('middle') ? (typeof lineCount === 'number' ? lineCount : lineCount[enabledWaves.indexOf('middle')] ?? 6) : 0, [enabledWaves, lineCount]);
+  const bottomLineCount = useMemo(() => enabledWaves.includes('bottom') ? (typeof lineCount === 'number' ? lineCount : lineCount[enabledWaves.indexOf('bottom')] ?? 6) : 0, [enabledWaves, lineCount]);
 
-  const getLineDistance = waveType => {
-    if (typeof lineDistance === 'number') return lineDistance;
-    if (!enabledWaves.includes(waveType)) return 0.1;
-    const index = enabledWaves.indexOf(waveType);
-    return lineDistance[index] ?? 0.1;
-  };
-
-  const topLineCount = enabledWaves.includes('top') ? getLineCount('top') : 0;
-  const middleLineCount = enabledWaves.includes('middle') ? getLineCount('middle') : 0;
-  const bottomLineCount = enabledWaves.includes('bottom') ? getLineCount('bottom') : 0;
-
-  const topLineDistance = enabledWaves.includes('top') ? getLineDistance('top') * 0.01 : 0.01;
-  const middleLineDistance = enabledWaves.includes('middle') ? getLineDistance('middle') * 0.01 : 0.01;
-  const bottomLineDistance = enabledWaves.includes('bottom') ? getLineDistance('bottom') * 0.01 : 0.01;
+  const topLineDistance = useMemo(() => enabledWaves.includes('top') ? (typeof lineDistance === 'number' ? lineDistance : lineDistance[enabledWaves.indexOf('top')] ?? 0.1) * 0.01 : 0.01, [enabledWaves, lineDistance]);
+  const middleLineDistance = useMemo(() => enabledWaves.includes('middle') ? (typeof lineDistance === 'number' ? lineDistance : lineDistance[enabledWaves.indexOf('middle')] ?? 0.1) * 0.01 : 0.01, [enabledWaves, lineDistance]);
+  const bottomLineDistance = useMemo(() => enabledWaves.includes('bottom') ? (typeof lineDistance === 'number' ? lineDistance : lineDistance[enabledWaves.indexOf('bottom')] ?? 0.1) * 0.01 : 0.01, [enabledWaves, lineDistance]);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Clear any existing canvas
     while (containerRef.current.firstChild) {
       containerRef.current.removeChild(containerRef.current.firstChild);
     }
@@ -272,8 +259,17 @@ export default function DarkVeil({
     const camera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
     camera.position.z = 1;
 
-    const renderer = new WebGLRenderer({ antialias: true, alpha: false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // 2. تحسين الأداء: إيقاف antialias وتقليل PixelRatio
+    // هذا سيجعل الخلفية أخف بكثير على كروت الشاشة الضعيفة والموبايل
+    const renderer = new WebGLRenderer({ 
+        antialias: false, // لا حاجة له مع هذا النوع من الشيدر
+        alpha: false,
+        powerPreference: "high-performance" // طلب الأداء العالي من المتصفح
+    });
+    
+    // استخدام 1 بدلاً من 2 لتقليل الحمل على الـ GPU للنصف
+    renderer.setPixelRatio(1); 
+    
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
     containerRef.current.appendChild(renderer.domElement);
@@ -334,7 +330,9 @@ export default function DarkVeil({
     const material = new ShaderMaterial({
       uniforms,
       vertexShader,
-      fragmentShader
+      fragmentShader,
+      depthWrite: false, // تحسين طفيف
+      depthTest: false   // تحسين طفيف
     });
 
     const geometry = new PlaneGeometry(2, 2);
@@ -365,7 +363,8 @@ export default function DarkVeil({
       const rect = renderer.domElement.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
-      const dpr = renderer.getPixelRatio();
+      // نستخدم 1 دائماً هنا لأننا ثبتنا الـ PixelRatio
+      const dpr = 1; 
       targetMouseRef.current.set(x * dpr, (rect.height - y) * dpr);
       targetInfluenceRef.current = 1.0;
       if (parallax) {
@@ -420,7 +419,14 @@ export default function DarkVeil({
         renderer.domElement.parentElement.removeChild(renderer.domElement);
       }
     };
-  }, [linesGradient, enabledWaves, lineCount, lineDistance, topWavePosition, middleWavePosition, bottomWavePosition, animationSpeed, interactive, bendRadius, bendStrength, mouseDamping, parallax, parallaxStrength]);
+  }, [
+    // إبقاء قائمة الاعتمادات كما هي لضمان التحديث عند تغير الخصائص
+    linesGradient, enabledWaves, lineCount, lineDistance, topWavePosition, 
+    middleWavePosition, bottomWavePosition, animationSpeed, interactive, 
+    bendRadius, bendStrength, mouseDamping, parallax, parallaxStrength,
+    topLineCount, middleLineCount, bottomLineCount, topLineDistance, 
+    middleLineDistance, bottomLineDistance
+  ]);
 
   return (
     <div
@@ -432,3 +438,8 @@ export default function DarkVeil({
     />
   );
 }
+
+// 3. الخطوة السحرية: تغليف المكون بـ React.memo
+// هذا يمنع إعادة تصيير الخلفية (وإعادة تحميل WebGL) عند تغير حالة الـ Parent 
+// (مثل تغيير الصفحة أو فتح قائمة) طالما أن الـ Props الخاصة بالخلفية لم تتغير.
+export default React.memo(DarkVeil);
