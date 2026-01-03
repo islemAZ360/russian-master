@@ -1,6 +1,6 @@
 ==================================================================
 PROJECT STRUCTURE (هيكل الملفات)
-Generated on: 3/1/2026, 23:05:10
+Generated on: 3/1/2026, 23:59:59
 ==================================================================
 
 (ROOT)
@@ -73,6 +73,8 @@ Generated on: 3/1/2026, 23:05:10
 │   │   │   ├── CyberHUD.jsx
 │   │   │   ├── CyberToast.jsx
 │   │   │   ├── DailyReward.jsx
+│   │   │   ├── DarkVeil.css
+│   │   │   ├── DarkVeil.jsx
 │   │   │   ├── DecryptText.jsx
 │   │   │   ├── DigitalRain.jsx
 │   │   │   ├── ErrorBoundary.jsx
@@ -139,7 +141,7 @@ Generated on: 3/1/2026, 23:05:10
 
 ==================================================================
 FILE CONTENTS (محتوى الملفات)
-Total Files Scanned: 106
+Total Files Scanned: 108
 ==================================================================
 
 
@@ -547,15 +549,18 @@ FILE: package.json
     "@jitsi/react-sdk": "^1.4.4",
     "@tabler/icons-react": "^3.0.0",
     "canvas-confetti": "^1.9.0",
-    "clsx": "^2.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "firebase": "^10.0.0",
     "framer-motion": "^11.0.0",
+    "lucide-react": "^0.562.0",
     "next": "14.2.0",
     "next-pwa": "^5.6.0",
+    "ogl": "^1.0.11",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
-    "tailwind-merge": "^2.0.0",
-    "tailwindcss-animate": "^1.0.0"
+    "tailwind-merge": "^2.6.0",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.23",
@@ -821,6 +826,71 @@ body {
   border: 1px solid rgba(128, 128, 128, 0.1) !important;
   box-shadow: 0 10px 40px rgba(0,0,0,0.1) !important;
   transition: all 0.3s ease-in-out;
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 10% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+  }
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }
 
 ------------------------------------------------------------------
@@ -5407,16 +5477,8 @@ export default function CyberLayout({ children }) {
   return (
     <div className="relative h-screen w-full overflow-hidden font-sans text-[var(--text-main)] bg-transparent">
       
-      {/* الخلفية الثابتة */}
       <CosmicBackground />
       
-      {/* 
-         المحتوى الرئيسي:
-         - md:pt-24: مسافة علوية للحاسوب
-         - pt-20: مسافة علوية للهاتف
-         - pb-32: مسافة سفلية كبيرة في الهاتف لتجنب تغطية المحتوى بواسطة الـ Dock
-         - md:pb-10: مسافة سفلية عادية للحاسوب
-      */}
       <main className="relative z-10 w-full h-full flex flex-col pt-20 md:pt-24 pb-32 md:pb-10 px-3 md:px-6 overflow-y-auto custom-scrollbar scroll-smooth">
           <div className="w-full max-w-7xl mx-auto h-full flex flex-col">
             {children}
@@ -5748,31 +5810,12 @@ FILE: src\components\ui\CosmicBackground.jsx
 ------------------------------------------------------------------
 "use client";
 import React from "react";
+import DarkVeil from "./DarkVeil";
 
 export const CosmicBackground = React.memo(() => {
   return (
-    <div className="fixed inset-0 w-full h-full z-[-1] overflow-hidden bg-[var(--bg-primary)] transition-colors duration-700">
-      
-      {/* 1. دائرة لونية علوية يسار */}
-      <div 
-        className="absolute top-[-20%] left-[-10%] w-[80vw] h-[80vw] rounded-full blur-[120px] opacity-40 transition-colors duration-700"
-        style={{ backgroundColor: 'var(--gradient-1)' }}
-      />
-      
-      {/* 2. دائرة لونية سفلية يمين */}
-      <div 
-        className="absolute bottom-[-20%] right-[-10%] w-[80vw] h-[80vw] rounded-full blur-[120px] opacity-40 transition-colors duration-700"
-        style={{ backgroundColor: 'var(--gradient-2)' }}
-      />
-
-      {/* 3. دائرة لونية وسطية */}
-      <div 
-        className="absolute top-[30%] left-[20%] w-[60vw] h-[60vw] rounded-full blur-[100px] opacity-30 transition-colors duration-700"
-        style={{ backgroundColor: 'var(--gradient-3)' }}
-      />
-
-      {/* 4. طبقة نويز خفيفة جداً للملمس */}
-      <div className="absolute inset-0 opacity-[0.03] bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-overlay pointer-events-none"></div>
+    <div className="fixed inset-0 w-full h-full z-[-1] overflow-hidden">
+        <DarkVeil />
     </div>
   );
 });
@@ -6057,6 +6100,227 @@ export default function DailyReward({ user, onClose }) {
                 )}
             </AnimatePresence>
         </div>
+    </div>
+  );
+}
+
+------------------------------------------------------------------
+FILE: src\components\ui\DarkVeil.css
+------------------------------------------------------------------
+.darkveil-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    pointer-events: none;
+}
+
+.darkveil-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+------------------------------------------------------------------
+FILE: src\components\ui\DarkVeil.jsx
+------------------------------------------------------------------
+"use client";
+import React, { useRef, useEffect } from 'react';
+import { Renderer, Program, Mesh, Triangle, Vec2 } from 'ogl';
+import { useSettings } from '@/context/SettingsContext';
+import './DarkVeil.css';
+
+const vertex = `
+attribute vec2 position;
+void main() {
+    gl_Position = vec4(position, 0.0, 1.0);
+}
+`;
+
+const fragment = `
+#ifdef GL_ES
+precision highp float;
+#endif
+
+uniform vec2 uResolution;
+uniform float uTime;
+uniform float uHueShift;
+uniform float uNoise;
+uniform float uScan;
+uniform float uScanFreq;
+uniform float uWarp;
+// متغير للتحقق من الوضع (0 = ليلي، 1 = نهاري)
+uniform float uIsLight; 
+
+#define iTime uTime
+#define iResolution uResolution
+
+vec4 buf[8];
+
+float rand(vec2 c){
+    return fract(sin(dot(c,vec2(12.9898,78.233)))*43758.5453);
+}
+
+mat3 rgb2yiq = mat3(0.299, 0.587, 0.114, 0.596, -0.274, -0.322, 0.211, -0.523, 0.312);
+mat3 yiq2rgb = mat3(1.0, 0.956, 0.621, 1.0, -0.272, -0.647, 1.0, -1.106, 1.703);
+
+vec3 hueShiftRGB(vec3 col, float deg){
+    vec3 yiq = rgb2yiq * col;
+    float rad = radians(deg);
+    float cosh = cos(rad);
+    float sinh = sin(rad);
+    vec3 yiqShift = vec3(yiq.x, yiq.y*cosh - yiq.z*sinh, yiq.y*sinh + yiq.z*cosh);
+    return clamp(yiq2rgb * yiqShift, 0.0, 1.0);
+}
+
+vec4 sigmoid(vec4 x){
+    return 1.0 / (1.0 + exp(-x));
+}
+
+vec4 cppn_fn(vec2 coordinate, float in0, float in1, float in2){
+    buf[6] = vec4(coordinate.x, coordinate.y, 0.3948333106474662 + in0, 0.36 + in1);
+    // التصحيح الرياضي: إضافة علامة الضرب *
+    buf[7] = vec4(0.14 + in2, sqrt(coordinate.x * coordinate.x + coordinate.y * coordinate.y), 0.0, 0.0);
+    
+    buf[0] = mat4(vec4(6.5404263,-3.6126034,0.7590882,-1.13613),vec4(2.4582713,3.1660357,1.2219609,0.06276096),vec4(-5.478085,-6.159632,1.8701609,-4.7742867),vec4(6.039214,-5.542865,-0.90925294,3.251348)) * buf[6] + 
+             mat4(vec4(0.8473259,-5.722911,3.975766,1.6522468),vec4(-0.24321538,0.5839259,-1.7661959,-5.350116),vec4(0.,0.,0.,0.),vec4(0.,0.,0.,0.)) * buf[7] + 
+             vec4(0.21808943,1.1243913,-1.7969975,5.0294676);
+             
+    buf[1] = mat4(vec4(-3.3522482,-6.0612736,0.55641043,-4.4719114),vec4(0.8631464,1.7432913,5.643898,1.6106541),vec4(2.4941394,-3.5012043,1.7184316,6.357333),vec4(3.310376,8.209261,1.1355612,-1.165539)) * buf[6] + 
+             mat4(vec4(5.24046,-13.034365,0.009859298,15.870829),vec4(2.987511,3.129433,-0.89023495,-1.6822904),vec4(0.,0.,0.,0.),vec4(0.,0.,0.,0.)) * buf[7] + 
+             vec4(-5.9457836,-6.573602,-0.8812491,1.5436668);
+             
+    buf[0] = sigmoid(buf[0]);
+    buf[1] = sigmoid(buf[1]);
+    
+    // معادلة مبسطة لضمان الأداء
+    buf[4] = mat4(vec4(5.2,-7.1,2.7,2.6), vec4(-5.6,-25.3,4.0,0.4), vec4(-10.5,24.2,21.1,37.5), vec4(4.3,-1.9,2.3,-1.3)) * buf[0] + 
+             vec4(-7.6, 15.9, 1.3, -1.6);
+             
+    buf[4] = sigmoid(buf[4]);
+    
+    return vec4(buf[4].x, buf[4].y, buf[4].z, 1.0);
+}
+
+void mainImage(out vec4 fragColor, in vec2 fragCoord){
+    vec2 uv = fragCoord / uResolution.xy * 2.0 - 1.0;
+    uv.y *= -1.0;
+    
+    // Warp effect
+    uv += uWarp * vec2(sin(uv.y * 6.283 + uTime * 0.5), cos(uv.x * 6.283 + uTime * 0.5)) * 0.05;
+    
+    fragColor = cppn_fn(uv, 0.1 * sin(0.3 * uTime), 0.1 * sin(0.69 * uTime), 0.1 * sin(0.44 * uTime));
+}
+
+void main(){
+    vec4 col;
+    mainImage(col, gl_FragCoord.xy);
+    
+    // تطبيق التأثيرات
+    col.rgb = hueShiftRGB(col.rgb, uHueShift);
+    
+    float scanline_val = sin(gl_FragCoord.y * uScanFreq) * 0.5 + 0.5;
+    col.rgb *= 1.0 - (scanline_val * scanline_val) * uScan;
+    
+    col.rgb += (rand(gl_FragCoord.xy + uTime) - 0.5) * uNoise;
+    
+    // === المنطق السحري للوضع النهاري ===
+    // إذا كان الوضع نهاري، نقلب الألوان ليصبح الأساس أبيض
+    if (uIsLight > 0.5) {
+        col.rgb = 1.0 - col.rgb; 
+    }
+    
+    gl_FragColor = vec4(clamp(col.rgb, 0.0, 1.0), 1.0);
+}
+`;
+
+export default function DarkVeil({
+  hueShift = 20,
+  noiseIntensity = 0.05,
+  scanlineIntensity = 0.1,
+  speed = 0.3,
+  scanlineFrequency = 0.5,
+  warpAmount = 0.5,
+  resolutionScale = 0.8
+}) {
+  const ref = useRef(null);
+  const { isDark } = useSettings(); // استدعاء حالة الثيم
+
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    
+    const parent = canvas.parentElement;
+
+    const renderer = new Renderer({
+      dpr: Math.min(window.devicePixelRatio, 2),
+      alpha: false, 
+      canvas
+    });
+
+    const gl = renderer.gl;
+    const geometry = new Triangle(gl);
+
+    const program = new Program(gl, {
+      vertex,
+      fragment,
+      uniforms: {
+        uTime: { value: 0 },
+        uResolution: { value: new Vec2() },
+        uHueShift: { value: hueShift },
+        uNoise: { value: noiseIntensity },
+        uScan: { value: scanlineIntensity },
+        uScanFreq: { value: scanlineFrequency },
+        uWarp: { value: warpAmount },
+        // تمرير حالة الثيم للشيدر (0 لليلي، 1 للنهاري)
+        uIsLight: { value: isDark ? 0.0 : 1.0 } 
+      }
+    });
+
+    const mesh = new Mesh(gl, { geometry, program });
+
+    const resize = () => {
+      if (!parent) return;
+      const w = parent.clientWidth;
+      const h = parent.clientHeight;
+      renderer.setSize(w * resolutionScale, h * resolutionScale);
+      program.uniforms.uResolution.value.set(w, h);
+    };
+
+    window.addEventListener('resize', resize);
+    resize();
+
+    let animationId;
+    const start = performance.now();
+
+    const loop = () => {
+      program.uniforms.uTime.value = ((performance.now() - start) / 1000) * speed;
+      program.uniforms.uHueShift.value = hueShift;
+      program.uniforms.uNoise.value = noiseIntensity;
+      program.uniforms.uScan.value = scanlineIntensity;
+      program.uniforms.uScanFreq.value = scanlineFrequency;
+      program.uniforms.uWarp.value = warpAmount;
+      
+      // تحديث القيمة ديناميكياً عند تغيير الثيم
+      program.uniforms.uIsLight.value = isDark ? 0.0 : 1.0;
+
+      renderer.render({ scene: mesh });
+      animationId = requestAnimationFrame(loop);
+    };
+
+    loop();
+
+    return () => {
+      cancelAnimationFrame(animationId);
+      window.removeEventListener('resize', resize);
+    };
+  }, [hueShift, noiseIntensity, scanlineIntensity, speed, scanlineFrequency, warpAmount, resolutionScale, isDark]);
+
+  return (
+    <div className="darkveil-container">
+        <canvas ref={ref} className="darkveil-canvas" />
     </div>
   );
 }
@@ -10073,30 +10337,83 @@ module.exports = {
   content: [
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
-  darkMode: ['class', '[data-theme="dark"]'],
+  darkMode: ['class', '[data-theme="dark"]', "class"],
   theme: {
-    extend: {
-      colors: {
-        background: "var(--bg-main)",
-        foreground: "var(--text-main)",
-      },
-      fontFamily: {
-        sans: ['var(--font-cairo)', 'sans-serif'],
-        mono: ['var(--font-mono)', 'monospace'],
-      },
-      animation: {
-        "pulse-slow": "pulse 8s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-        "float": "float 20s ease-in-out infinite",
-      },
-      keyframes: {
-        float: {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(-20px)" },
-        }
-      },
-    },
+  	extend: {
+  		colors: {
+  			background: 'hsl(var(--background))',
+  			foreground: 'hsl(var(--foreground))',
+  			card: {
+  				DEFAULT: 'hsl(var(--card))',
+  				foreground: 'hsl(var(--card-foreground))'
+  			},
+  			popover: {
+  				DEFAULT: 'hsl(var(--popover))',
+  				foreground: 'hsl(var(--popover-foreground))'
+  			},
+  			primary: {
+  				DEFAULT: 'hsl(var(--primary))',
+  				foreground: 'hsl(var(--primary-foreground))'
+  			},
+  			secondary: {
+  				DEFAULT: 'hsl(var(--secondary))',
+  				foreground: 'hsl(var(--secondary-foreground))'
+  			},
+  			muted: {
+  				DEFAULT: 'hsl(var(--muted))',
+  				foreground: 'hsl(var(--muted-foreground))'
+  			},
+  			accent: {
+  				DEFAULT: 'hsl(var(--accent))',
+  				foreground: 'hsl(var(--accent-foreground))'
+  			},
+  			destructive: {
+  				DEFAULT: 'hsl(var(--destructive))',
+  				foreground: 'hsl(var(--destructive-foreground))'
+  			},
+  			border: 'hsl(var(--border))',
+  			input: 'hsl(var(--input))',
+  			ring: 'hsl(var(--ring))',
+  			chart: {
+  				'1': 'hsl(var(--chart-1))',
+  				'2': 'hsl(var(--chart-2))',
+  				'3': 'hsl(var(--chart-3))',
+  				'4': 'hsl(var(--chart-4))',
+  				'5': 'hsl(var(--chart-5))'
+  			}
+  		},
+  		fontFamily: {
+  			sans: [
+  				'var(--font-cairo)',
+  				'sans-serif'
+  			],
+  			mono: [
+  				'var(--font-mono)',
+  				'monospace'
+  			]
+  		},
+  		animation: {
+  			'pulse-slow': 'pulse 8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+  			'float': 'float 20s ease-in-out infinite'
+  		},
+  		keyframes: {
+  			float: {
+  				'0%, 100%': {
+  					transform: 'translateY(0)'
+  				},
+  				'50%': {
+  					transform: 'translateY(-20px)'
+  				}
+  			}
+  		},
+  		borderRadius: {
+  			lg: 'var(--radius)',
+  			md: 'calc(var(--radius) - 2px)',
+  			sm: 'calc(var(--radius) - 4px)'
+  		}
+  	}
   },
-  plugins: [addVariablesForColors],
+  plugins: [addVariablesForColors, require("tailwindcss-animate")],
 };
 
 function addVariablesForColors({ addBase, theme }) {

@@ -23,7 +23,8 @@ uniform float uNoise;
 uniform float uScan;
 uniform float uScanFreq;
 uniform float uWarp;
-uniform float uIsLight; // 0.0 = Dark Mode, 1.0 = Light Mode
+// متغير للتحقق من الوضع (0 = ليلي، 1 = نهاري)
+uniform float uIsLight; 
 
 #define iTime uTime
 #define iResolution uResolution
@@ -34,7 +35,6 @@ float rand(vec2 c){
     return fract(sin(dot(c,vec2(12.9898,78.233)))*43758.5453);
 }
 
-// Color Space Conversions
 mat3 rgb2yiq = mat3(0.299, 0.587, 0.114, 0.596, -0.274, -0.322, 0.211, -0.523, 0.312);
 mat3 yiq2rgb = mat3(1.0, 0.956, 0.621, 1.0, -0.272, -0.647, 1.0, -1.106, 1.703);
 
@@ -51,10 +51,10 @@ vec4 sigmoid(vec4 x){
     return 1.0 / (1.0 + exp(-x));
 }
 
-// Compositional Pattern Producing Network function
 vec4 cppn_fn(vec2 coordinate, float in0, float in1, float in2){
     buf[6] = vec4(coordinate.x, coordinate.y, 0.3948333106474662 + in0, 0.36 + in1);
-    buf[7] = vec4(0.14 + in2, sqrt(coordinate.x*coordinate.x + coordinate.y*coordinate.y), 0.0, 0.0);
+    // التصحيح الرياضي: إضافة علامة الضرب *
+    buf[7] = vec4(0.14 + in2, sqrt(coordinate.x * coordinate.x + coordinate.y * coordinate.y), 0.0, 0.0);
     
     buf[0] = mat4(vec4(6.5404263,-3.6126034,0.7590882,-1.13613),vec4(2.4582713,3.1660357,1.2219609,0.06276096),vec4(-5.478085,-6.159632,1.8701609,-4.7742867),vec4(6.039214,-5.542865,-0.90925294,3.251348)) * buf[6] + 
              mat4(vec4(0.8473259,-5.722911,3.975766,1.6522468),vec4(-0.24321538,0.5839259,-1.7661959,-5.350116),vec4(0.,0.,0.,0.),vec4(0.,0.,0.,0.)) * buf[7] + 
@@ -67,19 +67,7 @@ vec4 cppn_fn(vec2 coordinate, float in0, float in1, float in2){
     buf[0] = sigmoid(buf[0]);
     buf[1] = sigmoid(buf[1]);
     
-    buf[2] = mat4(vec4(-15.219568,8.095543,-2.429353,-1.9381982),vec4(-5.951362,4.3115187,2.6393783,1.274315),vec4(-7.3145227,6.7297835,5.2473326,5.9411426),vec4(5.0796127,8.979051,-1.7278991,-1.158976)) * buf[6] + 
-             mat4(vec4(-11.967154,-11.608155,6.1486754,11.237008),vec4(2.124141,-6.263192,-1.7050359,-0.7021966),vec4(0.,0.,0.,0.),vec4(0.,0.,0.,0.)) * buf[7] + 
-             vec4(-4.17164,-3.2281182,-4.576417,-3.6401186);
-             
-    buf[3] = mat4(vec4(3.1832156,-13.738922,1.879223,3.233465),vec4(0.64300746,12.768129,1.9141049,0.50990224),vec4(-0.049295485,4.4807224,1.4733979,1.801449),vec4(5.0039253,13.000481,3.3991797,-4.5561905)) * buf[6] + 
-             mat4(vec4(-0.1285731,7.720628,-3.1425676,4.742367),vec4(0.6393625,3.714393,-0.8108378,-0.39174938),vec4(0.,0.,0.,0.),vec4(0.,0.,0.,0.)) * buf[7] + 
-             vec4(-1.1811101,-21.621881,0.7851888,1.2329718);
-             
-    buf[2] = sigmoid(buf[2]);
-    buf[3] = sigmoid(buf[3]);
-    
-    // (Simplified logic to fit shader complexity)
-    // Generating final color mix
+    // معادلة مبسطة لضمان الأداء
     buf[4] = mat4(vec4(5.2,-7.1,2.7,2.6), vec4(-5.6,-25.3,4.0,0.4), vec4(-10.5,24.2,21.1,37.5), vec4(4.3,-1.9,2.3,-1.3)) * buf[0] + 
              vec4(-7.6, 15.9, 1.3, -1.6);
              
@@ -95,7 +83,6 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord){
     // Warp effect
     uv += uWarp * vec2(sin(uv.y * 6.283 + uTime * 0.5), cos(uv.x * 6.283 + uTime * 0.5)) * 0.05;
     
-    // Generate Pattern
     fragColor = cppn_fn(uv, 0.1 * sin(0.3 * uTime), 0.1 * sin(0.69 * uTime), 0.1 * sin(0.44 * uTime));
 }
 
@@ -103,24 +90,18 @@ void main(){
     vec4 col;
     mainImage(col, gl_FragCoord.xy);
     
-    // Hue Shift
+    // تطبيق التأثيرات
     col.rgb = hueShiftRGB(col.rgb, uHueShift);
     
-    // Scanlines
     float scanline_val = sin(gl_FragCoord.y * uScanFreq) * 0.5 + 0.5;
     col.rgb *= 1.0 - (scanline_val * scanline_val) * uScan;
     
-    // Noise
     col.rgb += (rand(gl_FragCoord.xy + uTime) - 0.5) * uNoise;
     
-    // --- Dark/Light Mode Logic ---
-    // If uIsLight is 1.0, we invert the colors to make the background white-ish
-    // but keep the patterns visible.
+    // === المنطق السحري للوضع النهاري ===
+    // إذا كان الوضع نهاري، نقلب الألوان ليصبح الأساس أبيض
     if (uIsLight > 0.5) {
-        col.rgb = 1.0 - col.rgb;
-        
-        // Optional: Enhance contrast for light mode
-        col.rgb = pow(col.rgb, vec3(1.2)); 
+        col.rgb = 1.0 - col.rgb; 
     }
     
     gl_FragColor = vec4(clamp(col.rgb, 0.0, 1.0), 1.0);
@@ -128,16 +109,16 @@ void main(){
 `;
 
 export default function DarkVeil({
-  hueShift = 20, // Default Shift
+  hueShift = 20,
   noiseIntensity = 0.05,
   scanlineIntensity = 0.1,
-  speed = 0.3, // Slower speed for elegance
+  speed = 0.3,
   scanlineFrequency = 0.5,
   warpAmount = 0.5,
-  resolutionScale = 0.8 // Slightly lower res for performance
+  resolutionScale = 0.8
 }) {
   const ref = useRef(null);
-  const { isDark } = useSettings(); // Hook into your Theme Context
+  const { isDark } = useSettings(); // استدعاء حالة الثيم
 
   useEffect(() => {
     const canvas = ref.current;
@@ -147,7 +128,7 @@ export default function DarkVeil({
 
     const renderer = new Renderer({
       dpr: Math.min(window.devicePixelRatio, 2),
-      alpha: false, // Ensure opaque background
+      alpha: false, 
       canvas
     });
 
@@ -165,7 +146,8 @@ export default function DarkVeil({
         uScan: { value: scanlineIntensity },
         uScanFreq: { value: scanlineFrequency },
         uWarp: { value: warpAmount },
-        uIsLight: { value: 0.0 } // Initial value
+        // تمرير حالة الثيم للشيدر (0 لليلي، 1 للنهاري)
+        uIsLight: { value: isDark ? 0.0 : 1.0 } 
       }
     });
 
@@ -186,7 +168,6 @@ export default function DarkVeil({
     const start = performance.now();
 
     const loop = () => {
-      // Update Uniforms
       program.uniforms.uTime.value = ((performance.now() - start) / 1000) * speed;
       program.uniforms.uHueShift.value = hueShift;
       program.uniforms.uNoise.value = noiseIntensity;
@@ -194,8 +175,7 @@ export default function DarkVeil({
       program.uniforms.uScanFreq.value = scanlineFrequency;
       program.uniforms.uWarp.value = warpAmount;
       
-      // Dynamic Theme Switching
-      // Smoothly transition could be added here, but direct switch works for now
+      // تحديث القيمة ديناميكياً عند تغيير الثيم
       program.uniforms.uIsLight.value = isDark ? 0.0 : 1.0;
 
       renderer.render({ scene: mesh });
@@ -207,9 +187,12 @@ export default function DarkVeil({
     return () => {
       cancelAnimationFrame(animationId);
       window.removeEventListener('resize', resize);
-      // Optional: clean up WebGL context if needed
     };
   }, [hueShift, noiseIntensity, scanlineIntensity, speed, scanlineFrequency, warpAmount, resolutionScale, isDark]);
 
-  return <canvas ref={ref} className="darkveil-canvas" />;
+  return (
+    <div className="darkveil-container">
+        <canvas ref={ref} className="darkveil-canvas" />
+    </div>
+  );
 }
