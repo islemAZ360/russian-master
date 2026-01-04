@@ -26,7 +26,35 @@ export const translations = {
     btn_hacking: "اختراق عصبي",
     hacking_sub: "بروتوكول الهجوم: جاهز",
 
-    // --- Data Modules & Archive ---
+    // --- Games ---
+    games_title: "مركز المحاكاة",
+    games_subtitle: "تطوير المهارات اللغوية عبر البيئة الافتراضية",
+    game_chrono_title: "مسافر الزمن",
+    game_chrono_desc: "تحدى الوقت وأتقن قراءة الساعة باللغة الروسية بدقة متناهية.",
+    game_gravity_title: "بروتوكول الجاذبية",
+    game_gravity_desc: "استخدم الجاذبية لوضع الكلمات في سياقها الصحيح داخل الجمل.",
+    game_magnet_title: "الحقل المغناطيسي",
+    game_magnet_desc: "جذب الكلمات التي تنتمي لنفس الجذر اللغوي لبناء ترابط عصبي.",
+    game_scale_title: "ميزان الكلمات",
+    game_scale_desc: "حقق التوازن اللغوي عبر تصنيف الكلمات حسب وزنها المرجعي.",
+
+    // --- Categories (Data Modules) ---
+    cat_concepts_phrases: "المفاهيم والعبارات",
+    cat_conversation_uni: "المحادثة والجامعة",
+    cat_society_ethics: "المجتمع والأخلاق",
+    cat_science_nature: "العلوم والطبيعة",
+    cat_personality_feelings: "الشخصية والمشاعر",
+    cat_daily_life: "الحياة اليومية",
+    cat_gov_history: "الحكومة والتاريخ",
+    cat_slang_common: "العامية والمصطلحات",
+    cat_tech_innovation: "التقنية والابتكار",
+    cat_personality_traits: "سمات الشخصية",
+    cat_professions: "المهن والوظائف",
+    cat_ai_future: "الذكاء الاصطناعي والمستقبل",
+    cat_general: "عام",
+    cat_uncategorized: "غير مصنف",
+
+    // --- Data Modules UI ---
     modules_system_ready: "النظام جاهز",
     modules_available: "وحدة متاحة",
     modules_title_1: "أرشيف",
@@ -43,7 +71,7 @@ export const translations = {
     archive_edit: "تعديل",
     archive_delete: "حذف",
     
-    // --- Chat (Communication Hub) ---
+    // --- Chat ---
     chat_title: "الكتائب",
     chat_no_freq: "لم يتم تحديد تردد",
     chat_type_msg: "اكتب رسالة مشفرة...",
@@ -59,7 +87,7 @@ export const translations = {
     chat_server_public: "خادم عام",
     chat_server_private: "خادم خاص",
 
-    // --- Ranks (Achievements) ---
+    // --- Ranks ---
     rank_recruit: "مجند",
     rank_soldier: "جندي",
     rank_hacker: "هاكر",
@@ -83,7 +111,7 @@ export const translations = {
     profile_unlocked: "مفتوح",
     profile_requires: "يتطلب",
 
-    // --- Admin Dashboard ---
+    // --- Admin ---
     admin_title: "محطة التحكم",
     admin_overview: "نظرة عامة",
     admin_operatives: "العملاء",
@@ -112,6 +140,10 @@ export const translations = {
     live_secure_channel: "قناة آمنة",
     live_active_msg: "الإشارة نشطة",
     live_active_desc: "يمكنك التنقل بحرية. سيتم تصغير النافذة تلقائياً.",
+    live_log_ready: "النظام جاهز للاستقبال",
+    live_log_waiting: "في انتظار إدخال المعرف",
+    live_log_encrypt: "جاري تشفير النفق العصبي...",
+    live_log_established: "تم إنشاء الاتصال بنجاح",
 
     // --- Settings ---
     settings_title: "إعدادات النظام",
@@ -160,7 +192,35 @@ export const translations = {
     btn_hacking: "NEURAL BREACH",
     hacking_sub: "HACKING PROTOCOL: READY",
 
-    // Data Modules & Archive
+    // Games
+    games_title: "Simulation Hub",
+    games_subtitle: "Enhance linguistic skills in a virtual environment",
+    game_chrono_title: "Time Traveler",
+    game_chrono_desc: "Challenge time and master reading the clock in Russian with extreme precision.",
+    game_gravity_title: "Gravity Protocol",
+    game_gravity_desc: "Use gravity to place words in their correct context within sentences.",
+    game_magnet_title: "Magnetic Field",
+    game_magnet_desc: "Attract words belonging to the same linguistic root to build neural connections.",
+    game_scale_title: "Word Scale",
+    game_scale_desc: "Achieve linguistic balance by classifying words based on their reference weight.",
+
+    // Categories
+    cat_concepts_phrases: "Concepts & Phrases",
+    cat_conversation_uni: "Conversation & Uni",
+    cat_society_ethics: "Society & Ethics",
+    cat_science_nature: "Science & Nature",
+    cat_personality_feelings: "Personality & Feelings",
+    cat_daily_life: "Daily Life",
+    cat_gov_history: "Gov & History",
+    cat_slang_common: "Slang & Common",
+    cat_tech_innovation: "Tech & Innovation",
+    cat_personality_traits: "Personality Traits",
+    cat_professions: "Professions",
+    cat_ai_future: "AI & Future",
+    cat_general: "General",
+    cat_uncategorized: "Uncategorized",
+
+    // UI
     modules_system_ready: "SYSTEM_READY",
     modules_available: "AVAILABLE",
     modules_title_1: "DATA",
@@ -246,6 +306,10 @@ export const translations = {
     live_secure_channel: "SECURE CHANNEL",
     live_active_msg: "SIGNAL ACTIVE",
     live_active_desc: "YOU CAN NAVIGATE FREELY. CONNECTION WILL MINIMIZE AUTOMATICALLY.",
+    live_log_ready: "System ready for reception",
+    live_log_waiting: "Waiting for ID input",
+    live_log_encrypt: "Encrypting neural tunnel...",
+    live_log_established: "Connection established successfully",
 
     // Settings
     settings_title: "SYSTEM CONFIG",
@@ -267,139 +331,5 @@ export const translations = {
     logout_btn: "TERMINATE SESSION",
     alert_saved: "IDENTITY UPDATED SUCCESSFULLY",
     alert_error: "UPDATE FAILED"
-  },
-
-  ru: {
-    // Nav
-    nav_home: "База",
-    nav_games: "Аркада",
-    nav_live: "Эфир",
-    nav_chat: "Отряд",
-    nav_study: "Миссии",
-    nav_archive: "Архив",
-    nav_rank: "ID Карта",
-    nav_settings: "Настр.",
-    nav_admin: "Контроль",
-    nav_support: "Помощь",
-
-    // Hero
-    hero_status: "СТАТУС: ОНЛАЙН",
-    hero_welcome: "С ВОЗВРАЩЕНИЕМ,",
-    hero_line1: "> Нейроинтерфейс готов.",
-    hero_line2: "> Цели загружены.",
-    hero_stat_words: "Слов",
-    hero_stat_games: "Игры",
-    hero_stat_practice: "Практика",
-    btn_start: "НАЧАТЬ МИССИЮ",
-    btn_hacking: "ВЗЛОМ",
-    hacking_sub: "ПРОТОКОЛ АТАКИ: ГОТОВ",
-
-    // Data & Archive
-    modules_system_ready: "СИСТЕМА ГОТОВА",
-    modules_available: "ДОСТУПНО",
-    modules_title_1: "АРХИВ",
-    modules_title_2: "ДАННЫХ",
-    modules_search_placeholder: "ПОИСК ПРОТОКОЛОВ...",
-    modules_no_data: "НЕТ ДАННЫХ",
-    modules_esc: "ESC",
-    archive_header: "НЕЙРО АРХИВ",
-    archive_items: "ЭЛЕМЕНТОВ",
-    archive_search_placeholder: "ПОИСК В БАЗЕ...",
-    archive_add_btn: "ДОБАВИТЬ",
-    archive_load_more: "ЗАГРУЗИТЬ ЕЩЕ",
-    archive_manage_groups: "УПРАВЛЕНИЕ ГРУППАМИ",
-    archive_edit: "РЕД",
-    archive_delete: "УДАЛИТЬ",
-
-    // Chat
-    chat_title: "ОТРЯДЫ",
-    chat_no_freq: "ЧАСТОТА НЕ ВЫБРАНА",
-    chat_type_msg: "Введите сообщение...",
-    chat_invite: "Пригласить",
-    chat_squad_invite: "Подкрепление",
-    chat_create_squad: "Создать отряд",
-    chat_squad_name: "Название отряда",
-    chat_security: "Протокол безопасности",
-    chat_public: "Публичный",
-    chat_private: "Зашифрованный",
-    chat_cancel: "Отмена",
-    chat_init: "Инициализация",
-    chat_server_public: "ОБЩИЙ СЕРВЕР",
-    chat_server_private: "ПРИВАТНЫЙ СЕРВЕР",
-
-    // Ranks
-    rank_recruit: "НОВОБРАНЕЦ",
-    rank_soldier: "СОЛДАТ",
-    rank_hacker: "ХАКЕР",
-    rank_elite: "ЭЛИТА",
-    rank_commander: "КОМАНДИР",
-    rank_legend: "ЛЕГЕНДА",
-    rank_cybergod: "КИБЕР БОГ",
-
-    // Profile
-    profile_lvl: "УР",
-    profile_class: "КЛАСС",
-    profile_exp: "ОПЫТ",
-    profile_next: "СЛЕД",
-    profile_stats_cards: "Всего карт",
-    profile_stats_mastered: "Изучено",
-    profile_stats_streak: "Серия дней",
-    profile_rank_title: "ПРОГРЕСС РАНГА",
-    profile_metrics: "МЕТРИКИ",
-    profile_efficiency: "Эффективность",
-    profile_badges: "ЗНАКИ ОТЛИЧИЯ",
-    profile_unlocked: "ОТКРЫТО",
-    profile_requires: "ТРЕБУЕТСЯ",
-
-    // Admin
-    admin_title: "ТЕРМИНАЛ АДМИНА",
-    admin_overview: "Обзор",
-    admin_operatives: "Оперативники",
-    admin_squads: "Управление отрядами",
-    admin_signals: "Сигналы",
-    admin_uplink: "Поддержка",
-    admin_alert: "Глобальная тревога",
-    admin_exit: "Выход",
-    admin_total_ops: "Всего оперативников",
-    admin_threats: "Угрозы",
-    admin_tickets: "Тикеты",
-    admin_commanders: "Командиры",
-    admin_role: "Роль",
-    admin_status: "Статус",
-    admin_actions: "Действия",
-    admin_ban: "Забанить",
-    admin_unban: "Разбанить",
-    admin_broadcast_title: "Системное оповещение",
-    admin_broadcast_ph: "ВВЕДИТЕ СООБЩЕНИЕ...",
-    admin_broadcast_exec: "Выполнить трансляцию",
-
-    // Live
-    live_enter_id: "ВВЕДИТЕ ID КОМНАТЫ...",
-    live_connect_btn: "НАЧАТЬ СОЕДИНЕНИЕ",
-    live_connecting: "ШИФРОВАНИЕ...",
-    live_secure_channel: "ЗАЩИЩЕННЫЙ КАНАЛ",
-    live_active_msg: "СИГНАЛ АКТИВЕН",
-    live_active_desc: "ВЫ МОЖЕТЕ ПЕРЕМЕЩАТЬСЯ. ОКНО СВЕРНЕТСЯ АВТОМАТИЧЕСКИ.",
-
-    // Settings
-    settings_title: "НАСТРОЙКИ",
-    settings_subtitle: "МОДУЛЬ ПОЛЬЗОВАТЕЛЯ",
-    identity_title: "ЛИЧНОСТЬ",
-    identity_upload: "ЗАГРУЗИТЬ АВАТАР",
-    identity_name_label: "ПОЗЫВНОЙ",
-    identity_name_placeholder: "ВВЕДИТЕ ИМЯ...",
-    identity_avatar_label: "ВЫБРАТЬ АВАТАР",
-    identity_save_btn: "СОХРАНИТЬ",
-    identity_saving: "СОХРАНЕНИЕ...",
-    system_lang_title: "ЯЗЫК",
-    lang_system_label: "ЯЗЫК СИСТЕМЫ",
-    lang_target_label: "ИЗУЧАЕМЫЙ ЯЗЫК",
-    theme_title: "ТЕМА",
-    theme_dark: "ТЕМНАЯ",
-    theme_light: "СВЕТЛАЯ",
-    theme_auto: "АВТО",
-    logout_btn: "ВЫХОД",
-    alert_saved: "СОХРАНЕНО",
-    alert_error: "ОШИБКА"
   }
 };
