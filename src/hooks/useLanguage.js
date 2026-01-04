@@ -5,45 +5,46 @@ import { translations } from "@/data/translations";
 
 /**
  * هوك احترافي لإدارة اللغات والترجمة داخل النظام
- * يضمن عدم انهيار الواجهة في حال فقدان أي مفتاح ترجمة
+ * تم تصميمه ليكون المحرك الوحيد والمسؤول عن عرض النصوص بناءً على إعدادات المستخدم
  */
 export const useLanguage = () => {
   const { settings, mounted } = useSettings();
 
-  // تحديد اللغة الحالية: ننتظر التحميل (mounted) أولاً، ونستخدم 'ar' كقيمة افتراضية صلبة
+  // 1. تحديد الكود الخاص باللغة الحالية
+  // ننتظر حتى يتم تحميل المكون (mounted) لضمان قراءة الإعدادات من LocalStorage
   const lang = useMemo(() => {
     if (!mounted || !settings?.systemLanguage) return 'ar';
     return settings.systemLanguage;
   }, [mounted, settings?.systemLanguage]);
 
   /**
-   * دالة الترجمة t(key)
-   * تبحث في اللغة المختارة، ثم الإنجليزية كبديل، ثم العربية، ثم تعيد المفتاح نفسه
+   * 2. دالة الترجمة المركزية t(key)
+   * تبحث في القاموس المختار، وإذا لم تجد المفتاح تبحث في الإنجليزية كبديل (Fallback)
    */
   const t = useCallback((key) => {
     if (!key) return "";
 
-    // 1. محاولة جلب النص باللغة الحالية (روسي، عربي، إنجليزي)
-    const currentDict = translations[lang];
-    if (currentDict && currentDict[key]) {
-      return currentDict[key];
+    // جلب القاموس الخاص باللغة الحالية (ru, ar, en)
+    const dictionary = translations[lang] || translations['ar'];
+
+    if (dictionary[key]) {
+      return dictionary[key];
     }
 
-    // 2. إذا لم يتوفر، المحاولة بالإنجليزية (لغة تقنية احتياطية)
+    // إذا لم يتوفر المفتاح في اللغة المختارة، نبحث عنه في الإنجليزية لضمان عدم ظهور "undefined"
     if (translations['en'] && translations['en'][key]) {
       return translations['en'][key];
     }
 
-    // 3. إذا لم يتوفر، المحاولة بالعربية
-    if (translations['ar'] && translations['ar'][key]) {
-      return translations['ar'][key];
-    }
-
-    // 4. الخيار الأخير: إعادة المفتاح نفسه لكي يلاحظ المبرمج وجود نقص
+    // الخيار الأخير: إعادة المفتاح نفسه إذا كان مفقوداً تماماً من كل القواميس
     return key;
   }, [lang]);
 
-  // خصائص واجهة المستخدم بناءً على اللغة
+  /**
+   * 3. خصائص واجهة المستخدم (UI Properties)
+   * dir: اتجاه النص (rtl للعربية، ltr للباقي)
+   * isRTL: قيمة منطقية للتحقق السريع
+   */
   const dir = useMemo(() => (lang === 'ar' ? 'rtl' : 'ltr'), [lang]);
   const isRTL = useMemo(() => lang === 'ar', [lang]);
 
@@ -52,6 +53,6 @@ export const useLanguage = () => {
     dir, 
     isRTL, 
     lang,
-    isLoaded: mounted // لمعرفة ما إذا كان النظام جاهزاً لعرض النصوص الصحيحة
+    isLoaded: mounted // تتيح للمكونات معرفة ما إذا كانت الإعدادات قد تم تحميلها فعلياً
   };
 };
