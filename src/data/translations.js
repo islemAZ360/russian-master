@@ -1,11 +1,8 @@
 // src/data/translations.js
 
 export const translations = {
-  // =================================================================
-  // العربية (Arabic)
-  // =================================================================
   ar: {
-    // --- Navigation (القائمة السفلية) ---
+    // --- Navigation ---
     nav_home: "القاعدة",
     nav_games: "الألعاب",
     nav_live: "بث حي",
@@ -17,7 +14,7 @@ export const translations = {
     nav_admin: "تحكم",
     nav_support: "الدعم",
 
-    // --- Hero Section (الصفحة الرئيسية) ---
+    // --- Hero Section ---
     hero_status: "حالة النظام: متصل",
     hero_welcome: "أهلاً بعودتك،",
     hero_line1: "> الواجهة العصبية جاهزة.",
@@ -29,7 +26,7 @@ export const translations = {
     btn_hacking: "اختراق عصبي",
     hacking_sub: "بروتوكول الهجوم: جاهز",
 
-    // --- Data Modules (صفحة اختيار الأقسام) ---
+    // --- Data Modules & Archive ---
     modules_system_ready: "النظام جاهز",
     modules_available: "وحدة متاحة",
     modules_title_1: "أرشيف",
@@ -37,32 +34,41 @@ export const translations = {
     modules_search_placeholder: "بحث في السجلات...",
     modules_no_data: "لا توجد بيانات مطابقة",
     modules_esc: "خروج",
+    archive_header: "الأرشيف العصبي",
+    archive_items: "عنصر",
+    archive_search_placeholder: "بحث في قاعدة البيانات...",
+    archive_add_btn: "إضافة",
+    archive_load_more: "تحميل المزيد من البيانات",
+    archive_manage_groups: "إدارة المجموعات",
+    archive_edit: "تعديل",
+    archive_delete: "حذف",
     
-    // --- Games Page (صفحة الألعاب) ---
-    games_title: "صالة الألعاب",
-    games_subtitle: "اختر وحدة التدريب",
-    game_chrono_title: "مسافر عبر الزمن",
-    game_chrono_desc: "تعلم نظام الوقت الروسي.",
-    game_gravity_title: "بروتوكول الجاذبية",
-    game_gravity_desc: "أتقن حروف الجر.",
-    game_magnet_title: "المجال المغناطيسي",
-    game_magnet_desc: "استخرج جذور الكلمات.",
-    game_scale_title: "ميزان الكلمات",
-    game_scale_desc: "وازن فئات الكلمات.",
+    // --- Chat (Communication Hub) ---
+    chat_title: "الكتائب",
+    chat_no_freq: "لم يتم تحديد تردد",
+    chat_type_msg: "اكتب رسالة مشفرة...",
+    chat_invite: "دعوة",
+    chat_squad_invite: "تعزيزات",
+    chat_create_squad: "تأسيس كتيبة",
+    chat_squad_name: "اسم الكتيبة",
+    chat_security: "بروتوكول الأمان",
+    chat_public: "عام (مفتوح)",
+    chat_private: "مشفر (خاص)",
+    chat_cancel: "إلغاء",
+    chat_init: "تهيئة",
+    chat_server_public: "خادم عام",
+    chat_server_private: "خادم خاص",
 
-    // --- Live Stream (صفحة البث) ---
-    live_enter_id: "أدخل معرف الغرفة...",
-    live_connect_btn: "بدء الاتصال",
-    live_connecting: "جاري التشفير...",
-    live_secure_channel: "قناة آمنة",
-    live_active_msg: "الإشارة نشطة",
-    live_active_desc: "يمكنك التنقل بحرية. سيتم تصغير النافذة تلقائياً.",
-    live_log_ready: "النظام جاهز",
-    live_log_waiting: "بانتظار الإدخال...",
-    live_log_encrypt: "تشفير البيانات...",
-    live_log_established: "تم تأسيس الاتصال.",
-
-    // --- Profile (صفحة البروفايل) ---
+    // --- Ranks (Achievements) ---
+    rank_recruit: "مجند",
+    rank_soldier: "جندي",
+    rank_hacker: "هاكر",
+    rank_elite: "نخبة",
+    rank_commander: "قائد",
+    rank_legend: "أسطورة",
+    rank_cybergod: "إله سيبراني",
+    
+    // --- Profile ---
     profile_lvl: "مستوى",
     profile_class: "فئة",
     profile_exp: "خبرة",
@@ -77,7 +83,37 @@ export const translations = {
     profile_unlocked: "مفتوح",
     profile_requires: "يتطلب",
 
-    // --- Settings (صفحة الإعدادات) ---
+    // --- Admin Dashboard ---
+    admin_title: "محطة التحكم",
+    admin_overview: "نظرة عامة",
+    admin_operatives: "العملاء",
+    admin_squads: "الفرق",
+    admin_signals: "الإشارات",
+    admin_uplink: "اتصال الدعم",
+    admin_alert: "تنبيه عالمي",
+    admin_exit: "خروج",
+    admin_total_ops: "إجمالي العملاء",
+    admin_threats: "تهديدات نشطة",
+    admin_tickets: "تذاكر مفتوحة",
+    admin_commanders: "قادة",
+    admin_role: "الدور",
+    admin_status: "الحالة",
+    admin_actions: "إجراءات",
+    admin_ban: "حظر",
+    admin_unban: "إلغاء الحظر",
+    admin_broadcast_title: "تنبيه نظام عالمي",
+    admin_broadcast_ph: "أدخل رسالة التنبيه...",
+    admin_broadcast_exec: "تنفيذ البث",
+
+    // --- Live ---
+    live_enter_id: "أدخل معرف الغرفة...",
+    live_connect_btn: "بدء الاتصال",
+    live_connecting: "جاري التشفير...",
+    live_secure_channel: "قناة آمنة",
+    live_active_msg: "الإشارة نشطة",
+    live_active_desc: "يمكنك التنقل بحرية. سيتم تصغير النافذة تلقائياً.",
+
+    // --- Settings ---
     settings_title: "إعدادات النظام",
     settings_subtitle: "وحدة تفضيلات المستخدم",
     identity_title: "هوية العميل",
@@ -99,11 +135,8 @@ export const translations = {
     alert_error: "فشل التحديث"
   },
   
-  // =================================================================
-  // English (الإنجليزية)
-  // =================================================================
   en: {
-    // --- Navigation ---
+    // Navigation
     nav_home: "Base",
     nav_games: "Arcade",
     nav_live: "Live",
@@ -115,7 +148,7 @@ export const translations = {
     nav_admin: "Control",
     nav_support: "Support",
 
-    // --- Hero Section ---
+    // Hero
     hero_status: "SYSTEM STATUS: ONLINE",
     hero_welcome: "WELCOME BACK,",
     hero_line1: "> Neural Interface Ready.",
@@ -127,7 +160,7 @@ export const translations = {
     btn_hacking: "NEURAL BREACH",
     hacking_sub: "HACKING PROTOCOL: READY",
 
-    // --- Data Modules ---
+    // Data Modules & Archive
     modules_system_ready: "SYSTEM_READY",
     modules_available: "AVAILABLE",
     modules_title_1: "DATA",
@@ -135,33 +168,42 @@ export const translations = {
     modules_search_placeholder: "SEARCH PROTOCOLS...",
     modules_no_data: "NO MATCHING DATA",
     modules_esc: "ESC",
+    archive_header: "NEURAL ARCHIVE",
+    archive_items: "ITEMS",
+    archive_search_placeholder: "SEARCH DATABASE...",
+    archive_add_btn: "ADD",
+    archive_load_more: "LOAD MORE DATA",
+    archive_manage_groups: "MANAGE GROUPS",
+    archive_edit: "EDIT",
+    archive_delete: "DELETE",
 
-    // --- Games Page ---
-    games_title: "NEURAL ARCADE",
-    games_subtitle: "SELECT TRAINING MODULE",
-    game_chrono_title: "CHRONO MASTER",
-    game_chrono_desc: "Learn Russian time system.",
-    game_gravity_title: "GRAVITY PROTOCOL",
-    game_gravity_desc: "Master Russian prepositions.",
-    game_magnet_title: "MAGNETIC FIELD",
-    game_magnet_desc: "Extract word roots.",
-    game_scale_title: "WORD SCALE",
-    game_scale_desc: "Balance category weights.",
+    // Chat
+    chat_title: "SQUADS",
+    chat_no_freq: "NO FREQUENCY SELECTED",
+    chat_type_msg: "Type encrypted message...",
+    chat_invite: "Invite",
+    chat_squad_invite: "Reinforcements",
+    chat_create_squad: "Forge Squad",
+    chat_squad_name: "Squad Name",
+    chat_security: "Security Protocol",
+    chat_public: "Public (Open)",
+    chat_private: "Encrypted (Private)",
+    chat_cancel: "Cancel",
+    chat_init: "Initialize",
+    chat_server_public: "PUBLIC SERVER",
+    chat_server_private: "PRIVATE SERVER",
 
-    // --- Live Stream ---
-    live_enter_id: "ENTER ROOM ID...",
-    live_connect_btn: "INITIALIZE UPLINK",
-    live_connecting: "ENCRYPTING...",
-    live_secure_channel: "SECURE CHANNEL",
-    live_active_msg: "SIGNAL ACTIVE",
-    live_active_desc: "YOU CAN NAVIGATE FREELY. CONNECTION WILL MINIMIZE AUTOMATICALLY.",
-    live_log_ready: "SYSTEM_READY",
-    live_log_waiting: "WAITING_INPUT...",
-    live_log_encrypt: "ENCRYPTING...",
-    live_log_established: "UPLINK ESTABLISHED.",
+    // Ranks
+    rank_recruit: "RECRUIT",
+    rank_soldier: "SOLDIER",
+    rank_hacker: "HACKER",
+    rank_elite: "ELITE",
+    rank_commander: "COMMANDER",
+    rank_legend: "LEGEND",
+    rank_cybergod: "CYBER GOD",
 
-    // --- Profile ---
-    profile_level: "LVL",
+    // Profile
+    profile_lvl: "LVL",
     profile_class: "CLASS",
     profile_exp: "EXP",
     profile_next: "NEXT",
@@ -175,7 +217,37 @@ export const translations = {
     profile_unlocked: "UNLOCKED",
     profile_requires: "REQUIRES",
 
-    // --- Settings ---
+    // Admin
+    admin_title: "NEXUS ADMIN",
+    admin_overview: "Overview",
+    admin_operatives: "Operatives",
+    admin_squads: "Squad Control",
+    admin_signals: "Signals",
+    admin_uplink: "Support Uplink",
+    admin_alert: "Global Alert",
+    admin_exit: "Exit Terminal",
+    admin_total_ops: "Total Operatives",
+    admin_threats: "Active Threats",
+    admin_tickets: "Open Tickets",
+    admin_commanders: "Commanders",
+    admin_role: "Role",
+    admin_status: "Status",
+    admin_actions: "Actions",
+    admin_ban: "Ban Agent",
+    admin_unban: "Revoke Ban",
+    admin_broadcast_title: "Global System Alert",
+    admin_broadcast_ph: "ENTER ALERT MESSAGE...",
+    admin_broadcast_exec: "Execute Broadcast",
+
+    // Live
+    live_enter_id: "ENTER ROOM ID...",
+    live_connect_btn: "INITIALIZE UPLINK",
+    live_connecting: "ENCRYPTING...",
+    live_secure_channel: "SECURE CHANNEL",
+    live_active_msg: "SIGNAL ACTIVE",
+    live_active_desc: "YOU CAN NAVIGATE FREELY. CONNECTION WILL MINIMIZE AUTOMATICALLY.",
+
+    // Settings
     settings_title: "SYSTEM CONFIG",
     settings_subtitle: "USER_PREFERENCES_MODULE",
     identity_title: "OPERATIVE IDENTITY",
@@ -197,11 +269,8 @@ export const translations = {
     alert_error: "UPDATE FAILED"
   },
 
-  // =================================================================
-  // Russian (الروسية)
-  // =================================================================
   ru: {
-    // --- Navigation ---
+    // Nav
     nav_home: "База",
     nav_games: "Аркада",
     nav_live: "Эфир",
@@ -213,7 +282,7 @@ export const translations = {
     nav_admin: "Контроль",
     nav_support: "Помощь",
 
-    // --- Hero Section ---
+    // Hero
     hero_status: "СТАТУС: ОНЛАЙН",
     hero_welcome: "С ВОЗВРАЩЕНИЕМ,",
     hero_line1: "> Нейроинтерфейс готов.",
@@ -225,7 +294,7 @@ export const translations = {
     btn_hacking: "ВЗЛОМ",
     hacking_sub: "ПРОТОКОЛ АТАКИ: ГОТОВ",
 
-    // --- Data Modules ---
+    // Data & Archive
     modules_system_ready: "СИСТЕМА ГОТОВА",
     modules_available: "ДОСТУПНО",
     modules_title_1: "АРХИВ",
@@ -233,32 +302,41 @@ export const translations = {
     modules_search_placeholder: "ПОИСК ПРОТОКОЛОВ...",
     modules_no_data: "НЕТ ДАННЫХ",
     modules_esc: "ESC",
+    archive_header: "НЕЙРО АРХИВ",
+    archive_items: "ЭЛЕМЕНТОВ",
+    archive_search_placeholder: "ПОИСК В БАЗЕ...",
+    archive_add_btn: "ДОБАВИТЬ",
+    archive_load_more: "ЗАГРУЗИТЬ ЕЩЕ",
+    archive_manage_groups: "УПРАВЛЕНИЕ ГРУППАМИ",
+    archive_edit: "РЕД",
+    archive_delete: "УДАЛИТЬ",
 
-    // --- Games Page ---
-    games_title: "НЕЙРО-АРКАДА",
-    games_subtitle: "ВЫБЕРИТЕ МОДУЛЬ",
-    game_chrono_title: "ХРОНО МАСТЕР",
-    game_chrono_desc: "Изучение системы времени.",
-    game_gravity_title: "ГРАВИТАЦИЯ",
-    game_gravity_desc: "Предлоги и падежи.",
-    game_magnet_title: "МАГНИТНОЕ ПОЛЕ",
-    game_magnet_desc: "Корни слов.",
-    game_scale_title: "ВЕСЫ СЛОВ",
-    game_scale_desc: "Баланс категорий.",
+    // Chat
+    chat_title: "ОТРЯДЫ",
+    chat_no_freq: "ЧАСТОТА НЕ ВЫБРАНА",
+    chat_type_msg: "Введите сообщение...",
+    chat_invite: "Пригласить",
+    chat_squad_invite: "Подкрепление",
+    chat_create_squad: "Создать отряд",
+    chat_squad_name: "Название отряда",
+    chat_security: "Протокол безопасности",
+    chat_public: "Публичный",
+    chat_private: "Зашифрованный",
+    chat_cancel: "Отмена",
+    chat_init: "Инициализация",
+    chat_server_public: "ОБЩИЙ СЕРВЕР",
+    chat_server_private: "ПРИВАТНЫЙ СЕРВЕР",
 
-    // --- Live Stream ---
-    live_enter_id: "ВВЕДИТЕ ID КОМНАТЫ...",
-    live_connect_btn: "НАЧАТЬ СОЕДИНЕНИЕ",
-    live_connecting: "ШИФРОВАНИЕ...",
-    live_secure_channel: "ЗАЩИЩЕННЫЙ КАНАЛ",
-    live_active_msg: "СИГНАЛ АКТИВЕН",
-    live_active_desc: "ВЫ МОЖЕТЕ ПЕРЕМЕЩАТЬСЯ. ОКНО СВЕРНЕТСЯ АВТОМАТИЧЕСКИ.",
-    live_log_ready: "СИСТЕМА ГОТОВА",
-    live_log_waiting: "ОЖИДАНИЕ ВВОДА...",
-    live_log_encrypt: "ШИФРОВАНИЕ...",
-    live_log_established: "СВЯЗЬ УСТАНОВЛЕНА.",
+    // Ranks
+    rank_recruit: "НОВОБРАНЕЦ",
+    rank_soldier: "СОЛДАТ",
+    rank_hacker: "ХАКЕР",
+    rank_elite: "ЭЛИТА",
+    rank_commander: "КОМАНДИР",
+    rank_legend: "ЛЕГЕНДА",
+    rank_cybergod: "КИБЕР БОГ",
 
-    // --- Profile ---
+    // Profile
     profile_lvl: "УР",
     profile_class: "КЛАСС",
     profile_exp: "ОПЫТ",
@@ -273,7 +351,37 @@ export const translations = {
     profile_unlocked: "ОТКРЫТО",
     profile_requires: "ТРЕБУЕТСЯ",
 
-    // --- Settings ---
+    // Admin
+    admin_title: "ТЕРМИНАЛ АДМИНА",
+    admin_overview: "Обзор",
+    admin_operatives: "Оперативники",
+    admin_squads: "Управление отрядами",
+    admin_signals: "Сигналы",
+    admin_uplink: "Поддержка",
+    admin_alert: "Глобальная тревога",
+    admin_exit: "Выход",
+    admin_total_ops: "Всего оперативников",
+    admin_threats: "Угрозы",
+    admin_tickets: "Тикеты",
+    admin_commanders: "Командиры",
+    admin_role: "Роль",
+    admin_status: "Статус",
+    admin_actions: "Действия",
+    admin_ban: "Забанить",
+    admin_unban: "Разбанить",
+    admin_broadcast_title: "Системное оповещение",
+    admin_broadcast_ph: "ВВЕДИТЕ СООБЩЕНИЕ...",
+    admin_broadcast_exec: "Выполнить трансляцию",
+
+    // Live
+    live_enter_id: "ВВЕДИТЕ ID КОМНАТЫ...",
+    live_connect_btn: "НАЧАТЬ СОЕДИНЕНИЕ",
+    live_connecting: "ШИФРОВАНИЕ...",
+    live_secure_channel: "ЗАЩИЩЕННЫЙ КАНАЛ",
+    live_active_msg: "СИГНАЛ АКТИВЕН",
+    live_active_desc: "ВЫ МОЖЕТЕ ПЕРЕМЕЩАТЬСЯ. ОКНО СВЕРНЕТСЯ АВТОМАТИЧЕСКИ.",
+
+    // Settings
     settings_title: "НАСТРОЙКИ",
     settings_subtitle: "МОДУЛЬ ПОЛЬЗОВАТЕЛЯ",
     identity_title: "ЛИЧНОСТЬ",

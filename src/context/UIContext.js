@@ -17,30 +17,27 @@ export const UIProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
 
   // --- نظام البث المباشر (Global Live System) ---
+  // يجب تعريف الحالة الابتدائية بدقة
   const [liveStream, setLiveStream] = useState({
-    isActive: false,      // هل البث يعمل؟
-    roomName: null,       // اسم الغرفة
-    isMinimized: false    // هل هو مصغر حالياً؟
+    isActive: false,
+    roomName: null,
+    isMinimized: false
   });
 
-  // دالة بدء البث (تستدعى من صفحة الدخول)
   const startBroadcast = (room) => {
     setLiveStream({ isActive: true, roomName: room, isMinimized: false });
-    setCurrentView('live'); // الانتقال لصفحة البث تلقائياً
+    setCurrentView('live');
   };
 
-  // دالة إنهاء البث
   const endBroadcast = () => {
     setLiveStream({ isActive: false, roomName: null, isMinimized: false });
   };
 
-  // دالة تبديل التصغير (يدوياً)
   const toggleMinimize = (minimize) => {
     setLiveStream(prev => ({ ...prev, isMinimized: minimize }));
   };
 
-  // --- التأثير الذكي للتصغير التلقائي ---
-  // يراقب تغيير الصفحة: إذا خرجت من 'live'، يصغر الفيديو. إذا عدت، يكبره.
+  // التأثير الذكي للتصغير التلقائي
   useEffect(() => {
     if (liveStream.isActive) {
       if (currentView !== 'live') {
@@ -51,14 +48,13 @@ export const UIProvider = ({ children }) => {
     }
   }, [currentView, liveStream.isActive]);
 
-  // --- نظام الإشعارات (Firebase Realtime) ---
+  // --- نظام الإشعارات ---
   useEffect(() => {
     if (!user) {
         setNotifications([]);
         return;
     }
     
-    // 1. جلب إشعارات المستخدم الحالي
     const myNotifsQuery = query(
         collection(db, "notifications"),
         where("userId", "==", user.uid)
@@ -66,19 +62,14 @@ export const UIProvider = ({ children }) => {
 
     const unsubMy = onSnapshot(myNotifsQuery, (snap) => {
         const myData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        
-        // نقوم بتحديث الحالة بذكاء لدمجها مع إشعارات الأدمن (إذا وجد)
         setNotifications(prev => {
-            // نحتفظ بإشعارات الأدمن الموجودة في الحالة الحالية ونحدث إشعاراتي
             const others = prev.filter(n => n.userId !== user.uid && n.target === 'admin');
             const all = [...others, ...myData];
-            // إزالة التكرار وترتيب حسب الوقت (الأحدث أولاً)
             const unique = Array.from(new Map(all.map(item => [item.id, item])).values());
             return unique.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
         });
     }, (e) => console.log("Notif error:", e));
 
-    // 2. إذا كان المستخدم هو "الماستر"، اجلب إشعارات النظام أيضاً
     let unsubAdmin = () => {};
     if (user.email === MASTER_EMAIL) {
         const adminQuery = query(
@@ -109,20 +100,23 @@ export const UIProvider = ({ children }) => {
     } catch (e) { console.error("Remove notif failed", e); }
   };
 
-  return (
-    <UIContext.Provider value={{ 
-        // Navigation & State
-        currentView, setCurrentView, 
-        activeCategory, setActiveCategory,
-        showSupport, setShowSupport,
-        activeOverlayGame, setActiveOverlayGame,
-        
-        // Notifications
-        notifications, removeNotification,
+  // تمرير القيم بدقة - liveState هنا هو الحل للخطأ
+  // لاحظ: اسم المتغير في RealLiveStream.jsx يجب أن يطابق الاسم هنا (liveStream)
+  // في الكود السابق كان هناك خلط بين liveState و liveStream. وحدت الاسم ليكون `liveStream`.
+  const value = {
+      currentView, setCurrentView, 
+      activeCategory, setActiveCategory,
+      showSupport, setShowSupport,
+      activeOverlayGame, setActiveOverlayGame,
+      notifications, removeNotification,
+      
+      // هنا الإصلاح: التأكد من تمرير liveStream وليس liveState
+      liveState: liveStream, 
+      startBroadcast, endBroadcast, toggleMinimize
+  };
 
-        // Live Stream System
-        liveStream, startBroadcast, endBroadcast, toggleMinimize
-    }}>
+  return (
+    <UIContext.Provider value={value}>
       {children}
     </UIContext.Provider>
   );

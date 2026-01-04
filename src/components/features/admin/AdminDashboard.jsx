@@ -9,12 +9,16 @@ import {
   IconShieldLock, IconUsers, IconLayoutDashboard, 
   IconBroadcast, IconMessage2, IconBan, 
   IconTrash, IconSettings, IconX, IconMenu2,
-  IconSend, IconDeviceGamepad, IconHome, IconCheck, IconUser
+  IconSend, IconDeviceGamepad, IconHome, IconCheck, IconUser, IconArrowLeft
 } from '@tabler/icons-react';
 import { useUI } from '@/context/UIContext';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export default function AdminDashboard({ currentUser }) {
   const { setCurrentView } = useUI();
+  const { t, dir } = useLanguage();
+  
+  // --- View States ---
   const [activeView, setActiveView] = useState('overview');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
@@ -152,7 +156,7 @@ export default function AdminDashboard({ currentUser }) {
       } catch (e) { alert("Error: " + e.message); }
   };
 
-  // --- Components ---
+  // --- UI Components ---
 
   const StatCard = ({ title, value, icon, color }) => (
     <div className="p-4 md:p-6 rounded-2xl bg-[#111] border border-white/10 hover:border-white/20 transition-all">
@@ -173,7 +177,7 @@ export default function AdminDashboard({ currentUser }) {
   );
 
   return (
-    <div className="fixed inset-0 z-[200] flex bg-[#050505] text-white font-sans overflow-hidden">
+    <div className="fixed inset-0 z-[200] flex bg-[#050505] text-white font-sans overflow-hidden" dir={dir}>
         
         {/* Mobile Header Overlay */}
         <div className="md:hidden fixed top-0 left-0 w-full h-16 bg-[#050505] border-b border-white/10 z-50 flex items-center justify-between px-4">
@@ -188,7 +192,7 @@ export default function AdminDashboard({ currentUser }) {
         {/* Sidebar (Responsive) */}
         <nav className={`
             fixed md:relative top-0 left-0 h-full w-72 bg-black border-r border-white/10 z-40 transition-transform duration-300 flex flex-col shrink-0 pt-16 md:pt-0
-            ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+            ${isMobileMenuOpen ? 'translate-x-0' : (dir === 'rtl' ? 'translate-x-full md:translate-x-0' : '-translate-x-full md:translate-x-0')}
         `}>
             <div className="hidden md:flex p-6 h-20 border-b border-white/10 items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-900/20">
@@ -196,19 +200,19 @@ export default function AdminDashboard({ currentUser }) {
                 </div>
                 <div>
                     <h1 className="font-black tracking-widest text-lg leading-none">NEXUS<span className="text-indigo-500">OS</span></h1>
-                    <span className="text-[10px] text-gray-500 font-mono uppercase">Admin Terminal V3.0</span>
+                    <span className="text-[10px] text-gray-500 font-mono uppercase">V3.0</span>
                 </div>
             </div>
             
             <div className="flex-1 py-6 px-4 space-y-1 overflow-y-auto">
                 <div className="text-[10px] text-gray-600 font-bold uppercase tracking-widest mb-2 ml-2">Modules</div>
-                <NavBtn id="overview" label="Overview" icon={IconLayoutDashboard} />
-                <NavBtn id="users" label="Operatives" icon={IconUsers} />
-                <NavBtn id="comms" label="Squad Control" icon={IconDeviceGamepad} />
+                <NavBtn id="overview" label={t('admin_overview')} icon={IconLayoutDashboard} />
+                <NavBtn id="users" label={t('admin_operatives')} icon={IconUsers} />
+                <NavBtn id="comms" label={t('admin_squads')} icon={IconDeviceGamepad} />
                 
                 <div className="text-[10px] text-gray-600 font-bold uppercase tracking-widest mb-2 ml-2 mt-6">Signals</div>
-                <NavBtn id="support" label="Support Uplink" icon={IconMessage2} count={tickets.filter(t=>t.status!=='resolved').length} />
-                <NavBtn id="broadcast" label="Global Alert" icon={IconBroadcast} />
+                <NavBtn id="support" label={t('admin_uplink')} icon={IconMessage2} count={tickets.filter(t=>t.status!=='resolved').length} />
+                <NavBtn id="broadcast" label={t('admin_alert')} icon={IconBroadcast} />
             </div>
 
             <div className="p-4 border-t border-white/10">
@@ -217,7 +221,7 @@ export default function AdminDashboard({ currentUser }) {
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-gray-400 hover:text-white transition-all text-sm font-bold"
                 >
                     <IconHome size={18} />
-                    <span>Exit Terminal</span>
+                    <span>{t('admin_exit')}</span>
                 </button>
             </div>
         </nav>
@@ -227,15 +231,15 @@ export default function AdminDashboard({ currentUser }) {
             {/* Header (Desktop Only) */}
             <header className="hidden md:flex h-20 border-b border-white/10 bg-black/50 backdrop-blur-md items-center justify-between px-8 shrink-0">
                 <h2 className="text-xl font-bold uppercase tracking-widest text-white flex items-center gap-3">
-                    {activeView === 'overview' && <><IconLayoutDashboard className="text-indigo-500"/> System Overview</>}
-                    {activeView === 'users' && <><IconUsers className="text-indigo-500"/> Operative Database</>}
-                    {activeView === 'comms' && <><IconDeviceGamepad className="text-indigo-500"/> Squad Channels</>}
-                    {activeView === 'support' && <><IconMessage2 className="text-indigo-500"/> Support Signals</>}
-                    {activeView === 'broadcast' && <><IconBroadcast className="text-red-500"/> Emergency Broadcast</>}
+                    {activeView === 'overview' && <><IconLayoutDashboard className="text-indigo-500"/> {t('admin_overview')}</>}
+                    {activeView === 'users' && <><IconUsers className="text-indigo-500"/> {t('admin_operatives')}</>}
+                    {activeView === 'comms' && <><IconDeviceGamepad className="text-indigo-500"/> {t('admin_squads')}</>}
+                    {activeView === 'support' && <><IconMessage2 className="text-indigo-500"/> {t('admin_uplink')}</>}
+                    {activeView === 'broadcast' && <><IconBroadcast className="text-red-500"/> {t('admin_alert')}</>}
                 </h2>
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                    <span className="text-xs font-mono text-gray-500">SECURE CONNECTION</span>
+                    <span className="text-xs font-mono text-gray-500">SECURE</span>
                 </div>
             </header>
 
@@ -246,10 +250,10 @@ export default function AdminDashboard({ currentUser }) {
                 {activeView === 'overview' && (
                     <div className="h-full overflow-y-auto p-4 md:p-8 custom-scrollbar">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 animate-in fade-in">
-                            <StatCard title="Total Operatives" value={users.length} icon={<IconUsers/>} color="text-cyan-400" />
-                            <StatCard title="Active Threats" value={users.filter(u => u.isBanned).length} icon={<IconBan/>} color="text-red-500" />
-                            <StatCard title="Open Tickets" value={tickets.filter(t => t.status !== 'resolved').length} icon={<IconMessage2/>} color="text-yellow-500" />
-                            <StatCard title="Commanders" value={users.filter(u => u.role === 'admin' || u.role === 'master').length} icon={<IconShieldLock/>} color="text-purple-500" />
+                            <StatCard title={t('admin_total_ops')} value={users.length} icon={<IconUsers/>} color="text-cyan-400" />
+                            <StatCard title={t('admin_threats')} value={users.filter(u => u.isBanned).length} icon={<IconBan/>} color="text-red-500" />
+                            <StatCard title={t('admin_tickets')} value={tickets.filter(t => t.status !== 'resolved').length} icon={<IconMessage2/>} color="text-yellow-500" />
+                            <StatCard title={t('admin_commanders')} value={users.filter(u => u.role === 'admin' || u.role === 'master').length} icon={<IconShieldLock/>} color="text-purple-500" />
                         </div>
                     </div>
                 )}
@@ -261,10 +265,10 @@ export default function AdminDashboard({ currentUser }) {
                             <table className="w-full text-sm text-left min-w-[600px]">
                                 <thead className="bg-white/5 text-gray-400 font-bold uppercase text-xs">
                                     <tr>
-                                        <th className="p-4">Operative</th>
-                                        <th className="p-4">Role</th>
-                                        <th className="p-4">Status</th>
-                                        <th className="p-4 text-right">Actions</th>
+                                        <th className="p-4">{t('identity_name_label')}</th>
+                                        <th className="p-4">{t('admin_role')}</th>
+                                        <th className="p-4">{t('admin_status')}</th>
+                                        <th className="p-4 text-right">{t('admin_actions')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
@@ -312,7 +316,7 @@ export default function AdminDashboard({ currentUser }) {
                                                     onClick={() => toggleBan(u.id, u.isBanned)}
                                                     className={`text-xs font-bold underline ${u.isBanned ? 'text-green-500' : 'text-red-500'}`}
                                                 >
-                                                    {u.isBanned ? "Revoke Ban" : "Ban Agent"}
+                                                    {u.isBanned ? t('admin_unban') : t('admin_ban')}
                                                 </button>
                                             </td>
                                         </tr>
@@ -361,7 +365,7 @@ export default function AdminDashboard({ currentUser }) {
                     </div>
                 )}
 
-                {/* 4. SUPPORT SYSTEM (Stacked on Mobile, Split on Desktop) */}
+                {/* 4. SUPPORT SYSTEM */}
                 {activeView === 'support' && (
                     <div className="h-full flex flex-col md:flex-row p-4 md:p-6 gap-4 md:gap-6 overflow-hidden">
                         {/* Ticket List */}
@@ -450,21 +454,21 @@ export default function AdminDashboard({ currentUser }) {
                 {activeView === 'broadcast' && (
                     <div className="h-full overflow-y-auto p-4 md:p-8 custom-scrollbar">
                         <div className="max-w-2xl mx-auto bg-[#111] border border-white/10 rounded-2xl p-6 md:p-8 mt-4 md:mt-10">
-                            <h3 className="text-xl font-bold mb-2 flex items-center gap-2 text-white"><IconBroadcast className="text-red-500"/> Global System Alert</h3>
-                            <p className="text-gray-500 text-sm mb-6">This message will be broadcast to all active operatives immediately via the notification system.</p>
+                            <h3 className="text-xl font-bold mb-2 flex items-center gap-2 text-white"><IconBroadcast className="text-red-500"/> {t('admin_broadcast_title')}</h3>
+                            <p className="text-gray-500 text-sm mb-6">This message will be broadcast to all active operatives immediately.</p>
                             
                             <textarea 
                                 value={broadcastMsg}
                                 onChange={(e) => setBroadcastMsg(e.target.value)}
                                 className="w-full h-32 bg-black border border-white/20 rounded-xl p-4 text-white mb-4 focus:border-red-500 outline-none resize-none font-mono text-sm"
-                                placeholder="ENTER ALERT MESSAGE..."
+                                placeholder={t('admin_broadcast_ph')}
                                 dir="auto"
                             />
                             <button 
                                 onClick={sendBroadcast}
                                 className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-red-900/20 uppercase tracking-widest text-xs"
                             >
-                                Execute Broadcast
+                                {t('admin_broadcast_exec')}
                             </button>
                         </div>
                     </div>
