@@ -9,8 +9,7 @@ import {
 import { useLanguage } from "@/hooks/useLanguage";
 
 // --- تكوين الرتب (Global Ranks Config) ---
-// نستخدم معرفات (id) لربطها بملف الترجمة
-const RANKS = [
+const RANKS_CONFIG = [
     { id: "recruit", min: 0, color: "text-zinc-400", bg: "bg-zinc-500", icon: <IconUser /> },
     { id: "soldier", min: 100, color: "text-emerald-400", bg: "bg-emerald-500", icon: <IconTarget /> },
     { id: "hacker", min: 500, color: "text-cyan-400", bg: "bg-cyan-500", icon: <IconActivity /> },
@@ -21,70 +20,47 @@ const RANKS = [
 ];
 
 // --- مكون مخطط الرادار (Skill Radar) ---
-// يرسم مضلعاً يعكس مهارات المستخدم بناءً على البيانات
-const SkillRadar = ({ stats }) => {
-  // تحويل القيم إلى مقياس 0-100 للرسم البياني
+const SkillRadar = ({ stats, t }) => {
   const values = [
-    Math.min(100, (stats.totalCards / 100) * 100), // سعة الذاكرة (هدف أولي 100 كلمة)
-    Math.min(100, (stats.streak / 30) * 100),      // الاستمرارية (هدف شهري)
-    Math.min(100, (stats.xp / 5000) * 100),        // الخبرة (نسبة من رتبة Legend)
-    Math.min(100, stats.masteryRate),              // معدل الإتقان الفعلي
-    Math.min(100, stats.activityScore)             // نشاط التعلم
+    Math.min(100, (stats.totalCards / 200) * 100), // سعة الذاكرة
+    Math.min(100, (stats.streak / 30) * 100),      // الاستمرارية
+    Math.min(100, (stats.xp / 5000) * 100),        // مستوى الخبرة
+    Math.min(100, stats.masteryRate),              // معدل الإتقان
+    Math.min(100, stats.activityScore)             // النشاط
   ];
 
-  // حساب نقاط المضلع
   const points = values.map((val, i) => {
     const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
     const r = (val / 100) * 45; 
-    const x = 50 + r * Math.cos(angle);
-    const y = 50 + r * Math.sin(angle);
-    return `${x},${y}`;
+    return `${50 + r * Math.cos(angle)},${50 + r * Math.sin(angle)}`;
   }).join(" ");
 
   return (
-    <div className="relative w-full aspect-square max-w-[180px] mx-auto my-4">
+    <div className="relative w-full aspect-square max-w-[200px] mx-auto my-6">
       <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100">
-        {/* شبكة الخلفية (حلقات) */}
         {[20, 40, 60, 80, 100].map((r, i) => (
             <polygon key={i} points={[0,1,2,3,4].map(j => {
                 const angle = (Math.PI * 2 * j) / 5 - Math.PI / 2;
                 const rad = (r / 100) * 45;
                 return `${50 + rad * Math.cos(angle)},${50 + rad * Math.sin(angle)}`;
-            }).join(" ")} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+            }).join(" ")} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
         ))}
-        
-        {/* المحاور (خطوط من المركز) */}
-        {[0,1,2,3,4].map(i => {
-             const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
-             return <line key={i} x1="50" y1="50" x2={50 + 45 * Math.cos(angle)} y2={50 + 45 * Math.sin(angle)} stroke="rgba(255,255,255,0.1)" />;
-        })}
-
-        {/* مضلع البيانات (النتيجة) */}
         <motion.polygon 
           initial={{ opacity: 0, scale: 0 }}
           animate={{ opacity: 0.6, scale: 1 }}
-          transition={{ duration: 1 }}
+          transition={{ duration: 1.5, ease: "circOut" }}
           points={points} 
           fill="rgba(6, 182, 212, 0.2)" 
           stroke="#06b6d4" 
           strokeWidth="2" 
         />
-        
-        {/* نقاط التقاطع */}
-        {values.map((val, i) => {
-             const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
-             const r = (val / 100) * 45;
-             return <circle key={i} cx={50 + r * Math.cos(angle)} cy={50 + r * Math.sin(angle)} r="2" fill="#fff" />;
-        })}
       </svg>
-      
-      {/* التسميات التوضيحية */}
-      <div className="absolute inset-0 pointer-events-none text-[8px] font-bold text-white/50 font-mono">
-          <span className="absolute top-0 left-1/2 -translate-x-1/2 bg-black/50 px-1">MEM</span>
-          <span className="absolute top-[35%] right-0 translate-x-2">STR</span>
-          <span className="absolute bottom-0 right-0 translate-x-1">XP</span>
-          <span className="absolute bottom-0 left-0 -translate-x-1">MST</span>
-          <span className="absolute top-[35%] left-0 -translate-x-4">ACT</span>
+      <div className="absolute inset-0 pointer-events-none text-[7px] font-black text-white/30 font-mono uppercase tracking-tighter">
+          <span className="absolute top-[-10px] left-1/2 -translate-x-1/2 text-cyan-500">MEM</span>
+          <span className="absolute top-[30%] right-[-15px]">STRK</span>
+          <span className="absolute bottom-[-5px] right-[5px]">EXP</span>
+          <span className="absolute bottom-[-5px] left-[5px]">MSTR</span>
+          <span className="absolute top-[30%] left-[-20px]">ACTV</span>
       </div>
     </div>
   );
@@ -92,191 +68,170 @@ const SkillRadar = ({ stats }) => {
 
 // --- المكون الرئيسي ---
 export default function CyberDeck({ user, stats, cards = [] }) {
-  const { t, dir } = useLanguage();
+  const { t, dir, isRTL } = useLanguage();
 
-  // 1. معالجة البيانات الحقيقية (Memoized Calculations)
-  // يتم حساب الرتب والنسب المئوية هنا لضمان السرعة والدقة
   const analytics = useMemo(() => {
     const xp = stats?.xp || 0;
     const streak = stats?.streak || 0;
     const totalCards = cards.length;
-    
-    // حساب البطاقات المتقنة (مستوى 5) والجديدة
     const masteredCards = cards.filter(c => c.level >= 5).length;
     const learningCards = cards.filter(c => c.level > 0 && c.level < 5).length;
-    
-    // نسبة الإتقان (تجنب القسمة على صفر)
     const masteryRate = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
     
-    // تحديد الرتبة الحالية والقادمة بناءً على الـ XP
-    const rankIndex = RANKS.findIndex((r, i) => {
-        const next = RANKS[i + 1];
+    const rankIndex = RANKS_CONFIG.findIndex((r, i) => {
+        const next = RANKS_CONFIG[i + 1];
         return xp >= r.min && (!next || xp < next.min);
     });
-    const currentRank = RANKS[rankIndex] || RANKS[0];
-    const nextRank = RANKS[rankIndex + 1];
+    const currentRank = RANKS_CONFIG[rankIndex] || RANKS_CONFIG[0];
+    const nextRank = RANKS_CONFIG[rankIndex + 1];
     
-    // نسبة التقدم للرتبة التالية (للشريط)
     let rankProgress = 100;
     if (nextRank) {
-        const totalNeeded = nextRank.min - currentRank.min;
-        const currentEarned = xp - currentRank.min;
-        rankProgress = Math.min(100, Math.max(0, (currentEarned / totalNeeded) * 100));
+        rankProgress = Math.min(100, ((xp - currentRank.min) / (nextRank.min - currentRank.min)) * 100);
     }
 
-    // درجة النشاط (معادلة تقريبية للرادار)
-    const activityScore = Math.min(100, learningCards * 5 + masteredCards * 2 + streak * 2);
+    const activityScore = Math.min(100, (learningCards * 10 + streak * 5));
 
     return {
-        xp, streak, totalCards, masteredCards, learningCards,
+        xp, streak, totalCards, masteredCards,
         masteryRate, currentRank, nextRank, rankProgress, activityScore
     };
-  }, [user, stats, cards]);
+  }, [stats, cards]);
 
   return (
-    <div className="w-full pb-20 font-sans p-4 md:p-0" dir={dir}>
+    <div className="w-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20" dir={dir}>
         
-        {/* --- GRID LAYOUT --- */}
+        {/* صف الهوية والتحليل */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            {/* 1. Identity Card (بطاقة الهوية - يسار الشاشة الكبيرة) */}
-            <div className="lg:col-span-8 bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden relative group">
-                {/* خلفية متحركة خفيفة (Noise + Gradient) */}
-                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
-                <div className="absolute top-0 right-0 p-32 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
+            {/* 1. Identity Card */}
+            <div className="lg:col-span-8 bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-8 relative overflow-hidden group shadow-2xl">
+                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none"></div>
+                <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 blur-[100px] rounded-full"></div>
 
-                <div className="p-8 relative z-10">
-                    <div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
-                        {/* إطار الصورة */}
-                        <div className="relative">
-                            <div className="w-32 h-32 rounded-2xl p-[2px] bg-gradient-to-br from-white/20 to-transparent">
-                                <div className="w-full h-full rounded-xl overflow-hidden bg-black">
-                                    <img src={user?.photoURL || '/avatars/avatar1.png'} className="w-full h-full object-cover" alt="Avatar"/>
-                                </div>
-                            </div>
-                            {/* شارة المستوى أسفل الصورة */}
-                            <div className="absolute -bottom-3 inset-x-0 flex justify-center">
-                                <span className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest bg-[#111] border border-white/10 ${analytics.currentRank.color}`}>
-                                    {t('profile_lvl')}.{Math.floor(analytics.xp / 500) + 1}
-                                </span>
+                <div className="relative z-10 flex flex-col md:flex-row gap-10 items-center md:items-start">
+                    <div className="relative">
+                        <div className="w-40 h-40 rounded-3xl p-1 bg-gradient-to-br from-white/20 to-transparent shadow-2xl">
+                            <div className="w-full h-full rounded-[1.4rem] overflow-hidden bg-black border border-white/10">
+                                <img src={user?.photoURL || '/avatars/avatar1.png'} className="w-full h-full object-cover grayscale-[0.5] hover:grayscale-0 transition-all duration-500" alt="Avatar"/>
                             </div>
                         </div>
-
-                        {/* معلومات المستخدم */}
-                        <div className={`flex-1 text-center ${dir === 'rtl' ? 'md:text-right' : 'md:text-left'} w-full`}>
-                            {/* الرتبة والفئة */}
-                            <div className={`flex items-center justify-center ${dir === 'rtl' ? 'md:justify-start' : 'md:justify-start'} gap-2 mb-2`}>
-                                <span className={`w-2 h-2 rounded-full ${analytics.currentRank.bg}`}></span>
-                                <span className={`text-xs font-bold tracking-[0.2em] uppercase ${analytics.currentRank.color}`}>
-                                    {t('rank_' + analytics.currentRank.id)} {t('profile_class')}
-                                </span>
-                            </div>
-                            
-                            {/* الاسم */}
-                            <h1 className="text-4xl font-black text-white tracking-tighter mb-4 truncate">
-                                {user?.displayName || "OPERATIVE"}
-                            </h1>
-
-                            {/* شريط الخبرة (XP Bar) */}
-                            <div className="relative pt-2">
-                                <div className="flex justify-between text-[10px] font-mono text-white/40 mb-1">
-                                    <span>{t('profile_exp')}: {analytics.xp}</span>
-                                    <span>{t('profile_next')}: {analytics.nextRank ? analytics.nextRank.min : "MAX"}</span>
-                                </div>
-                                <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                                    <motion.div 
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${analytics.rankProgress}%` }}
-                                        transition={{ duration: 1.5, ease: "circOut" }}
-                                        className={`h-full ${analytics.currentRank.bg}`}
-                                    />
-                                </div>
-                            </div>
+                        <div className="absolute -bottom-4 inset-x-0 flex justify-center">
+                            <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] bg-black border border-white/10 shadow-xl ${analytics.currentRank.color}`}>
+                                LVL.{Math.floor(analytics.xp / 500) + 1}
+                            </span>
                         </div>
                     </div>
 
-                    {/* صف الإحصائيات السريعة (أسفل البطاقة) */}
-                    <div className="grid grid-cols-3 gap-4 mt-8 pt-8 border-t border-white/5">
-                        <StatItem label={t('profile_stats_cards')} value={analytics.totalCards} color="text-white" icon={<IconDna size={16}/>} />
-                        <StatItem label={t('profile_stats_mastered')} value={analytics.masteredCards} color="text-yellow-400" icon={<IconCrown size={16}/>} />
-                        <StatItem label={t('profile_stats_streak')} value={analytics.streak} color="text-orange-400" icon={<IconFlame size={16}/>} />
+                    <div className="flex-1 w-full text-center md:text-left">
+                        <div className={`flex items-center gap-2 mb-3 justify-center md:justify-start`}>
+                            <div className={`w-2 h-2 rounded-full animate-pulse ${analytics.currentRank.bg}`}></div>
+                            <span className={`text-xs font-black tracking-[0.3em] uppercase ${analytics.currentRank.color}`}>
+                                {t(`rank_${analytics.currentRank.id}`)} {t('profile_class')}
+                            </span>
+                        </div>
+                        
+                        <h1 className="text-4xl md:text-6xl font-black text-white tracking-tighter mb-6 truncate uppercase">
+                            {user?.displayName || "OPERATIVE"}
+                        </h1>
+
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-[10px] font-mono text-white/30 uppercase tracking-widest">
+                                <span>{t('profile_exp')}: {analytics.xp}</span>
+                                <span>{t('profile_next')}: {analytics.nextRank ? analytics.nextRank.min : "MAX_CAP"}</span>
+                            </div>
+                            <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 p-0.5">
+                                <motion.div 
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${analytics.rankProgress}%` }}
+                                    transition={{ duration: 2, ease: "circOut" }}
+                                    className={`h-full rounded-full ${analytics.currentRank.bg} shadow-[0_0_15px_rgba(255,255,255,0.1)]`}
+                                />
+                            </div>
+                        </div>
                     </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-6 mt-12 pt-8 border-t border-white/5">
+                    <StatBox label={t('profile_stats_cards')} value={analytics.totalCards} color="text-white" icon={<IconDna size={18}/>} />
+                    <StatBox label={t('profile_stats_mastered')} value={analytics.masteredCards} color="text-yellow-400" icon={<IconCrown size={18}/>} />
+                    <StatBox label={t('profile_stats_streak')} value={analytics.streak} color="text-orange-500" icon={<IconFlame size={18}/>} />
                 </div>
             </div>
 
-            {/* 2. Neural Scan (تحليل الأداء - يمين الشاشة الكبيرة) */}
-            <div className="lg:col-span-4 bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 flex flex-col items-center justify-center relative min-h-[300px]">
-                <div className={`flex items-center gap-2 absolute top-6 text-cyan-500/50 ${dir === 'rtl' ? 'right-6' : 'left-6'}`}>
-                    <IconChartRadar size={18}/>
-                    <span className="text-[10px] font-black tracking-widest uppercase">{t('profile_metrics')}</span>
+            {/* 2. Performance Metrics */}
+            <div className="lg:col-span-4 bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-8 flex flex-col items-center justify-center relative shadow-2xl overflow-hidden min-h-[400px]">
+                <div className="absolute top-8 left-8 flex items-center gap-2 opacity-30">
+                    <IconChartRadar size={20} className="text-cyan-500"/>
+                    <span className="text-[10px] font-black tracking-[0.3em] uppercase">{t('profile_metrics')}</span>
                 </div>
                 
-                {/* الرسم البياني */}
-                <SkillRadar stats={analytics} />
+                <SkillRadar stats={analytics} t={t} />
                 
-                <div className="mt-4 text-center">
-                    <div className="text-3xl font-black text-white">{analytics.masteryRate}%</div>
-                    <div className="text-[10px] text-white/30 uppercase tracking-widest">{t('profile_efficiency')}</div>
+                <div className="mt-6 text-center">
+                    <div className="text-5xl font-black text-white tracking-tighter">{analytics.masteryRate}%</div>
+                    <div className="text-[10px] text-white/20 uppercase tracking-[0.4em] mt-2 font-black">{t('profile_efficiency')}</div>
                 </div>
+                <div className="absolute bottom-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent"></div>
             </div>
         </div>
 
-        {/* 3. Badges Grid (شبكة الأوسمة - أسفل الصفحة) */}
-        <div className="mt-8">
-            <div className={`flex items-center gap-3 mb-6 px-2 ${dir === 'rtl' ? 'flex-row-reverse' : 'flex-row'}`}>
-                <IconMedal className="text-white/20" size={24} />
-                <h3 className="text-xl font-black text-white tracking-wide">{t('profile_badges')}</h3>
+        {/* 3. Badges Grid */}
+        <div className="space-y-8">
+            <div className="flex items-center gap-4 px-2">
+                <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40">
+                    <IconMedal size={24} />
+                </div>
+                <h3 className="text-2xl font-black text-white uppercase tracking-tighter">{t('profile_badges')}</h3>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {RANKS.map((r, i) => {
-                    if (i === 0) return null; // تخطي رتبة المبتدئ
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {RANKS_CONFIG.map((r, i) => {
+                    if (i === 0) return null;
                     const isUnlocked = analytics.xp >= r.min;
                     
                     return (
-                        <div key={i} className={`p-4 rounded-2xl border transition-all ${
-                            isUnlocked 
-                            ? 'bg-[#111] border-white/10 hover:border-white/20' 
-                            : 'bg-black border-white/5 opacity-40'
-                        }`}>
-                            <div className="flex items-center gap-4">
-                                {/* أيقونة الرتبة */}
-                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isUnlocked ? r.bg + '/20 ' + r.color : 'bg-white/5 text-white/20'}`}>
-                                    {isUnlocked ? r.icon : <IconLock size={18}/>}
+                        <motion.div 
+                            key={i} 
+                            whileHover={isUnlocked ? { y: -5 } : {}}
+                            className={`p-6 rounded-3xl border transition-all duration-500 relative overflow-hidden ${
+                                isUnlocked 
+                                ? 'bg-[#111] border-white/10 shadow-xl' 
+                                : 'bg-black/40 border-white/5 opacity-40 grayscale'
+                            }`}
+                        >
+                            <div className="flex items-center gap-5">
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${
+                                    isUnlocked ? r.bg + '/20 ' + r.color : 'bg-white/5 text-white/10'
+                                }`}>
+                                    {isUnlocked ? React.cloneElement(r.icon, { size: 32 }) : <IconLock size={24}/>}
                                 </div>
-                                {/* تفاصيل الرتبة */}
                                 <div>
-                                    <h4 className={`text-sm font-bold ${isUnlocked ? 'text-white' : 'text-white/30'}`}>
-                                        {t('rank_' + r.id)}
+                                    <h4 className={`text-lg font-black tracking-tight uppercase ${isUnlocked ? 'text-white' : 'text-white/20'}`}>
+                                        {t(`rank_${r.id}`)}
                                     </h4>
-                                    <p className="text-[10px] font-mono text-white/30">
+                                    <p className="text-[9px] font-mono text-white/30 uppercase tracking-widest mt-1">
                                         {isUnlocked ? t('profile_unlocked') : `${t('profile_requires')} ${r.min} XP`}
                                     </p>
                                 </div>
                             </div>
-                            
-                            {/* شريط صغير أسفل البطاقة للمفتوحين */}
-                            {isUnlocked && (
-                                <div className="mt-3 h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                                    <div className={`h-full ${r.bg} w-full`}></div>
-                                </div>
-                            )}
-                        </div>
+                            {isUnlocked && <div className={`absolute bottom-0 left-0 h-1 w-full ${r.bg} opacity-30`}></div>}
+                        </motion.div>
                     );
                 })}
             </div>
         </div>
-
     </div>
   );
 }
 
-// --- مكون مساعد للإحصائيات الصغيرة (معزول) ---
-const StatItem = ({ label, value, color, icon }) => (
-    <div className="text-center">
-        <div className="flex items-center justify-center gap-1 text-[10px] text-white/30 font-bold uppercase mb-1">
-            {icon} {label}
+function StatBox({ label, value, color, icon }) {
+    return (
+        <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center gap-2 text-[9px] text-white/20 font-black uppercase tracking-widest">
+                {icon} {label}
+            </div>
+            <div className={`text-3xl font-black ${color} font-mono tracking-tighter`}>{value}</div>
         </div>
-        <div className={`text-xl md:text-2xl font-black ${color} font-mono`}>{value}</div>
-    </div>
-);
+    );
+}

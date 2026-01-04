@@ -2,11 +2,12 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// استيراد الهوكس الأساسية
 import { useUI } from '@/hooks/useUI';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 
-// استيراد كافة العروض (Views)
+// استيراد كافة العروض (Views) - تم التأكد من المسارات الصحيحة
 import HeroView from './HeroView';
 import AdminView from './AdminView';
 import StudyView from './StudyView';
@@ -21,20 +22,20 @@ import { CategorySelect } from '@/components/features/study/CategorySelect';
 
 /**
  * مدير العروض المركزي (ViewManager)
- * المسؤول عن التنقل السلس بين وحدات النظام مع دعم كامل للترجمة والأنيميشن
+ * القلب النابض للنظام والمسؤول عن توجيه البيانات وتنسيق الانتقالات البصرية
  */
 export default function ViewManager(props) {
   const { currentView, setActiveCategory, activeCategory, setCurrentView } = useUI();
   const { isJunior, isAdmin } = useAuth();
-  const { dir, isRTL, isLoaded } = useLanguage();
+  const { t, dir, isRTL, isLoaded } = useLanguage();
 
-  // --- إعدادات الأنيميشن الاحترافية (Cinematic Layering) ---
-  const variants = {
+  // --- إعدادات الأنيميشن السينمائي (Motion Variants) ---
+  const pageVariants = {
     initial: { 
       opacity: 0, 
-      x: isRTL ? -20 : 20, // الحركة تأتي حسب اتجاه اللغة
-      filter: "blur(12px)",
-      scale: 0.98
+      x: isRTL ? -30 : 30, // الحركة تتبع منطق اتجاه اللغة
+      filter: "blur(15px)",
+      scale: 0.97
     },
     animate: { 
       opacity: 1, 
@@ -43,47 +44,54 @@ export default function ViewManager(props) {
       scale: 1,
       transition: {
         type: "spring",
-        stiffness: 260,
-        damping: 25
+        stiffness: 280,
+        damping: 28,
+        mass: 0.5
       }
     },
     exit: { 
       opacity: 0, 
-      x: isRTL ? 20 : -20,
-      filter: "blur(12px)",
-      scale: 1.02,
+      x: isRTL ? 30 : -30,
+      filter: "blur(15px)",
+      scale: 1.03,
       transition: {
-        duration: 0.3
+        duration: 0.3,
+        ease: "easeInOut"
       }
     }
   };
 
   /**
-   * دالة رندرة المحتوى بناءً على العرض الحالي
-   * تضمن تمرير كافة الوظائف السابقة دون حذف أي منها
+   * وظيفة رندرة المحتوى بناءً على حالة العرض الحالية
+   * تضمن تمرير كافة الوظائف المستلمة من Page.js دون أي حذف
    */
-  const renderContent = () => {
-    // نمنع الرندرة حتى يتم تحميل محرك اللغة لمنع ظهور الرموز (Keys)
+  const renderViewContent = () => {
+    // 1. انتظار تحميل محرك اللغة لمنع الومضات البرمجية
     if (!isLoaded) return null;
 
     switch (currentView) {
       case 'home':
         return <HeroView />;
-      
+
       case 'admin_panel':
-        // حماية أمنية: الأدمن فقط من يمكنه رؤية هذه اللوحة
+        // فحص أمني مزدوج للوصول للوحة الإدارة
         if (isJunior || isAdmin) return <AdminView />;
-        return <div className="h-full flex items-center justify-center font-mono text-red-500">ACCESS_DENIED: UNAUTHORIZED_ENTRY</div>;
-      
+        return (
+            <div className="h-full flex flex-col items-center justify-center text-red-500 font-mono tracking-widest gap-4">
+                <span className="text-4xl">⚠️</span>
+                <span className="font-black uppercase text-xs">Access_Denied: Unauthorized_Clearance_Level</span>
+            </div>
+        );
+
       case 'games':
         return <GamesView />;
-      
+
       case 'live':
         return <LiveView />;
-      
+
       case 'chat':
         return <CommunicationHub />;
-      
+
       case 'category':
         return (
           <CategorySelect 
@@ -96,7 +104,7 @@ export default function ViewManager(props) {
             }} 
           />
         );
-      
+
       case 'study':
         return (
           <StudyView 
@@ -109,7 +117,7 @@ export default function ViewManager(props) {
             speak={props.speak} 
           />
         );
-      
+
       case 'data':
         return (
           <DataView 
@@ -119,7 +127,7 @@ export default function ViewManager(props) {
             updateCard={props.updateCard} 
           />
         );
-      
+
       case 'leaderboard':
         return (
           <LeaderboardView 
@@ -127,7 +135,7 @@ export default function ViewManager(props) {
             stats={props.stats} 
           />
         );
-      
+
       case 'settings':
         return (
           <SettingsViewWrapper 
@@ -136,25 +144,34 @@ export default function ViewManager(props) {
         );
 
       default:
+        // العودة للقاعدة في حال وجود أي حالة غير معرفة
         return <HeroView />;
     }
   };
 
   return (
-    <div className="w-full h-full relative overflow-hidden flex flex-col items-center">
-        {/* AnimatePresence تضمن خروج العرض القديم بنعومة قبل دخول الجديد */}
+    <div className="w-full h-full relative overflow-hidden flex flex-col items-center" dir={dir}>
+        
+        {/* AnimatePresence تضمن خروج الصفحة السابقة تماماً قبل رندرة الجديدة (mode="wait") */}
         <AnimatePresence mode="wait" initial={false}>
           <motion.div 
-            key={currentView}
-            variants={variants}
+            key={currentView} // المفتاح الذي يراقب التغيير لتشغيل الأنيميشن
+            variants={pageVariants}
             initial="initial"
             animate="animate"
             exit="exit"
-            className="w-full h-full will-change-transform flex flex-col"
+            className="w-full h-full will-change-transform flex flex-col scroll-smooth"
           >
-            {renderContent()}
+            {renderViewContent()}
           </motion.div>
         </AnimatePresence>
+
+        {/* ستايلات محلية لضمان ثبات الواجهة أثناء التنقل */}
+        <style jsx>{`
+            div {
+                scrollbar-gutter: stable;
+            }
+        `}</style>
     </div>
   );
 }

@@ -11,79 +11,114 @@ export const AuthProvider = ({ children }) => {
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   
+  /**
+   * دالة تهيئة الملف الشخصي (Profile Initialization)
+   * تُستخدم لإنشاء مستند المستخدم في Firestore لأول مرة
+   */
   const initializeUserProfile = useCallback(async (firebaseUser) => {
     if (!firebaseUser) return;
+    
     try {
       const userRef = doc(db, "users", firebaseUser.uid);
       const snap = await getDoc(userRef);
       
+      // إذا كان المستخدم جديداً تماماً (لم يتم إنشاء مستنده بعد)
       if (!snap.exists()) {
         const initialRole = firebaseUser.email?.toLowerCase() === MASTER_EMAIL?.toLowerCase() ? 'master' : 'user';
+        
         const newProfile = {
           email: firebaseUser.email,
-          displayName: firebaseUser.displayName || 'User',
+          displayName: firebaseUser.displayName || 'Agent', // اسم مؤقت لحين اختيار الاسم الرمزي
           photoURL: firebaseUser.photoURL || "/avatars/avatar1.png",
           role: initialRole,
           xp: 0,
+          streak: 0,
           isBanned: false,
           createdAt: serverTimestamp(),
           lastLogin: serverTimestamp(),
         };
+        
         await setDoc(userRef, newProfile);
       } else {
+        // إذا كان موجوداً، نكتفي بتحديث وقت آخر دخول
         await updateDoc(userRef, { lastLogin: serverTimestamp() });
       }
-    } catch (e) { console.error("Profile init warning:", e); }
+    } catch (e) { 
+        console.error("Critical Profile Initialization Error:", e); 
+    }
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      try {
-        if (firebaseUser) {
-          setUser(firebaseUser);
-          initializeUserProfile(firebaseUser);
-          
-          const userRef = doc(db, "users", firebaseUser.uid);
-          onSnapshot(userRef, (docSnap) => {
-              if (docSnap.exists()) {
-                const data = docSnap.data();
-                setUserData(data);
-                if (data.isBanned && firebaseUser.email !== MASTER_EMAIL) signOut(auth);
-              }
-            });
-        } else {
-          setUser(null);
-          setUserData(null);
-        }
-      } catch (error) {
-        console.error("Auth Error:", error);
-      } finally {
-        setLoading(false);
+    // المستمع الرئيسي لحالة تسجيل الدخول
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        
+        // محاولة تهيئة الملف إذا لم يكن موجوداً
+        await initializeUserProfile(firebaseUser);
+        
+        // البدء بمراقبة بيانات المستخدم في Firestore في الوقت الفعلي
+        const userRef = doc(db, "users", firebaseUser.uid);
+        const unsubscribeDoc = onSnapshot(userRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setUserData(data);
+            
+            // بروتوكول الحظر الفوري
+            if (data.isBanned && firebaseUser.email?.toLowerCase() !== MASTER_EMAIL?.toLowerCase()) {
+              signOut(auth);
+            }
+          }
+        }, (err) => {
+          console.error("User Data Stream Error:", err);
+        });
+
+        // تنظيف مستمع المستند عند تسجيل الخروج
+        return () => unsubscribeDoc();
+
+      } else {
+        setUser(null);
+        setUserData(null);
       }
+      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => unsubscribeAuth();
   }, [initializeUserProfile]);
 
+  /**
+   * وظيفة إنهاء الجلسة بشكل آمن
+   */
   const logout = async () => {
-    await signOut(auth);
-    window.location.reload();
+    try {
+        await signOut(auth);
+        window.location.reload(); // إعادة تحميل النظام لتصفير كافة الحالات (Clean Slate)
+    } catch (e) {
+        console.error("Security Termination Failed:", e);
+    }
   };
 
+  // القيم التي سيتم تصديرها لكافة أنحاء التطبيق
   const value = {
-    user, userData, loading, logout,
+    user, 
+    userData, 
+    loading, 
+    logout,
+    // مساعدات برمجية سريعة لفحص الصلاحيات
     isAdmin: userData?.role === 'admin' || userData?.role === 'master',
     isJunior: ['junior','admin','master'].includes(userData?.role),
-    isMaster: userData?.role === 'master',
+    isMaster: userData?.role === 'master' || user?.email?.toLowerCase() === MASTER_EMAIL?.toLowerCase(),
     isBanned: userData?.isBanned === true
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// تعريف الـ Hook هنا لتجنب المشاكل
+// الهوك المخصص للوصول السهل لبيانات الهوية
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider. Neural link failed.');
+  }
   return context;
 };

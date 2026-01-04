@@ -1,223 +1,230 @@
 "use client";
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { fullDatabase } from '../data/fullDatabase'; 
 import { db } from '../lib/firebase';
-import { doc, setDoc, collection, getDocs, updateDoc, deleteDoc, writeBatch, getDoc, onSnapshot } from "firebase/firestore";
+import { 
+  doc, setDoc, collection, getDocs, updateDoc, 
+  deleteDoc, writeBatch, onSnapshot, serverTimestamp 
+} from "firebase/firestore";
+import { useUI } from './useUI';
 
-const APP_VERSION = "2.0.2";
+// إصدار النظام: تحديث هذا الرقم سيؤدي لتصفير الكاش لدى كافة المستخدمين لضمان الاستقرار
+const SYSTEM_PATCH_VERSION = "4.2.0";
 
+/**
+ * هوك نظام الدراسة المركزي (useStudySystem)
+ * المسؤول عن خوارزمية التعلم، مزامنة البيانات، وإدارة مستودع الكلمات
+ */
 export const useStudySystem = (user) => {
+  const { activeCategory } = useUI();
+  
+  // --- الحالات الأساسية ---
   const [cards, setCards] = useState(fullDatabase); 
   const [stats, setStats] = useState({ xp: 0, streak: 0, role: 'user' });
-  const [loading, setLoading] = useState(true);
   const [currentCard, setCurrentCard] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [isBanned, setIsBanned] = useState(false);
 
-  // Check version on mount
+  /**
+   * 1. بروتوكول صيانة النظام (Maintenance Protocol)
+   * يقوم بتنظيف localStorage عند رصد تحديث جديد للنظام
+   */
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const savedVersion = localStorage.getItem('RM_SYSTEM_VERSION');
     
-    const savedVersion = localStorage.getItem('app_version');
-    if (savedVersion !== APP_VERSION) {
-      console.log("Detecting new version, clearing old state...");
-      // Keep auth data but clear other caches
-      const authData = localStorage.getItem('firebase:authUser');
-      localStorage.clear(); 
-      if (authData) {
-        localStorage.setItem('firebase:authUser', authData);
-      }
-      localStorage.setItem('app_version', APP_VERSION);
+    if (savedVersion !== SYSTEM_PATCH_VERSION) {
+      console.warn("System Update Detected. Synchronizing Neural Cache...");
+      // تنظيف الكاش مع الحفاظ على بيانات الجلسة (Auth)
+      const authKey = Object.keys(localStorage).find(k => k.includes('firebase:authUser'));
+      const authVal = authKey ? localStorage.getItem(authKey) : null;
+      
+      localStorage.clear();
+      
+      if (authKey && authVal) localStorage.setItem(authKey, authVal);
+      localStorage.setItem('RM_SYSTEM_VERSION', SYSTEM_PATCH_VERSION);
     }
   }, []);
 
-  // Smart card picker function
+  /**
+   * 2. خوارزمية اختيار الكارت التالي (Smart Picker)
+   * تختار الكارت بناءً على: الفئة النشطة، مستوى الإتقان، وعدم التكرار الفوري
+   */
   const pickNextCard = useCallback((currentList, excludeId = null) => {
     if (!currentList || currentList.length === 0) {
       setCurrentCard(null);
       return;
     }
-    
+
     const now = Date.now();
-    // Filter out the current card to avoid repetition
-    const availableCards = excludeId 
-      ? currentList.filter(c => c.id !== excludeId)
-      : currentList;
     
-    // Cards that are due (or new with level 0)
-    const due = availableCards.filter(c => c.level < 5 && (!c.nextReview || c.nextReview <= now));
-    
+    // أ. التصفية حسب الفئة المختارة (إذا لم تكن 'All')
+    let pool = activeCategory === 'All' 
+      ? currentList 
+      : currentList.filter(c => c.category === activeCategory);
+
+    // ب. استبعاد الكارت الحالي لمنع التكرار الممل
+    if (excludeId) {
+        pool = pool.filter(c => c.id !== excludeId);
+    }
+
+    // ج. البحث عن الكروت التي حان موعد مراجعتها (Due Cards)
+    // الكروت الجديدة (Level 0) لها أولوية قصوى
+    const due = pool.filter(c => 
+        (c.level || 0) < 5 && 
+        (!c.nextReview || c.nextReview <= now)
+    );
+
     if (due.length > 0) {
-      // Pick randomly from due cards to avoid boredom
+      // اختيار عشوائي من قائمة "المستحق للمراجعة"
       const randomIndex = Math.floor(Math.random() * due.length);
       setCurrentCard(due[randomIndex]);
-    } else if (availableCards.length > 0) {
-      // If no due cards, pick any card for review (Overdrive Mode)
-      const randomAny = Math.floor(Math.random() * availableCards.length);
-      setCurrentCard(availableCards[randomAny]);
+    } else if (pool.length > 0) {
+      // إذا انتهت المراجعات، ندخل في وضع "المراجعة المستمرة" (Overdrive)
+      const randomIndex = Math.floor(Math.random() * pool.length);
+      setCurrentCard(pool[randomIndex]);
     } else {
       setCurrentCard(null);
     }
-  }, []);
+  }, [activeCategory]);
 
-  // Initial load and user sync
+  /**
+   * 3. مزامنة البيانات مع Firestore
+   */
   useEffect(() => {
-    pickNextCard(fullDatabase);
-    setLoading(false);
+    if (!user) {
+        setLoading(false);
+        return;
+    }
 
-    if (!user) return;
+    // مراقبة إحصائيات المستخدم (XP) في الوقت الفعلي
+    const userRef = doc(db, "users", user.uid);
+    const unsubStats = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setStats(data);
+        if (data.isBanned) setIsBanned(true);
+      }
+    });
 
-    let unsubscribe = () => {};
-
-    const syncUserData = async () => {
+    // جلب تقدم المستخدم في الكروت
+    const fetchUserProgress = async () => {
       try {
-        const userRef = doc(db, "users", user.uid);
-        
-        // Listen for real-time user data changes
-        unsubscribe = onSnapshot(userRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const userData = docSnap.data();
-            setStats(userData);
-            
-            // Check if user is banned
-            if (userData.isBanned) {
-              setIsBanned(true);
-            }
-          }
-        }, (error) => {
-          console.error("User snapshot error:", error);
-        });
-
-        // Get user cards
         const cardsCollection = collection(db, "users", user.uid, "personal_cards");
         const snapshot = await getDocs(cardsCollection);
         
         if (!snapshot.empty) {
-          const userCardsMap = new Map(snapshot.docs.map(d => [d.id, d.data()]));
-          const mergedCards = fullDatabase.map(card => {
-            const userProgress = userCardsMap.get(String(card.id));
-            return userProgress ? { ...card, ...userProgress } : card;
+          const userProgressMap = new Map(snapshot.docs.map(d => [d.id, d.data()]));
+          
+          // دمج قاعدة البيانات الشاملة مع تقدم المستخدم الحالي
+          const merged = fullDatabase.map(card => {
+            const progress = userProgressMap.get(String(card.id));
+            return progress ? { ...card, ...progress } : { ...card, level: 0 };
           });
-          setCards(mergedCards);
-          pickNextCard(mergedCards);
+          
+          setCards(merged);
+          pickNextCard(merged);
         } else {
-          await initializeUserDb(user.uid);
+          // مستخدم جديد: تهيئة الواجهة بالقاعدة الافتراضية
+          setCards(fullDatabase.map(c => ({...c, level: 0})));
+          pickNextCard(fullDatabase);
         }
-      } catch (e) {
-        console.error("Sync error:", e);
+      } catch (err) {
+        console.error("Neural Data Fetch Failed:", err);
+      } finally {
+        setLoading(false);
       }
     };
 
-    syncUserData();
-    
-    return () => unsubscribe();
+    fetchUserProgress();
+    return () => unsubStats();
   }, [user, pickNextCard]);
 
-  const initializeUserDb = async (uid) => {
-    try {
-      const batch = writeBatch(db);
-      const cardsCollection = collection(db, "users", uid, "personal_cards");
-      fullDatabase.slice(0, 20).forEach(card => {
-        const docRef = doc(cardsCollection, String(card.id));
-        batch.set(docRef, { ...card, level: 0, nextReview: Date.now() });
-      });
-      await batch.commit();
-    } catch (e) {
-      console.error("Batch initialization error:", e);
-    }
-  };
-
-  // Core swipe handler with optimistic UI
+  /**
+   * 4. معالجة التفاعل (Swipe Logic)
+   * تحديث مستوى الكارت وحفظ التقدم في السحابة
+   */
   const handleSwipe = useCallback(async (direction) => {
-    if (!currentCard || !user) return;
+    if (!currentCard || !user || isBanned) return;
     
     const known = direction === 'right';
-    // Algorithm: If known, next review is far. If not known, next review is soon.
-    const nextLevel = known ? Math.min((currentCard.level || 0) + 1, 5) : 0;
-    const nextReview = Date.now() + (known ? (Math.pow(2, nextLevel) * 86400000) : 60000); 
-
-    // 1. Optimistic UI update
-    const updatedCard = { ...currentCard, level: nextLevel, nextReview };
+    const oldLevel = currentCard.level || 0;
     
+    // خوارزمية التكرار المتباعد (SRS Logic)
+    // المستوى 5 هو الإتقان الكامل
+    const nextLevel = known ? Math.min(oldLevel + 1, 5) : 0;
+    
+    // تحديد موعد المراجعة القادم (مضاعفات زمنية)
+    const reviewIntervals = [
+        60000,           // Level 0 -> 1 min
+        3600000,         // Level 1 -> 1 hour
+        86400000,        // Level 2 -> 1 day
+        259200000,       // Level 3 -> 3 days
+        604800000,       // Level 4 -> 1 week
+        2592000000       // Level 5 -> 1 month (Mastered)
+    ];
+    
+    const nextReview = Date.now() + (known ? reviewIntervals[nextLevel] : 30000);
+
+    const updatedCard = { 
+        ...currentCard, 
+        level: nextLevel, 
+        nextReview,
+        lastStudied: Date.now() 
+    };
+
+    // أ. تحديث الحالة المحلية فوراً (Optimistic UI)
     const newCardsList = cards.map(c => c.id === currentCard.id ? updatedCard : c);
     setCards(newCardsList);
     
-    // 2. Pick next card immediately (exclude current card)
+    // اختيار الكارت التالي فوراً
     pickNextCard(newCardsList, currentCard.id);
 
-    // 3. Save to Firebase (background)
+    // ب. المزامنة مع Firestore في الخلفية
     try {
       const cardRef = doc(db, "users", user.uid, "personal_cards", String(currentCard.id));
-      await setDoc(cardRef, { ...updatedCard }, { merge: true });
+      await setDoc(cardRef, { 
+          level: nextLevel, 
+          nextReview, 
+          category: currentCard.category,
+          russian: currentCard.russian,
+          arabic: currentCard.arabic
+      }, { merge: true });
       
       if (known) {
-        await updateDoc(doc(db, "users", user.uid), { xp: (stats.xp || 0) + 10 });
-        setStats(prev => ({...prev, xp: prev.xp + 10}));
+        await updateDoc(doc(db, "users", user.uid), { 
+            xp: (stats.xp || 0) + 10,
+            lastActivity: serverTimestamp()
+        });
       }
-    } catch (e) { 
-      console.error("Save failed:", e); 
-    }
-  }, [currentCard, user, cards, stats.xp, pickNextCard]);
+    } catch (e) { console.error("Database Update Desync:", e); }
+  }, [currentCard, user, cards, stats.xp, isBanned, pickNextCard]);
+
+  // --- وظائف الإدارة (Admin Functions) ---
 
   const addCard = useCallback(async (cardData) => {
-    const newCard = { ...cardData, id: Date.now(), level: 0, nextReview: Date.now() };
-    setCards(prev => [...prev, newCard]);
+    const newId = Date.now();
+    const newCard = { ...cardData, id: newId, level: 0, nextReview: Date.now() };
+    setCards(prev => [newCard, ...prev]);
     
     if (user) {
-      try {
-        await setDoc(doc(db, "users", user.uid, "personal_cards", String(newCard.id)), newCard);
-      } catch (e) {
-        console.error("Add card error:", e);
-      }
+      await setDoc(doc(db, "users", user.uid, "personal_cards", String(newId)), newCard);
     }
-    return newCard;
   }, [user]);
 
   const deleteCard = useCallback(async (cardId) => {
     setCards(prev => prev.filter(c => c.id !== cardId));
-    
     if (user) {
-      try {
-        await deleteDoc(doc(db, "users", user.uid, "personal_cards", String(cardId)));
-      } catch (e) {
-        console.error("Delete card error:", e);
-      }
+      await deleteDoc(doc(db, "users", user.uid, "personal_cards", String(cardId)));
     }
   }, [user]);
 
   const updateCard = useCallback(async (cardId, newData) => {
     setCards(prev => prev.map(c => c.id === cardId ? { ...c, ...newData } : c));
-    
     if (user) {
-      try {
-        await updateDoc(doc(db, "users", user.uid, "personal_cards", String(cardId)), newData);
-      } catch (e) {
-        console.error("Update card error:", e);
-      }
+      await updateDoc(doc(db, "users", user.uid, "personal_cards", String(cardId)), newData);
     }
   }, [user]);
-
-  const resetProgress = useCallback(async () => {
-    if (!user) return;
-    
-    try {
-      const batch = writeBatch(db);
-      const cardsCollection = collection(db, "users", user.uid, "personal_cards");
-      
-      cards.forEach(card => {
-        const docRef = doc(cardsCollection, String(card.id));
-        batch.update(docRef, { level: 0, nextReview: Date.now() });
-      });
-      
-      await batch.commit();
-      
-      // Reset local state
-      const resetCards = cards.map(c => ({ ...c, level: 0, nextReview: Date.now() }));
-      setCards(resetCards);
-      pickNextCard(resetCards);
-    } catch (e) {
-      console.error("Reset progress error:", e);
-    }
-  }, [user, cards, pickNextCard]);
 
   return { 
     cards, 
@@ -227,10 +234,7 @@ export const useStudySystem = (user) => {
     loading, 
     addCard, 
     deleteCard, 
-    updateCard, 
-    resetProgress,
-    isAdmin: stats.role === 'admin' || stats.role === 'master',
-    isMaster: stats.role === 'master',
+    updateCard,
     isBanned 
   };
 };

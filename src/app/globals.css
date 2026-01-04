@@ -5,118 +5,128 @@
 @tailwind utilities;
 
 :root {
-  /* === الوضع النهاري (Light Mode) - ألوان زاهية ومشرقة === */
-  --bg-primary: #f0fdf4; /* أخضر فاتح جداً */
+  /* === الوضع النهاري (Light Mode) === */
+  --bg-primary: #f8fafc;
   --bg-secondary: #ffffff;
-  --text-main: #1e293b;
+  --bg-card: #ffffff;
+  --text-main: #0f172a;
   --text-muted: #64748b;
-  --accent-color: #0ea5e9; /* أزرق سماوي */
-  --accent-glow: rgba(14, 165, 233, 0.3);
+  --accent-primary: #0ea5e9;
+  --accent-glow: rgba(14, 165, 233, 0.2);
+  --border-color: rgba(0, 0, 0, 0.08);
   
-  /* تدرجات الخلفية النهارية */
-  --gradient-1: #c084fc; /* بنفسجي فاتح */
-  --gradient-2: #60a5fa; /* أزرق */
-  --gradient-3: #34d399; /* أخضر */
+  /* تدرجات الأورورا النهارية */
+  --aurora-1: #c084fc;
+  --aurora-2: #60a5fa;
+  --aurora-3: #34d399;
 }
 
-/* === الوضع الليلي (Dark Mode) - ألوان نيون وعميقة === */
+/* === الوضع الليلي (Dark Mode) === */
 [data-theme='dark'] {
-  --bg-primary: #020617; /* كحلي غامق جداً */
-  --bg-secondary: #0f172a;
+  --bg-primary: #050505;
+  --bg-secondary: #0a0a0a;
+  --bg-card: #0d0d0d;
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
-  --accent-color: #f43f5e; /* وردي نيون */
-  --accent-glow: rgba(244, 63, 94, 0.3);
+  --accent-primary: #06b6d4;
+  --accent-glow: rgba(6, 182, 212, 0.3);
+  --border-color: rgba(255, 255, 255, 0.1);
 
-  /* تدرجات الخلفية الليلية */
-  --gradient-1: #4c1d95; /* بنفسجي غامق */
-  --gradient-2: #be123c; /* أحمر غامق */
-  --gradient-3: #1e3a8a; /* أزرق غامق */
+  /* تدرجات الأورورا الليلية */
+  --aurora-1: #4c1d95;
+  --aurora-2: #0891b2;
+  --aurora-3: #1e3a8a;
 }
 
-body {
+/* === إعدادات الصفحة الأساسية === */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  /* منع التمرير في الطبقة الخارجية لمنع "Bounce" المتصفح اللعين */
+  overflow: hidden; 
   background-color: var(--bg-primary);
   color: var(--text-main);
-  overflow-x: hidden;
+  font-family: var(--font-cairo), var(--font-mono), sans-serif;
   -webkit-font-smoothing: antialiased;
   transition: background-color 0.5s ease, color 0.3s ease;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--text-muted); opacity: 0.2; border-radius: 10px; }
+/* التمرير يتم فقط داخل حاوية الـ Main المحددة في CyberLayout */
+.custom-scrollbar {
+  scrollbar-gutter: stable;
+}
 
-/* كلاسات مساعدة */
+/* === تخصيص شريط التمرير السيبراني === */
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 10px;
+  opacity: 0.2;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
+
+/* === كلاسات مساعدة (Utility Classes) === */
+
 .glass-panel {
   background: var(--bg-secondary);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(128, 128, 128, 0.1);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
-/* Smart Dock */
-.smart-dock {
-  background-color: var(--bg-secondary) !important;
-  border: 1px solid rgba(128, 128, 128, 0.1) !important;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.1) !important;
-  transition: all 0.3s ease-in-out;
+.aurora-blob {
+  position: absolute;
+  filter: blur(100px);
+  border-radius: 50%;
+  z-index: -1;
+  opacity: 0.4;
+  mix-blend-mode: screen;
+  animation: aurora-move 20s infinite alternate ease-in-out;
 }
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 10% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-  }
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-  }
+@keyframes aurora-move {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(5%, 10%) scale(1.1); }
+  100% { transform: translate(-5%, -5%) scale(0.9); }
+}
+
+/* تحسين الخطوط بناءً على اللغة */
+[lang='ar'] {
+  font-family: var(--font-cairo), sans-serif;
+}
+
+[lang='ru'], [lang='en'] {
+  font-family: var(--font-mono), sans-serif;
+}
+
+/* إخفاء شريط التمرير في Dock */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* تأثير الاهتزاز عند الخطأ */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+.animate-shake {
+  animation: shake 0.2s ease-in-out 0s 2;
 }
 
 @layer base {
