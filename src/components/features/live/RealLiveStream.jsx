@@ -5,20 +5,21 @@ import {
   IconBroadcast, IconLoader, IconDeviceTv, IconShieldCheck, IconWifi 
 } from "@tabler/icons-react";
 import { useUI } from "@/context/UIContext";
-import { useLanguage } from "@/hooks/useLanguage"; // استدعاء هوك اللغة
+import { useLanguage } from "@/hooks/useLanguage";
 
 export default function RealLiveStream() {
-  // 1. إصلاح الخطأ: استخراج liveState هنا
-  const { startBroadcast, liveState, toggleMinimize } = useUI(); 
-  const { t, dir } = useLanguage(); // استدعاء الترجمة
+  const uiContext = useUI(); // استدعاء السياق كاملاً أولاً
+  const { startBroadcast, liveState, toggleMinimize } = uiContext || {}; // تفكيك آمن
+  const { t, dir } = useLanguage();
   
   const [roomName, setRoomName] = useState("");
   const [status, setStatus] = useState("idle");
-  
-  // استخدام نصوص مترجمة للسجلات
   const [logs, setLogs] = useState([`> ${t('live_log_ready')}`, `> ${t('live_log_waiting')}`]);
 
   const addLog = (msg) => setLogs(prev => [...prev.slice(-3), `> ${msg}`]);
+
+  // حماية ضد الانهيار إذا لم يتم تحميل السياق بعد
+  if (!uiContext || !liveState) return <div className="p-10 text-center text-white/50">Loading Interface...</div>;
 
   const handleJoin = () => {
     if (!roomName.trim()) return;
@@ -31,7 +32,6 @@ export default function RealLiveStream() {
     }, 1500);
   };
 
-  // واجهة "تم الاتصال"
   if (liveState.isActive) {
       return (
         <div className="flex flex-col items-center justify-center h-full w-full text-center" dir={dir}>
@@ -47,7 +47,6 @@ export default function RealLiveStream() {
       );
   }
 
-  // واجهة الدخول (Lobby)
   return (
     <div className="w-full h-full flex flex-col relative font-sans overflow-hidden items-center justify-center" dir={dir}>
         <motion.div 
@@ -89,7 +88,6 @@ export default function RealLiveStream() {
                     </span>
                 </button>
                 
-                {/* Console Logs */}
                 <div className="bg-black/40 rounded-lg p-3 h-20 overflow-hidden font-mono text-[9px] text-green-500/60 border border-white/5 flex flex-col justify-end text-left" dir="ltr">
                     {logs.map((l, i) => <div key={i}>{l}</div>)}
                 </div>

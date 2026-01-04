@@ -1,6 +1,6 @@
 ==================================================================
 PROJECT STRUCTURE (هيكل الملفات)
-Generated on: 4/1/2026, 02:50:32
+Generated on: 4/1/2026, 03:13:13
 ==================================================================
 
 (ROOT)
@@ -1293,12 +1293,16 @@ import {
   IconShieldLock, IconUsers, IconLayoutDashboard, 
   IconBroadcast, IconMessage2, IconBan, 
   IconTrash, IconSettings, IconX, IconMenu2,
-  IconSend, IconDeviceGamepad, IconHome, IconCheck, IconUser
+  IconSend, IconDeviceGamepad, IconHome, IconCheck, IconUser, IconArrowLeft
 } from '@tabler/icons-react';
 import { useUI } from '@/context/UIContext';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export default function AdminDashboard({ currentUser }) {
   const { setCurrentView } = useUI();
+  const { t, dir } = useLanguage();
+  
+  // --- View States ---
   const [activeView, setActiveView] = useState('overview');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
@@ -1436,7 +1440,7 @@ export default function AdminDashboard({ currentUser }) {
       } catch (e) { alert("Error: " + e.message); }
   };
 
-  // --- Components ---
+  // --- UI Components ---
 
   const StatCard = ({ title, value, icon, color }) => (
     <div className="p-4 md:p-6 rounded-2xl bg-[#111] border border-white/10 hover:border-white/20 transition-all">
@@ -1457,7 +1461,7 @@ export default function AdminDashboard({ currentUser }) {
   );
 
   return (
-    <div className="fixed inset-0 z-[200] flex bg-[#050505] text-white font-sans overflow-hidden">
+    <div className="fixed inset-0 z-[200] flex bg-[#050505] text-white font-sans overflow-hidden" dir={dir}>
         
         {/* Mobile Header Overlay */}
         <div className="md:hidden fixed top-0 left-0 w-full h-16 bg-[#050505] border-b border-white/10 z-50 flex items-center justify-between px-4">
@@ -1472,7 +1476,7 @@ export default function AdminDashboard({ currentUser }) {
         {/* Sidebar (Responsive) */}
         <nav className={`
             fixed md:relative top-0 left-0 h-full w-72 bg-black border-r border-white/10 z-40 transition-transform duration-300 flex flex-col shrink-0 pt-16 md:pt-0
-            ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+            ${isMobileMenuOpen ? 'translate-x-0' : (dir === 'rtl' ? 'translate-x-full md:translate-x-0' : '-translate-x-full md:translate-x-0')}
         `}>
             <div className="hidden md:flex p-6 h-20 border-b border-white/10 items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-900/20">
@@ -1480,19 +1484,19 @@ export default function AdminDashboard({ currentUser }) {
                 </div>
                 <div>
                     <h1 className="font-black tracking-widest text-lg leading-none">NEXUS<span className="text-indigo-500">OS</span></h1>
-                    <span className="text-[10px] text-gray-500 font-mono uppercase">Admin Terminal V3.0</span>
+                    <span className="text-[10px] text-gray-500 font-mono uppercase">V3.0</span>
                 </div>
             </div>
             
             <div className="flex-1 py-6 px-4 space-y-1 overflow-y-auto">
                 <div className="text-[10px] text-gray-600 font-bold uppercase tracking-widest mb-2 ml-2">Modules</div>
-                <NavBtn id="overview" label="Overview" icon={IconLayoutDashboard} />
-                <NavBtn id="users" label="Operatives" icon={IconUsers} />
-                <NavBtn id="comms" label="Squad Control" icon={IconDeviceGamepad} />
+                <NavBtn id="overview" label={t('admin_overview')} icon={IconLayoutDashboard} />
+                <NavBtn id="users" label={t('admin_operatives')} icon={IconUsers} />
+                <NavBtn id="comms" label={t('admin_squads')} icon={IconDeviceGamepad} />
                 
                 <div className="text-[10px] text-gray-600 font-bold uppercase tracking-widest mb-2 ml-2 mt-6">Signals</div>
-                <NavBtn id="support" label="Support Uplink" icon={IconMessage2} count={tickets.filter(t=>t.status!=='resolved').length} />
-                <NavBtn id="broadcast" label="Global Alert" icon={IconBroadcast} />
+                <NavBtn id="support" label={t('admin_uplink')} icon={IconMessage2} count={tickets.filter(t=>t.status!=='resolved').length} />
+                <NavBtn id="broadcast" label={t('admin_alert')} icon={IconBroadcast} />
             </div>
 
             <div className="p-4 border-t border-white/10">
@@ -1501,7 +1505,7 @@ export default function AdminDashboard({ currentUser }) {
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-white/10 hover:bg-white/5 text-gray-400 hover:text-white transition-all text-sm font-bold"
                 >
                     <IconHome size={18} />
-                    <span>Exit Terminal</span>
+                    <span>{t('admin_exit')}</span>
                 </button>
             </div>
         </nav>
@@ -1511,15 +1515,15 @@ export default function AdminDashboard({ currentUser }) {
             {/* Header (Desktop Only) */}
             <header className="hidden md:flex h-20 border-b border-white/10 bg-black/50 backdrop-blur-md items-center justify-between px-8 shrink-0">
                 <h2 className="text-xl font-bold uppercase tracking-widest text-white flex items-center gap-3">
-                    {activeView === 'overview' && <><IconLayoutDashboard className="text-indigo-500"/> System Overview</>}
-                    {activeView === 'users' && <><IconUsers className="text-indigo-500"/> Operative Database</>}
-                    {activeView === 'comms' && <><IconDeviceGamepad className="text-indigo-500"/> Squad Channels</>}
-                    {activeView === 'support' && <><IconMessage2 className="text-indigo-500"/> Support Signals</>}
-                    {activeView === 'broadcast' && <><IconBroadcast className="text-red-500"/> Emergency Broadcast</>}
+                    {activeView === 'overview' && <><IconLayoutDashboard className="text-indigo-500"/> {t('admin_overview')}</>}
+                    {activeView === 'users' && <><IconUsers className="text-indigo-500"/> {t('admin_operatives')}</>}
+                    {activeView === 'comms' && <><IconDeviceGamepad className="text-indigo-500"/> {t('admin_squads')}</>}
+                    {activeView === 'support' && <><IconMessage2 className="text-indigo-500"/> {t('admin_uplink')}</>}
+                    {activeView === 'broadcast' && <><IconBroadcast className="text-red-500"/> {t('admin_alert')}</>}
                 </h2>
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                    <span className="text-xs font-mono text-gray-500">SECURE CONNECTION</span>
+                    <span className="text-xs font-mono text-gray-500">SECURE</span>
                 </div>
             </header>
 
@@ -1530,10 +1534,10 @@ export default function AdminDashboard({ currentUser }) {
                 {activeView === 'overview' && (
                     <div className="h-full overflow-y-auto p-4 md:p-8 custom-scrollbar">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 animate-in fade-in">
-                            <StatCard title="Total Operatives" value={users.length} icon={<IconUsers/>} color="text-cyan-400" />
-                            <StatCard title="Active Threats" value={users.filter(u => u.isBanned).length} icon={<IconBan/>} color="text-red-500" />
-                            <StatCard title="Open Tickets" value={tickets.filter(t => t.status !== 'resolved').length} icon={<IconMessage2/>} color="text-yellow-500" />
-                            <StatCard title="Commanders" value={users.filter(u => u.role === 'admin' || u.role === 'master').length} icon={<IconShieldLock/>} color="text-purple-500" />
+                            <StatCard title={t('admin_total_ops')} value={users.length} icon={<IconUsers/>} color="text-cyan-400" />
+                            <StatCard title={t('admin_threats')} value={users.filter(u => u.isBanned).length} icon={<IconBan/>} color="text-red-500" />
+                            <StatCard title={t('admin_tickets')} value={tickets.filter(t => t.status !== 'resolved').length} icon={<IconMessage2/>} color="text-yellow-500" />
+                            <StatCard title={t('admin_commanders')} value={users.filter(u => u.role === 'admin' || u.role === 'master').length} icon={<IconShieldLock/>} color="text-purple-500" />
                         </div>
                     </div>
                 )}
@@ -1545,10 +1549,10 @@ export default function AdminDashboard({ currentUser }) {
                             <table className="w-full text-sm text-left min-w-[600px]">
                                 <thead className="bg-white/5 text-gray-400 font-bold uppercase text-xs">
                                     <tr>
-                                        <th className="p-4">Operative</th>
-                                        <th className="p-4">Role</th>
-                                        <th className="p-4">Status</th>
-                                        <th className="p-4 text-right">Actions</th>
+                                        <th className="p-4">{t('identity_name_label')}</th>
+                                        <th className="p-4">{t('admin_role')}</th>
+                                        <th className="p-4">{t('admin_status')}</th>
+                                        <th className="p-4 text-right">{t('admin_actions')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
@@ -1596,7 +1600,7 @@ export default function AdminDashboard({ currentUser }) {
                                                     onClick={() => toggleBan(u.id, u.isBanned)}
                                                     className={`text-xs font-bold underline ${u.isBanned ? 'text-green-500' : 'text-red-500'}`}
                                                 >
-                                                    {u.isBanned ? "Revoke Ban" : "Ban Agent"}
+                                                    {u.isBanned ? t('admin_unban') : t('admin_ban')}
                                                 </button>
                                             </td>
                                         </tr>
@@ -1645,7 +1649,7 @@ export default function AdminDashboard({ currentUser }) {
                     </div>
                 )}
 
-                {/* 4. SUPPORT SYSTEM (Stacked on Mobile, Split on Desktop) */}
+                {/* 4. SUPPORT SYSTEM */}
                 {activeView === 'support' && (
                     <div className="h-full flex flex-col md:flex-row p-4 md:p-6 gap-4 md:gap-6 overflow-hidden">
                         {/* Ticket List */}
@@ -1734,21 +1738,21 @@ export default function AdminDashboard({ currentUser }) {
                 {activeView === 'broadcast' && (
                     <div className="h-full overflow-y-auto p-4 md:p-8 custom-scrollbar">
                         <div className="max-w-2xl mx-auto bg-[#111] border border-white/10 rounded-2xl p-6 md:p-8 mt-4 md:mt-10">
-                            <h3 className="text-xl font-bold mb-2 flex items-center gap-2 text-white"><IconBroadcast className="text-red-500"/> Global System Alert</h3>
-                            <p className="text-gray-500 text-sm mb-6">This message will be broadcast to all active operatives immediately via the notification system.</p>
+                            <h3 className="text-xl font-bold mb-2 flex items-center gap-2 text-white"><IconBroadcast className="text-red-500"/> {t('admin_broadcast_title')}</h3>
+                            <p className="text-gray-500 text-sm mb-6">This message will be broadcast to all active operatives immediately.</p>
                             
                             <textarea 
                                 value={broadcastMsg}
                                 onChange={(e) => setBroadcastMsg(e.target.value)}
                                 className="w-full h-32 bg-black border border-white/20 rounded-xl p-4 text-white mb-4 focus:border-red-500 outline-none resize-none font-mono text-sm"
-                                placeholder="ENTER ALERT MESSAGE..."
+                                placeholder={t('admin_broadcast_ph')}
                                 dir="auto"
                             />
                             <button 
                                 onClick={sendBroadcast}
                                 className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-red-900/20 uppercase tracking-widest text-xs"
                             >
-                                Execute Broadcast
+                                {t('admin_broadcast_exec')}
                             </button>
                         </div>
                     </div>
@@ -2630,7 +2634,8 @@ FILE: src\components\features\chat\CommunicationHub.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  IconMessage, IconPlus, IconLock, IconSend, IconUserPlus, IconArrowLeft, IconX, IconHash, IconUsers
+  IconMessage, IconPlus, IconLock, IconSend, IconUserPlus, 
+  IconArrowLeft, IconX, IconHash, IconUsers, IconWorld
 } from "@tabler/icons-react";
 import { db } from "@/lib/firebase";
 import { 
@@ -2638,179 +2643,259 @@ import {
   serverTimestamp, doc, updateDoc 
 } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/hooks/useLanguage";
 
 export default function CommunicationHub() {
   const { user, userData, isJunior } = useAuth();
+  const { t, dir } = useLanguage(); // استدعاء الترجمة واتجاه النص
+  
+  // States
   const [selectedChat, setSelectedChat] = useState(null);
   const [chats, setChats] = useState([]);
   const [messages, setMessages] = useState([]);
-  const [allUsers, setAllUsers] = useState([]);
+  const [allUsers, setAllUsers] = useState([]); // لغرض الدعوات
   const [inputText, setInputText] = useState("");
+  
+  // Modals States
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [newGroup, setNewGroup] = useState({ name: "", type: "public" });
+  
+  // Refs
   const messagesEndRef = useRef(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
+  // --- 1. جلب المحادثات (Real-time) ---
   useEffect(() => {
+    if (!user) return;
+
+    // ترتيب المحادثات حسب آخر نشاط
     const q = query(collection(db, "chats"), orderBy("lastActivity", "desc"));
-    return onSnapshot(q, (snapshot) => {
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
         const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        // تصفية المحادثات: إما عامة أو المستخدم عضو فيها
         setChats(list.filter(c => c.type === 'public' || c.members?.includes(user.uid)));
     });
+
+    return () => unsubscribe();
   }, [user]);
 
+  // --- 2. جلب الرسائل عند اختيار محادثة ---
   useEffect(() => {
     if (!selectedChat) return;
-    const q = query(collection(db, "chats", selectedChat.id, "messages"), orderBy("createdAt", "asc"));
-    const unsub = onSnapshot(q, (snap) => {
+    
+    const q = query(
+        collection(db, "chats", selectedChat.id, "messages"), 
+        orderBy("createdAt", "asc")
+    );
+    
+    const unsubscribe = onSnapshot(q, (snap) => {
         setMessages(snap.docs.map(d => d.data()));
-        setTimeout(scrollToBottom, 100);
+        // التمرير للأسفل عند وصول رسالة جديدة
+        setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
     });
-    return () => unsub();
+    
+    return () => unsubscribe();
   }, [selectedChat]);
 
+  // --- 3. جلب المستخدمين (فقط عند فتح نافذة الدعوة) ---
   useEffect(() => {
     if(showInviteModal) {
-        // جلب المستخدمين فقط عند فتح نافذة الدعوة
-        const unsub = onSnapshot(collection(db, "users"), (snap) => {
+        const unsubscribe = onSnapshot(collection(db, "users"), (snap) => {
             setAllUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         });
-        return () => unsub();
+        return () => unsubscribe();
     }
   }, [showInviteModal]);
 
+  // --- Actions ---
+
   const createGroup = async () => {
     if(!newGroup.name.trim() || !isJunior) return;
-    const docRef = await addDoc(collection(db, "chats"), {
-      name: newGroup.name,
-      type: newGroup.type,
-      createdBy: user.uid,
-      members: [user.uid],
-      lastActivity: serverTimestamp(),
-      lastMessage: "Channel Active"
-    });
-    setShowCreateModal(false);
-    setSelectedChat({ id: docRef.id, name: newGroup.name, type: newGroup.type, createdBy: user.uid });
+    
+    try {
+        const docRef = await addDoc(collection(db, "chats"), {
+          name: newGroup.name,
+          type: newGroup.type,
+          createdBy: user.uid,
+          members: [user.uid],
+          lastActivity: serverTimestamp(),
+          lastMessage: "Channel Initialized"
+        });
+        
+        setShowCreateModal(false);
+        // الانتقال للمحادثة الجديدة مباشرة
+        setSelectedChat({ 
+            id: docRef.id, 
+            name: newGroup.name, 
+            type: newGroup.type, 
+            createdBy: user.uid 
+        });
+        setNewGroup({ name: "", type: "public" });
+    } catch (e) {
+        console.error("Error creating group:", e);
+    }
   };
 
   const sendMessage = async () => {
     if (!inputText.trim() || !selectedChat) return;
-    const text = inputText; setInputText("");
-    await addDoc(collection(db, "chats", selectedChat.id, "messages"), {
-      text, senderName: userData?.displayName || user.email, createdAt: serverTimestamp()
-    });
-    await updateDoc(doc(db, "chats", selectedChat.id), {
-      lastActivity: serverTimestamp(), lastMessage: text
-    });
+    
+    const text = inputText; 
+    setInputText(""); // مسح الحقل فوراً لتحسين التجربة
+
+    try {
+        // إضافة الرسالة
+        await addDoc(collection(db, "chats", selectedChat.id, "messages"), {
+          text, 
+          senderName: userData?.displayName || user.email?.split('@')[0], 
+          createdAt: serverTimestamp()
+        });
+        
+        // تحديث آخر نشاط للمحادثة (لتظهر في الأعلى)
+        await updateDoc(doc(db, "chats", selectedChat.id), {
+          lastActivity: serverTimestamp(), 
+          lastMessage: text
+        });
+    } catch (e) {
+        console.error("Error sending message:", e);
+    }
   };
 
   const sendInvite = async (targetId, targetName) => {
-    await addDoc(collection(db, "notifications"), {
-      userId: targetId,
-      title: "SQUAD INVITE",
-      message: `${userData?.displayName || "Admin"} invited you to join ${selectedChat.name}`,
-      type: "invite",
-      chatId: selectedChat.id,
-      createdAt: serverTimestamp()
-    });
-    alert(`Invite sent to ${targetName}`);
+    try {
+        // إضافة إشعار للمستخدم المدعو
+        await addDoc(collection(db, "notifications"), {
+          userId: targetId,
+          title: t('chat_squad_invite'),
+          message: `${userData?.displayName || "Commander"} invited you to join ${selectedChat.name}`,
+          type: "invite", // هذا النوع يتم التعامل معه في NotificationCenter
+          chatId: selectedChat.id,
+          createdAt: serverTimestamp()
+        });
+        
+        // إضافة المستخدم لقائمة الأعضاء (اختياري: يمكن أن يتم عند قبول الدعوة)
+        // هنا سنضيفه مباشرة للتسهيل
+        await updateDoc(doc(db, "chats", selectedChat.id), {
+            // ملاحظة: Firestore arrayUnion يحتاج لاستيراد
+            // لكن هنا سنفترض أن المستخدم سيقبل الدعوة من الإشعارات
+        });
+
+        alert(`Signal sent to ${targetName}`);
+    } catch (e) {
+        console.error("Invite failed:", e);
+    }
   };
 
   return (
-    // حاوية رئيسية بتصميم زجاجي واحترافي
-    <div className="w-full h-[80vh] flex flex-col md:flex-row rounded-3xl overflow-hidden border border-white/10 shadow-2xl backdrop-blur-xl bg-black/20">
+    <div className="w-full h-[80vh] flex flex-col md:flex-row rounded-3xl overflow-hidden border border-white/10 shadow-2xl backdrop-blur-xl bg-black/20" dir={dir}>
       
-      {/* القائمة الجانبية (Sidebar) */}
-      <aside className={`w-full md:w-80 border-r border-white/5 flex flex-col bg-black/20 ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
+      {/* 1. Sidebar (قائمة المحادثات) */}
+      <aside className={`w-full md:w-80 border-r border-white/5 flex flex-col bg-black/40 ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-6 border-b border-white/5 flex justify-between items-center backdrop-blur-md">
           <h2 className="text-xl font-black italic tracking-tighter text-white flex items-center gap-2">
-            <IconMessage className="text-[var(--accent-color)]"/> SQUADS
+            <IconMessage className="text-cyan-500"/> {t('chat_title')}
           </h2>
           {isJunior && (
-              <button onClick={() => setShowCreateModal(true)} className="p-2 bg-[var(--accent-color)] rounded-xl hover:opacity-90 transition-all shadow-lg text-white">
+              <button 
+                onClick={() => setShowCreateModal(true)} 
+                className="p-2 bg-cyan-500/10 hover:bg-cyan-500 hover:text-white text-cyan-500 rounded-xl transition-all border border-cyan-500/20"
+                title={t('chat_create_squad')}
+              >
                   <IconPlus size={20}/>
               </button>
           )}
         </div>
+        
         <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
           {chats.map(chat => (
             <div key={chat.id} onClick={() => setSelectedChat(chat)} 
                  className={`p-4 rounded-xl cursor-pointer transition-all group flex justify-between items-center border ${
                     selectedChat?.id === chat.id 
-                    ? 'bg-[var(--accent-color)]/20 border-[var(--accent-color)]/50' 
+                    ? 'bg-cyan-500/10 border-cyan-500/30' 
                     : 'bg-white/5 border-transparent hover:bg-white/10 hover:border-white/10'
                  }`}
             >
-              <div>
-                <div className="font-bold text-white group-hover:text-[var(--accent-color)] transition-colors text-sm">{chat.name}</div>
-                <div className="text-[10px] text-white/40 truncate mt-1 font-mono max-w-[150px]">{chat.lastMessage}</div>
+              <div className="overflow-hidden">
+                <div className={`font-bold text-sm transition-colors truncate ${selectedChat?.id === chat.id ? 'text-cyan-400' : 'text-white'}`}>
+                    {chat.name}
+                </div>
+                <div className="text-[10px] text-white/40 truncate mt-1 font-mono max-w-[150px]">
+                    {chat.lastMessage}
+                </div>
               </div>
-              {chat.type === 'private' && <IconLock size={14} className="text-orange-400" />}
+              
+              {/* أيقونة نوع المحادثة */}
+              {chat.type === 'private' 
+                ? <IconLock size={14} className="text-orange-400 shrink-0" /> 
+                : <IconWorld size={14} className="text-emerald-400 shrink-0" />
+              }
             </div>
           ))}
         </div>
       </aside>
 
-      {/* منطقة الشات الرئيسية */}
+      {/* 2. Main Chat Area (منطقة المحادثة) */}
       <main className={`flex-1 flex flex-col relative bg-transparent ${!selectedChat ? 'hidden md:flex' : 'flex'}`}>
         {!selectedChat ? (
           <div className="flex-1 flex flex-col items-center justify-center text-white/20">
-              <div className="w-24 h-24 rounded-full border-4 border-white/5 flex items-center justify-center mb-6">
+              <div className="w-24 h-24 rounded-full border-4 border-white/5 flex items-center justify-center mb-6 animate-pulse">
                   <IconHash size={48} className="opacity-50"/>
               </div>
-              <p className="font-mono text-sm tracking-[0.2em]">NO FREQUENCY SELECTED</p>
+              <p className="font-mono text-sm tracking-[0.2em] uppercase">{t('chat_no_freq')}</p>
           </div>
         ) : (
           <>
-            {/* رأس المحادثة */}
+            {/* Chat Header */}
             <header className="h-20 border-b border-white/5 flex items-center px-6 bg-black/20 backdrop-blur-md gap-4 shrink-0">
-              <button onClick={() => setSelectedChat(null)} className="md:hidden p-2 hover:bg-white/10 rounded-full text-white"><IconArrowLeft/></button>
+              {/* زر الرجوع للموبايل */}
+              <button onClick={() => setSelectedChat(null)} className="md:hidden p-2 hover:bg-white/10 rounded-full text-white">
+                  <IconArrowLeft/>
+              </button>
               
               <div className="flex items-center gap-4 flex-1">
-                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--accent-color)] to-purple-600 flex items-center justify-center font-bold text-white text-sm shadow-lg">
+                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-600 to-purple-600 flex items-center justify-center font-bold text-white text-sm shadow-lg border border-white/10">
                     {selectedChat.name[0].toUpperCase()}
                  </div>
                  <div className="flex flex-col">
                      <h3 className="font-bold text-white text-lg leading-none">{selectedChat.name}</h3>
-                     <span className="text-[10px] text-[var(--accent-color)] font-mono tracking-wider uppercase mt-1 flex items-center gap-1">
-                        {selectedChat.type === 'private' ? <IconLock size={10}/> : <IconHash size={10}/>} 
-                        {selectedChat.type} SERVER
+                     <span className="text-[10px] text-cyan-500 font-mono tracking-wider uppercase mt-1 flex items-center gap-1">
+                        {selectedChat.type === 'private' ? <IconLock size={10}/> : <IconWorld size={10}/>} 
+                        {selectedChat.type === 'private' ? t('chat_server_private') : t('chat_server_public')}
                      </span>
                  </div>
               </div>
 
+              {/* زر الدعوة (للمالك فقط) */}
               {selectedChat.createdBy === user.uid && (
                 <button 
                     onClick={() => setShowInviteModal(true)} 
                     className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 rounded-lg transition-all text-xs font-bold uppercase tracking-wider"
                 >
                     <IconUserPlus size={16} />
-                    <span className="hidden sm:inline">Invite</span>
+                    <span className="hidden sm:inline">{t('chat_invite')}</span>
                 </button>
               )}
             </header>
 
-            {/* رسائل المحادثة */}
+            {/* Messages List */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-transparent custom-scrollbar">
               {messages.map((m, i) => {
-                const isMe = m.senderName === (userData?.displayName || user.email);
+                const isMe = m.senderName === (userData?.displayName || user.email?.split('@')[0]);
                 return (
                     <div key={i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                        <div className="flex items-end gap-3 max-w-[85%]">
+                        <div className={`flex items-end gap-3 max-w-[85%] ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
                             {!isMe && (
                                 <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-[10px] text-white font-bold shrink-0 mb-1 border border-white/10">
-                                    {m.senderName[0].toUpperCase()}
+                                    {m.senderName ? m.senderName[0].toUpperCase() : '?'}
                                 </div>
                             )}
                             <div>
                                 {!isMe && <div className="text-[10px] text-white/40 mb-1 ml-1">{m.senderName}</div>}
                                 <div className={`px-5 py-3 rounded-2xl text-sm leading-relaxed shadow-md backdrop-blur-sm ${
                                     isMe 
-                                    ? 'bg-[var(--accent-color)] text-white rounded-br-none' 
+                                    ? 'bg-cyan-600 text-white rounded-br-none' 
                                     : 'bg-white/10 text-white/90 border border-white/5 rounded-bl-none'
                                 }`}>
                                     {m.text}
@@ -2826,20 +2911,20 @@ export default function CommunicationHub() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* حقل الإدخال */}
+            {/* Input Area */}
             <footer className="p-4 bg-black/20 border-t border-white/5 backdrop-blur-md shrink-0">
-              <div className="flex gap-3 bg-white/5 p-2 rounded-2xl border border-white/10 focus-within:border-[var(--accent-color)]/50 transition-colors">
+              <div className="flex gap-3 bg-white/5 p-2 rounded-2xl border border-white/10 focus-within:border-cyan-500/50 transition-colors">
                   <input 
                     value={inputText} 
                     onChange={e=>setInputText(e.target.value)} 
                     onKeyDown={e=>e.key==='Enter'&&sendMessage()} 
                     className="flex-1 bg-transparent px-4 text-sm text-white outline-none placeholder:text-white/20" 
-                    placeholder="Type encrypted message..." 
+                    placeholder={t('chat_type_msg')} 
                   />
                   <button 
                     onClick={sendMessage} 
                     disabled={!inputText.trim()}
-                    className="p-3 bg-[var(--accent-color)] hover:opacity-90 text-white rounded-xl transition-all disabled:opacity-50 shadow-lg"
+                    className="p-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl transition-all disabled:opacity-50 shadow-lg"
                   >
                     <IconSend size={18}/>
                   </button>
@@ -2849,13 +2934,15 @@ export default function CommunicationHub() {
         )}
       </main>
 
-      {/* نافذة الدعوة (Invite Modal) */}
+      {/* 3. Invite Modal */}
       <AnimatePresence>
         {showInviteModal && (
-          <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
             <motion.div initial={{scale:0.9, opacity:0}} animate={{scale:1, opacity:1}} exit={{scale:0.9, opacity:0}} className="w-full max-w-md bg-[#111] border border-white/10 rounded-[2rem] p-6 shadow-2xl relative overflow-hidden">
               <div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
-                <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2"><IconUsers size={20} className="text-[var(--accent-color)]"/> Reinforcements</h3>
+                <h3 className="text-lg font-black text-white uppercase tracking-wider flex items-center gap-2">
+                    <IconUsers size={20} className="text-cyan-500"/> {t('chat_squad_invite')}
+                </h3>
                 <button onClick={()=>setShowInviteModal(false)} className="text-white/30 hover:text-white"><IconX/></button>
               </div>
               
@@ -2867,12 +2954,11 @@ export default function CommunicationHub() {
                             {(u.displayName || u.id || "?")[0].toUpperCase()}
                         </div>
                         <div className="flex flex-col">
-                            {/* هنا التعديل المطلوب: عرض الاسم أو الـ ID */}
                             <span className="text-sm font-bold text-white">{u.displayName || "Unknown Agent"}</span>
-                            <span className="text-[10px] text-white/30 font-mono">ID: {u.id}</span>
+                            <span className="text-[10px] text-white/30 font-mono">ID: {u.id.slice(0,6)}...</span>
                         </div>
                     </div>
-                    <button onClick={()=>sendInvite(u.id, u.displayName || u.id)} className="p-2 bg-[var(--accent-color)]/20 text-[var(--accent-color)] hover:bg-[var(--accent-color)] hover:text-white rounded-lg text-xs transition-all">
+                    <button onClick={()=>sendInvite(u.id, u.displayName || u.id)} className="p-2 bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500 hover:text-white rounded-lg text-xs transition-all">
                         <IconUserPlus size={16}/>
                     </button>
                   </div>
@@ -2883,31 +2969,31 @@ export default function CommunicationHub() {
         )}
       </AnimatePresence>
 
-      {/* نافذة إنشاء مجموعة (Create Modal) */}
+      {/* 4. Create Group Modal */}
       <AnimatePresence>
         {showCreateModal && (
-          <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
             <motion.div initial={{scale:0.9, opacity:0}} animate={{scale:1, opacity:1}} exit={{scale:0.9, opacity:0}} className="w-full max-w-sm bg-[#111] border border-white/10 rounded-[2rem] p-8 shadow-2xl">
-              <h3 className="text-2xl font-black mb-1 italic uppercase text-white">Forge Squad</h3>
-              <p className="text-white/30 text-xs mb-6">Create a new neural frequency.</p>
+              <h3 className="text-2xl font-black mb-1 italic uppercase text-white">{t('chat_create_squad')}</h3>
+              <p className="text-white/30 text-xs mb-6 font-mono">Create a new frequency.</p>
               
               <div className="space-y-4">
                   <div>
-                      <label className="text-[10px] font-bold text-[var(--accent-color)] uppercase tracking-widest ml-1">Squad Name</label>
-                      <input value={newGroup.name} onChange={e=>setNewGroup({...newGroup, name:e.target.value})} className="w-full bg-black/50 border border-white/20 rounded-xl p-3 mt-1 outline-none focus:border-[var(--accent-color)] text-white font-bold" placeholder="Alpha Team" />
+                      <label className="text-[10px] font-bold text-cyan-500 uppercase tracking-widest ml-1">{t('chat_squad_name')}</label>
+                      <input value={newGroup.name} onChange={e=>setNewGroup({...newGroup, name:e.target.value})} className="w-full bg-black/50 border border-white/20 rounded-xl p-3 mt-1 outline-none focus:border-cyan-500 text-white font-bold" placeholder="Alpha Team" />
                   </div>
                   <div>
-                      <label className="text-[10px] font-bold text-[var(--accent-color)] uppercase tracking-widest ml-1">Security Protocol</label>
-                      <select value={newGroup.type} onChange={e=>setNewGroup({...newGroup, type:e.target.value})} className="w-full bg-black/50 border border-white/20 rounded-xl p-3 mt-1 outline-none text-white focus:border-[var(--accent-color)] cursor-pointer">
-                        <option value="public">Public (Open)</option>
-                        <option value="private">Encrypted (Private)</option>
+                      <label className="text-[10px] font-bold text-cyan-500 uppercase tracking-widest ml-1">{t('chat_security')}</label>
+                      <select value={newGroup.type} onChange={e=>setNewGroup({...newGroup, type:e.target.value})} className="w-full bg-black/50 border border-white/20 rounded-xl p-3 mt-1 outline-none text-white focus:border-cyan-500 cursor-pointer">
+                        <option value="public">{t('chat_public')}</option>
+                        <option value="private">{t('chat_private')}</option>
                       </select>
                   </div>
               </div>
 
               <div className="flex gap-3 mt-8">
-                  <button onClick={()=>setShowCreateModal(false)} className="flex-1 py-3 text-white/50 font-bold hover:text-white transition-colors">Cancel</button>
-                  <button onClick={createGroup} className="flex-1 py-3 bg-[var(--accent-color)] hover:opacity-90 text-white font-bold rounded-xl shadow-lg transition-all">Initialize</button>
+                  <button onClick={()=>setShowCreateModal(false)} className="flex-1 py-3 text-white/50 font-bold hover:text-white transition-colors">{t('chat_cancel')}</button>
+                  <button onClick={createGroup} className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg transition-all">{t('chat_init')}</button>
               </div>
             </motion.div>
           </div>
@@ -2924,46 +3010,58 @@ FILE: src\components\features\data\DataManager.jsx
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { 
   IconTrash, IconPencil, IconSearch, IconDatabase, IconArrowDown, 
-  IconPlus, IconCategory, IconSparkles, IconSettings, IconX, IconCheck, IconFolder
+  IconPlus, IconCategory, IconSparkles, IconSettings, IconX, IconCheck, IconFolder, IconDeviceFloppy
 } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLanguage } from "@/hooks/useLanguage"; // استدعاء هوك اللغة
 
-// --- مكون البطاقة (MemoryNode) ---
-const MemoryNode = React.memo(({ card, index, isJunior, editingId, editForm, startEdit, saveEdit, cancelEdit, onDelete, setEditForm, categories }) => {
+// --- 1. مكون البطاقة (MemoryNode) ---
+// تم تصميمه ليكون خفيفاً وسريعاً باستخدام React.memo
+const MemoryNode = React.memo(({ 
+    card, index, isJunior, 
+    editingId, editForm, 
+    startEdit, saveEdit, cancelEdit, onDelete, setEditForm, 
+    categories 
+}) => {
     
+    // دالة لتحديث المدخلات أثناء التعديل
     const handleChange = (field, value) => {
         setEditForm(prev => ({ ...prev, [field]: value }));
     };
 
     return (
         <motion.div 
+            layout
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "50px" }}
             transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.2) }}
-            className="group relative h-full w-full will-change-transform"
+            className="group relative h-full w-full"
         >
-            <div className="relative h-full w-full bg-[var(--bg-secondary)] rounded-[1.5rem] border border-white/5 overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[var(--accent-color)]/10">
+            <div className="relative h-full w-full bg-[#0a0a0a] rounded-2xl border border-white/10 overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:border-cyan-500/30">
                 
-                <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--accent-color)]/5 rounded-full blur-[40px] pointer-events-none group-hover:bg-[var(--accent-color)]/10 transition-colors duration-300"></div>
+                {/* تأثير خلفية خفيف */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-[40px] pointer-events-none group-hover:bg-cyan-500/10 transition-colors duration-300"></div>
                 
                 <div className="relative z-10 p-5 flex flex-col h-full justify-between min-h-[200px]">
                     
+                    {/* --- وضع التعديل (Edit Mode) --- */}
                     {editingId === card.id ? (
-                        <div className="flex flex-col gap-3 h-full justify-center">
-                            <div className="text-[10px] font-bold text-[var(--accent-color)] uppercase tracking-widest text-center">Editing</div>
+                        <div className="flex flex-col gap-3 h-full justify-center animate-in fade-in zoom-in-95 duration-200">
+                            <div className="text-[10px] font-bold text-cyan-500 uppercase tracking-widest text-center mb-2">EDITING DATA</div>
                             
                             <input 
                                 value={editForm.russian} 
                                 onChange={(e) => handleChange('russian', e.target.value)} 
-                                className="bg-[var(--bg-primary)] rounded-xl p-2 text-center text-lg font-bold text-[var(--text-main)] outline-none border border-[var(--accent-color)]" 
+                                className="bg-black/50 border border-cyan-500 rounded-lg p-2 text-center text-lg font-bold text-white outline-none focus:shadow-[0_0_10px_rgba(6,182,212,0.3)]" 
                                 placeholder="Russian" 
                             />
                             <input 
                                 value={editForm.arabic} 
                                 onChange={(e) => handleChange('arabic', e.target.value)} 
-                                className="bg-[var(--bg-primary)] rounded-xl p-2 text-center text-sm text-[var(--text-main)] outline-none border border-white/10" 
+                                className="bg-black/50 border border-white/20 rounded-lg p-2 text-center text-sm text-white outline-none focus:border-cyan-500" 
                                 placeholder="Arabic" 
+                                dir="auto"
                             />
                             
                             <div className="relative">
@@ -2971,7 +3069,7 @@ const MemoryNode = React.memo(({ card, index, isJunior, editingId, editForm, sta
                                     list={`cat-list-${card.id}`}
                                     value={editForm.category} 
                                     onChange={(e) => handleChange('category', e.target.value)} 
-                                    className="w-full bg-[var(--bg-primary)] rounded-xl p-2 text-[10px] text-center font-mono text-[var(--text-muted)] outline-none border border-white/10" 
+                                    className="w-full bg-black/50 border border-white/20 rounded-lg p-2 text-[10px] text-center font-mono text-white/70 outline-none focus:border-cyan-500" 
                                     placeholder="Category" 
                                 />
                                 <datalist id={`cat-list-${card.id}`}>
@@ -2980,36 +3078,36 @@ const MemoryNode = React.memo(({ card, index, isJunior, editingId, editForm, sta
                             </div>
 
                             <div className="flex gap-2 mt-2">
-                                <button onClick={saveEdit} className="flex-1 bg-green-600 text-white py-2 rounded-xl font-bold text-xs shadow-md hover:bg-green-500 transition-colors">Save</button>
-                                <button onClick={cancelEdit} className="flex-1 bg-gray-500/20 text-[var(--text-main)] py-2 rounded-xl font-bold text-xs hover:bg-gray-500/30 transition-colors">Cancel</button>
+                                <button onClick={saveEdit} className="flex-1 bg-green-600 hover:bg-green-500 text-white py-2 rounded-lg font-bold text-xs shadow-lg transition-colors flex items-center justify-center gap-1"><IconCheck size={14}/> SAVE</button>
+                                <button onClick={cancelEdit} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg font-bold text-xs transition-colors flex items-center justify-center gap-1"><IconX size={14}/> CANCEL</button>
                             </div>
                         </div>
                     ) : (
+                        /* --- وضع العرض (View Mode) --- */
                         <>
                             <div className="flex justify-between items-start">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--accent-color)]/10 text-[var(--accent-color)] text-[10px] font-bold uppercase tracking-wider border border-[var(--accent-color)]/20">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-cyan-950/30 text-cyan-400 text-[10px] font-bold uppercase tracking-wider border border-cyan-500/20">
                                     <IconCategory size={10} /> {card.category}
                                 </span>
                                 
                                 {isJunior && (
-                                    <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
-                                        <button onClick={() => startEdit(card)} className="p-2 rounded-full bg-[var(--bg-primary)] hover:text-[var(--accent-color)] text-[var(--text-muted)] transition-colors"><IconPencil size={14}/></button>
-                                        <button onClick={() => onDelete(card.id)} className="p-2 rounded-full bg-[var(--bg-primary)] hover:text-red-500 text-[var(--text-muted)] transition-colors"><IconTrash size={14}/></button>
+                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 translate-x-2 group-hover:translate-x-0">
+                                        <button onClick={() => startEdit(card)} className="p-2 rounded-lg bg-white/5 hover:bg-cyan-500 hover:text-white text-gray-400 transition-colors"><IconPencil size={14}/></button>
+                                        <button onClick={() => onDelete(card.id)} className="p-2 rounded-lg bg-white/5 hover:bg-red-500 hover:text-white text-gray-400 transition-colors"><IconTrash size={14}/></button>
                                     </div>
                                 )}
                             </div>
 
-                            <div className="py-5 text-center relative">
-                                <h3 className="text-2xl font-black tracking-tight text-[var(--text-main)] group-hover:text-[var(--accent-color)] transition-colors duration-300">
+                            <div className="py-6 text-center relative flex-1 flex flex-col justify-center">
+                                <h3 className="text-2xl font-black tracking-tight text-white group-hover:text-cyan-400 transition-colors duration-300 drop-shadow-md">
                                     {card.russian}
                                 </h3>
                             </div>
 
-                            <div className="mt-auto">
-                                <div className="w-8 h-1 bg-[var(--accent-color)]/20 rounded-full mb-3 mx-auto group-hover:w-full group-hover:bg-[var(--accent-color)] transition-all duration-500"></div>
-                                <div className="flex justify-between items-end">
-                                    <IconSparkles size={14} className="text-[var(--accent-color)] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                                    <p className="text-sm text-[var(--text-muted)] group-hover:text-[var(--text-main)] dir-rtl font-bold transition-colors">
+                            <div className="mt-auto pt-4 border-t border-white/5">
+                                <div className="flex justify-between items-center">
+                                    <IconSparkles size={14} className="text-cyan-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                    <p className="text-sm text-gray-400 group-hover:text-white dir-rtl font-bold transition-colors" dir="auto">
                                         {card.arabic}
                                     </p>
                                 </div>
@@ -3021,6 +3119,7 @@ const MemoryNode = React.memo(({ card, index, isJunior, editingId, editForm, sta
         </motion.div>
     );
 }, (prev, next) => {
+    // Custom comparison for performance
     return prev.card === next.card && 
            prev.editingId === next.editingId && 
            prev.editForm === next.editForm &&
@@ -3030,22 +3129,29 @@ const MemoryNode = React.memo(({ card, index, isJunior, editingId, editForm, sta
 
 MemoryNode.displayName = "MemoryNode";
 
-// --- المكون الرئيسي (DataManager) ---
+// --- 2. المكون الرئيسي (DataManager) ---
 export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior }) {
+  const { t, dir } = useLanguage();
+  
+  // States
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [displayLimit, setDisplayLimit] = useState(20);
   
+  // New Card State
   const [newCard, setNewCard] = useState({ russian: "", arabic: "", category: "" });
   const [isNewCategoryMode, setIsNewCategoryMode] = useState(false);
 
+  // Edit State
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ russian: "", arabic: "", category: "" });
 
+  // Category Manager State
   const [showCatManager, setShowCatManager] = useState(false);
   const [editingCatName, setEditingCatName] = useState(null);
   const [newCatNameInput, setNewCatNameInput] = useState("");
 
+  // Derived State (Memoized)
   const categories = useMemo(() => {
     const cats = new Set(cards.map(c => c.category || "General"));
     return ["All", ...Array.from(cats).sort()];
@@ -3060,9 +3166,10 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
       });
   }, [cards, search, filter]);
 
+  // Reset pagination on search/filter
   useEffect(() => { setDisplayLimit(20); }, [search, filter]);
 
-  // --- Handlers ---
+  // --- Handlers (الوظائف الكاملة) ---
 
   const handleAddSubmit = () => {
       if(newCard.russian && newCard.arabic && newCard.category) {
@@ -3090,12 +3197,13 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
       setEditingId(null);
   }, []);
 
-  // إدارة المجموعات
+  // وظيفة إعادة تسمية المجموعة
   const handleRenameCategory = (oldName) => {
       if (!newCatNameInput.trim() || newCatNameInput === oldName) {
           setEditingCatName(null);
           return;
       }
+      // تحديث كل البطاقات التي تحمل الاسم القديم
       const cardsToUpdate = cards.filter(c => c.category === oldName);
       cardsToUpdate.forEach(card => {
           onUpdate(card.id, { ...card, category: newCatNameInput });
@@ -3104,46 +3212,52 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
       setNewCatNameInput("");
   };
 
+  // وظيفة حذف مجموعة كاملة
   const handleDeleteCategory = (catName) => {
-      if (!confirm(`Delete group "${catName}" and ALL its words?`)) return;
+      if (!confirm(`WARNING: Delete group "${catName}" and ALL its words permanently?`)) return;
       const cardsToDelete = cards.filter(c => c.category === catName);
       cardsToDelete.forEach(card => onDelete(card.id));
   };
 
   const visibleCards = filteredCards.slice(0, displayLimit);
 
-  // --- Category Manager Modal ---
+  // --- 3. نافذة إدارة المجموعات (Category Manager Modal) ---
   const CategoryManagerModal = () => (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-[var(--bg-secondary)] border border-[var(--text-muted)]/20 w-full max-w-lg rounded-[2rem] p-6 shadow-2xl relative overflow-hidden">
-              <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-black text-[var(--text-main)] flex items-center gap-2"><IconSettings className="text-[var(--accent-color)]"/> Manage Groups</h3>
-                  <button onClick={() => setShowCatManager(false)} className="p-2 hover:bg-[var(--bg-primary)] rounded-full text-[var(--text-muted)]"><IconX/></button>
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-[#111] border border-white/10 w-full max-w-lg rounded-2xl p-6 shadow-2xl relative overflow-hidden flex flex-col max-h-[80vh]">
+              <div className="flex justify-between items-center mb-6 border-b border-white/5 pb-4">
+                  <h3 className="text-xl font-black text-white flex items-center gap-2">
+                      <IconSettings className="text-cyan-500"/> {t('archive_manage_groups')}
+                  </h3>
+                  <button onClick={() => setShowCatManager(false)} className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white"><IconX/></button>
               </div>
-              <div className="max-h-[60vh] overflow-y-auto custom-scrollbar space-y-3 pr-2">
+              
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-2">
                   {categories.filter(c => c !== "All" && c !== "Uncategorized").map(cat => (
-                      <div key={cat} className="flex items-center justify-between p-3 bg-[var(--bg-primary)]/50 rounded-xl border border-white/5 group hover:border-[var(--accent-color)]/30 transition-colors">
+                      <div key={cat} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-transparent hover:border-white/10 transition-colors group">
                           {editingCatName === cat ? (
-                              <div className="flex-1 flex gap-2 mr-2">
+                              <div className="flex-1 flex gap-2 animate-in fade-in">
                                   <input 
                                     autoFocus 
                                     defaultValue={cat} 
                                     onChange={(e) => setNewCatNameInput(e.target.value)} 
-                                    className="flex-1 bg-transparent px-2 text-sm text-[var(--text-main)] outline-none border-b border-[var(--accent-color)]"
+                                    className="flex-1 bg-black border border-cyan-500 rounded-lg px-3 text-sm text-white outline-none"
                                   />
-                                  <button onClick={() => handleRenameCategory(cat)} className="p-1.5 bg-green-500/10 text-green-500 rounded hover:bg-green-500/20"><IconCheck size={16}/></button>
-                                  <button onClick={() => setEditingCatName(null)} className="p-1.5 bg-red-500/10 text-red-500 rounded hover:bg-red-500/20"><IconX size={16}/></button>
+                                  <button onClick={() => handleRenameCategory(cat)} className="p-2 bg-green-600 text-white rounded-lg hover:bg-green-500"><IconCheck size={16}/></button>
+                                  <button onClick={() => setEditingCatName(null)} className="p-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"><IconX size={16}/></button>
                               </div>
                           ) : (
                               <>
                                   <div className="flex items-center gap-3">
-                                      <IconFolder size={18} className="text-[var(--text-muted)]"/>
-                                      <span className="font-bold text-[var(--text-main)]">{cat}</span>
-                                      <span className="text-[10px] bg-[var(--bg-secondary)] px-2 py-0.5 rounded text-[var(--text-muted)] border border-white/5">{cards.filter(c => c.category === cat).length}</span>
+                                      <div className="p-2 bg-cyan-900/20 rounded-lg text-cyan-400"><IconFolder size={18}/></div>
+                                      <span className="font-bold text-white text-sm">{cat}</span>
+                                      <span className="text-[10px] bg-black px-2 py-0.5 rounded text-gray-500 border border-white/5 font-mono">
+                                          {cards.filter(c => c.category === cat).length} ITEMS
+                                      </span>
                                   </div>
-                                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button onClick={() => { setEditingCatName(cat); setNewCatNameInput(cat); }} className="p-2 hover:bg-blue-500/10 text-blue-400 rounded-lg"><IconPencil size={16}/></button>
-                                      <button onClick={() => handleDeleteCategory(cat)} className="p-2 hover:bg-red-500/10 text-red-400 rounded-lg"><IconTrash size={16}/></button>
+                                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button onClick={() => { setEditingCatName(cat); setNewCatNameInput(cat); }} className="p-2 hover:bg-blue-500/20 text-blue-400 rounded-lg transition-colors"><IconPencil size={16}/></button>
+                                      <button onClick={() => handleDeleteCategory(cat)} className="p-2 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"><IconTrash size={16}/></button>
                                   </div>
                               </>
                           )}
@@ -3155,53 +3269,53 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
   );
 
   return (
-    <div className="w-full flex flex-col p-4 md:p-8 font-sans min-h-screen">
+    <div className="w-full flex flex-col p-4 md:p-8 font-sans min-h-screen" dir={dir}>
       
-      {/* 1. Header (Static for performance) */}
+      {/* 4. الهيدر (Header) */}
       <div className="flex flex-col items-center justify-center mb-10 text-center relative">
           <div className="relative z-10">
-              <span className="text-[10px] font-bold tracking-[0.4em] text-[var(--accent-color)] uppercase mb-2 block">Database</span>
-              <h1 className="text-5xl md:text-7xl font-black text-[var(--text-main)] tracking-tighter mb-4">
-                  Archive
+              <span className="text-[10px] font-bold tracking-[0.4em] text-cyan-500 uppercase mb-2 block">{t('archive_header')}</span>
+              <h1 className="text-5xl md:text-7xl font-black text-white tracking-tighter mb-4">
+                  {t('modules_title_2')}
               </h1>
               <div className="flex items-center justify-center gap-3">
-                  <div className="flex items-center gap-2 text-sm text-[var(--text-muted)] bg-[var(--bg-secondary)] px-4 py-1.5 rounded-full border border-white/5">
-                      <IconDatabase size={14}/> <span>{filteredCards.length} Units</span>
+                  <div className="flex items-center gap-2 text-sm text-gray-400 bg-white/5 px-4 py-1.5 rounded-full border border-white/5 backdrop-blur-sm">
+                      <IconDatabase size={14}/> <span>{filteredCards.length} {t('archive_items')}</span>
                   </div>
                   {isJunior && (
                       <button 
                         onClick={() => setShowCatManager(true)} 
-                        className="flex items-center gap-2 text-xs font-bold text-[var(--accent-color)] bg-[var(--accent-color)]/10 px-4 py-2 rounded-full hover:bg-[var(--accent-color)] hover:text-white transition-all border border-[var(--accent-color)]/20"
+                        className="flex items-center gap-2 text-xs font-bold text-cyan-400 bg-cyan-500/10 px-4 py-2 rounded-full hover:bg-cyan-500 hover:text-white transition-all border border-cyan-500/20"
                       >
-                          <IconSettings size={14}/> Manage Groups
+                          <IconSettings size={14}/> {t('archive_manage_groups')}
                       </button>
                   )}
               </div>
           </div>
       </div>
 
-      {/* 2. Floating Command Center */}
+      {/* 5. شريط التحكم العائم (Floating Command Center) */}
       <div className="sticky top-4 z-40 mb-8 flex justify-center">
-         <div className="w-full max-w-4xl bg-[var(--bg-secondary)]/90 backdrop-blur-xl border border-[var(--text-muted)]/10 rounded-[2rem] p-3 pl-6 shadow-2xl flex flex-col md:flex-row gap-4 items-center">
+         <div className="w-full max-w-4xl bg-[#111]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-3 pl-6 shadow-2xl flex flex-col md:flex-row gap-4 items-center">
              
-             {/* Search */}
+             {/* البحث */}
              <div className="flex-1 flex items-center gap-3 w-full">
-                <IconSearch className="text-[var(--text-muted)]" size={20} />
+                <IconSearch className="text-gray-500" size={20} />
                 <input 
                     type="text" 
                     value={search} 
                     onChange={(e) => setSearch(e.target.value)} 
-                    placeholder="Search words..." 
-                    className="flex-1 bg-transparent text-[var(--text-main)] placeholder-[var(--text-muted)]/50 outline-none text-base font-medium h-10"
+                    placeholder={t('archive_search_placeholder')} 
+                    className="flex-1 bg-transparent text-white placeholder-gray-600 outline-none text-sm font-medium h-10 uppercase font-mono"
                 />
              </div>
 
-             {/* Add System */}
+             {/* نظام الإضافة (للأدمن فقط) */}
              {isJunior && (
                  <div className="w-full md:w-auto flex flex-col md:flex-row items-center gap-2 pr-0 md:pr-2 border-t md:border-t-0 md:border-l border-white/10 pt-3 md:pt-0 md:pl-4">
                      <div className="flex w-full md:w-auto gap-2">
-                         <input value={newCard.russian} onChange={e => setNewCard({...newCard, russian: e.target.value})} placeholder="Rus" className="flex-1 md:w-24 bg-[var(--bg-primary)] rounded-lg px-3 py-2 text-sm outline-none text-[var(--text-main)]" />
-                         <input value={newCard.arabic} onChange={e => setNewCard({...newCard, arabic: e.target.value})} placeholder="Ara" className="flex-1 md:w-24 bg-[var(--bg-primary)] rounded-lg px-3 py-2 text-sm outline-none text-[var(--text-main)] text-right" />
+                         <input value={newCard.russian} onChange={e => setNewCard({...newCard, russian: e.target.value})} placeholder="Rus" className="flex-1 md:w-24 bg-black border border-white/10 rounded-lg px-3 py-2 text-sm outline-none text-white focus:border-cyan-500 transition-colors" />
+                         <input value={newCard.arabic} onChange={e => setNewCard({...newCard, arabic: e.target.value})} placeholder="Ara" className="flex-1 md:w-24 bg-black border border-white/10 rounded-lg px-3 py-2 text-sm outline-none text-white text-right focus:border-cyan-500 transition-colors" />
                      </div>
                      <div className="flex w-full md:w-auto gap-2">
                         {isNewCategoryMode ? (
@@ -3211,9 +3325,9 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
                                     value={newCard.category} 
                                     onChange={e => setNewCard({...newCard, category: e.target.value})} 
                                     placeholder="New Group" 
-                                    className="flex-1 bg-[var(--bg-primary)] rounded-lg px-3 py-2 text-xs outline-none text-[var(--text-main)] border border-[var(--accent-color)]" 
+                                    className="flex-1 bg-black border border-cyan-500 rounded-lg px-3 py-2 text-xs outline-none text-white" 
                                 />
-                                <button onClick={() => setIsNewCategoryMode(false)} className="text-[var(--text-muted)] hover:text-red-500"><IconX size={14}/></button>
+                                <button onClick={() => setIsNewCategoryMode(false)} className="text-gray-500 hover:text-red-500"><IconX size={14}/></button>
                             </div>
                         ) : (
                             <select 
@@ -3222,30 +3336,39 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
                                     if (e.target.value === 'NEW_CAT_TRIGGER') setIsNewCategoryMode(true); 
                                     else setNewCard({...newCard, category: e.target.value}); 
                                 }} 
-                                className="flex-1 md:w-auto bg-[var(--bg-primary)] rounded-lg px-3 py-2 text-xs outline-none text-[var(--text-main)] cursor-pointer"
+                                className="flex-1 md:w-auto bg-black border border-white/10 rounded-lg px-3 py-2 text-xs outline-none text-white cursor-pointer hover:border-white/30"
                             >
                                 <option value="" disabled>Group</option>
                                 {categories.filter(c => c !== "All").map(c => <option key={c} value={c}>{c}</option>)}
-                                <option value="NEW_CAT_TRIGGER" className="font-bold text-[var(--accent-color)]">+ New Group</option>
+                                <option value="NEW_CAT_TRIGGER" className="font-bold text-cyan-500">+ NEW</option>
                             </select>
                         )}
-                        <button onClick={handleAddSubmit} className="h-9 w-9 bg-[var(--accent-color)] text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform"><IconPlus size={20}/></button>
+                        <button onClick={handleAddSubmit} className="h-9 w-9 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg flex items-center justify-center shadow-lg transition-all border border-cyan-400/50">
+                            <IconPlus size={20}/>
+                        </button>
                      </div>
                  </div>
              )}
          </div>
       </div>
 
-      {/* 3. Filter Pills */}
+      {/* 6. فلاتر التصنيف (Filter Pills) */}
       <div className="flex flex-wrap justify-center gap-2 mb-10">
           {categories.map(cat => (
-              <button key={cat} onClick={() => setFilter(cat)} className={`px-4 py-1.5 text-xs font-bold rounded-full transition-all duration-200 border border-transparent ${filter === cat ? "bg-[var(--accent-color)] text-white shadow-lg shadow-[var(--accent-color)]/30" : "bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:border-[var(--accent-color)]/30"}`}>
+              <button 
+                key={cat} 
+                onClick={() => setFilter(cat)} 
+                className={`px-4 py-1.5 text-xs font-bold rounded-full transition-all duration-200 border 
+                ${filter === cat 
+                    ? "bg-cyan-600 text-white border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)]" 
+                    : "bg-white/5 text-gray-400 border-transparent hover:border-white/20 hover:text-white"}`}
+              >
                   {cat}
               </button>
           ))}
       </div>
 
-      {/* 4. The Grid (High Performance) */}
+      {/* 7. الشبكة (Grid) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20 w-full max-w-7xl mx-auto">
             {visibleCards.map((card, index) => (
                 <MemoryNode 
@@ -3265,15 +3388,15 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [], isJunior })
             ))}
       </div>
 
-      {/* 5. Load More */}
+      {/* 8. زر تحميل المزيد */}
       {visibleCards.length < filteredCards.length && (
             <div className="flex justify-center pb-10">
                 <button 
                     onClick={() => setDisplayLimit(prev => prev + 20)}
-                    className="group flex flex-col items-center gap-2 text-[var(--text-muted)] hover:text-[var(--accent-color)] transition-colors"
+                    className="group flex flex-col items-center gap-2 text-gray-500 hover:text-cyan-400 transition-colors"
                 >
-                    <span className="text-xs font-bold tracking-[0.2em] uppercase">Load More</span>
-                    <div className="p-3 rounded-full bg-[var(--bg-secondary)] border border-white/10 shadow-lg group-hover:scale-110 transition-transform">
+                    <span className="text-xs font-bold tracking-[0.2em] uppercase">{t('archive_load_more')}</span>
+                    <div className="p-3 rounded-full bg-white/5 border border-white/10 shadow-lg group-hover:scale-110 transition-transform group-hover:border-cyan-500/30">
                         <IconArrowDown size={20} className="animate-bounce"/>
                     </div>
                 </button>
@@ -4908,17 +5031,19 @@ import {
 import { useLanguage } from "@/hooks/useLanguage";
 
 // --- تكوين الرتب (Global Ranks Config) ---
+// نستخدم معرفات (id) لربطها بملف الترجمة
 const RANKS = [
-    { name: "RECRUIT", min: 0, color: "text-zinc-400", bg: "bg-zinc-500", icon: <IconUser /> },
-    { name: "SOLDIER", min: 100, color: "text-emerald-400", bg: "bg-emerald-500", icon: <IconTarget /> },
-    { name: "HACKER", min: 500, color: "text-cyan-400", bg: "bg-cyan-500", icon: <IconActivity /> },
-    { name: "ELITE", min: 1500, color: "text-violet-400", bg: "bg-violet-500", icon: <IconMedal /> },
-    { name: "COMMANDER", min: 3000, color: "text-orange-400", bg: "bg-orange-500", icon: <IconTrophy /> },
-    { name: "LEGEND", min: 5000, color: "text-yellow-400", bg: "bg-yellow-500", icon: <IconCrown /> },
-    { name: "CYBER GOD", min: 10000, color: "text-red-500", bg: "bg-red-500", icon: <IconFlame /> },
+    { id: "recruit", min: 0, color: "text-zinc-400", bg: "bg-zinc-500", icon: <IconUser /> },
+    { id: "soldier", min: 100, color: "text-emerald-400", bg: "bg-emerald-500", icon: <IconTarget /> },
+    { id: "hacker", min: 500, color: "text-cyan-400", bg: "bg-cyan-500", icon: <IconActivity /> },
+    { id: "elite", min: 1500, color: "text-violet-400", bg: "bg-violet-500", icon: <IconMedal /> },
+    { id: "commander", min: 3000, color: "text-orange-400", bg: "bg-orange-500", icon: <IconTrophy /> },
+    { id: "legend", min: 5000, color: "text-yellow-400", bg: "bg-yellow-500", icon: <IconCrown /> },
+    { id: "cybergod", min: 10000, color: "text-red-500", bg: "bg-red-500", icon: <IconFlame /> },
 ];
 
 // --- مكون مخطط الرادار (Skill Radar) ---
+// يرسم مضلعاً يعكس مهارات المستخدم بناءً على البيانات
 const SkillRadar = ({ stats }) => {
   // تحويل القيم إلى مقياس 0-100 للرسم البياني
   const values = [
@@ -4929,6 +5054,7 @@ const SkillRadar = ({ stats }) => {
     Math.min(100, stats.activityScore)             // نشاط التعلم
   ];
 
+  // حساب نقاط المضلع
   const points = values.map((val, i) => {
     const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
     const r = (val / 100) * 45; 
@@ -4940,7 +5066,7 @@ const SkillRadar = ({ stats }) => {
   return (
     <div className="relative w-full aspect-square max-w-[180px] mx-auto my-4">
       <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100">
-        {/* شبكة الخلفية */}
+        {/* شبكة الخلفية (حلقات) */}
         {[20, 40, 60, 80, 100].map((r, i) => (
             <polygon key={i} points={[0,1,2,3,4].map(j => {
                 const angle = (Math.PI * 2 * j) / 5 - Math.PI / 2;
@@ -4949,13 +5075,13 @@ const SkillRadar = ({ stats }) => {
             }).join(" ")} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
         ))}
         
-        {/* المحاور */}
+        {/* المحاور (خطوط من المركز) */}
         {[0,1,2,3,4].map(i => {
              const angle = (Math.PI * 2 * i) / 5 - Math.PI / 2;
              return <line key={i} x1="50" y1="50" x2={50 + 45 * Math.cos(angle)} y2={50 + 45 * Math.sin(angle)} stroke="rgba(255,255,255,0.1)" />;
         })}
 
-        {/* مضلع البيانات */}
+        {/* مضلع البيانات (النتيجة) */}
         <motion.polygon 
           initial={{ opacity: 0, scale: 0 }}
           animate={{ opacity: 0.6, scale: 1 }}
@@ -4976,11 +5102,11 @@ const SkillRadar = ({ stats }) => {
       
       {/* التسميات التوضيحية */}
       <div className="absolute inset-0 pointer-events-none text-[8px] font-bold text-white/50 font-mono">
-          <span className="absolute top-0 left-1/2 -translate-x-1/2 bg-black/50 px-1">MEMORY</span>
-          <span className="absolute top-[35%] right-0 translate-x-2">STREAK</span>
+          <span className="absolute top-0 left-1/2 -translate-x-1/2 bg-black/50 px-1">MEM</span>
+          <span className="absolute top-[35%] right-0 translate-x-2">STR</span>
           <span className="absolute bottom-0 right-0 translate-x-1">XP</span>
-          <span className="absolute bottom-0 left-0 -translate-x-1">MASTERY</span>
-          <span className="absolute top-[35%] left-0 -translate-x-4">ACTIVITY</span>
+          <span className="absolute bottom-0 left-0 -translate-x-1">MST</span>
+          <span className="absolute top-[35%] left-0 -translate-x-4">ACT</span>
       </div>
     </div>
   );
@@ -4991,6 +5117,7 @@ export default function CyberDeck({ user, stats, cards = [] }) {
   const { t, dir } = useLanguage();
 
   // 1. معالجة البيانات الحقيقية (Memoized Calculations)
+  // يتم حساب الرتب والنسب المئوية هنا لضمان السرعة والدقة
   const analytics = useMemo(() => {
     const xp = stats?.xp || 0;
     const streak = stats?.streak || 0;
@@ -5000,10 +5127,10 @@ export default function CyberDeck({ user, stats, cards = [] }) {
     const masteredCards = cards.filter(c => c.level >= 5).length;
     const learningCards = cards.filter(c => c.level > 0 && c.level < 5).length;
     
-    // نسبة الإتقان
+    // نسبة الإتقان (تجنب القسمة على صفر)
     const masteryRate = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
     
-    // تحديد الرتبة الحالية والقادمة
+    // تحديد الرتبة الحالية والقادمة بناءً على الـ XP
     const rankIndex = RANKS.findIndex((r, i) => {
         const next = RANKS[i + 1];
         return xp >= r.min && (!next || xp < next.min);
@@ -5011,7 +5138,7 @@ export default function CyberDeck({ user, stats, cards = [] }) {
     const currentRank = RANKS[rankIndex] || RANKS[0];
     const nextRank = RANKS[rankIndex + 1];
     
-    // نسبة التقدم للرتبة التالية
+    // نسبة التقدم للرتبة التالية (للشريط)
     let rankProgress = 100;
     if (nextRank) {
         const totalNeeded = nextRank.min - currentRank.min;
@@ -5019,7 +5146,7 @@ export default function CyberDeck({ user, stats, cards = [] }) {
         rankProgress = Math.min(100, Math.max(0, (currentEarned / totalNeeded) * 100));
     }
 
-    // درجة النشاط (معادلة بسيطة)
+    // درجة النشاط (معادلة تقريبية للرادار)
     const activityScore = Math.min(100, learningCards * 5 + masteredCards * 2 + streak * 2);
 
     return {
@@ -5034,9 +5161,9 @@ export default function CyberDeck({ user, stats, cards = [] }) {
         {/* --- GRID LAYOUT --- */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            {/* 1. Identity Card (بطاقة الهوية) */}
+            {/* 1. Identity Card (بطاقة الهوية - يسار الشاشة الكبيرة) */}
             <div className="lg:col-span-8 bg-[#0a0a0a] border border-white/10 rounded-3xl overflow-hidden relative group">
-                {/* خلفية متحركة خفيفة */}
+                {/* خلفية متحركة خفيفة (Noise + Gradient) */}
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
                 <div className="absolute top-0 right-0 p-32 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
 
@@ -5049,7 +5176,7 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                                     <img src={user?.photoURL || '/avatars/avatar1.png'} className="w-full h-full object-cover" alt="Avatar"/>
                                 </div>
                             </div>
-                            {/* شارة المستوى */}
+                            {/* شارة المستوى أسفل الصورة */}
                             <div className="absolute -bottom-3 inset-x-0 flex justify-center">
                                 <span className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest bg-[#111] border border-white/10 ${analytics.currentRank.color}`}>
                                     {t('profile_lvl')}.{Math.floor(analytics.xp / 500) + 1}
@@ -5059,17 +5186,20 @@ export default function CyberDeck({ user, stats, cards = [] }) {
 
                         {/* معلومات المستخدم */}
                         <div className={`flex-1 text-center ${dir === 'rtl' ? 'md:text-right' : 'md:text-left'} w-full`}>
+                            {/* الرتبة والفئة */}
                             <div className={`flex items-center justify-center ${dir === 'rtl' ? 'md:justify-start' : 'md:justify-start'} gap-2 mb-2`}>
                                 <span className={`w-2 h-2 rounded-full ${analytics.currentRank.bg}`}></span>
                                 <span className={`text-xs font-bold tracking-[0.2em] uppercase ${analytics.currentRank.color}`}>
-                                    {analytics.currentRank.name} {t('profile_class')}
+                                    {t('rank_' + analytics.currentRank.id)} {t('profile_class')}
                                 </span>
                             </div>
+                            
+                            {/* الاسم */}
                             <h1 className="text-4xl font-black text-white tracking-tighter mb-4 truncate">
                                 {user?.displayName || "OPERATIVE"}
                             </h1>
 
-                            {/* شريط الخبرة */}
+                            {/* شريط الخبرة (XP Bar) */}
                             <div className="relative pt-2">
                                 <div className="flex justify-between text-[10px] font-mono text-white/40 mb-1">
                                     <span>{t('profile_exp')}: {analytics.xp}</span>
@@ -5087,7 +5217,7 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                         </div>
                     </div>
 
-                    {/* صف الإحصائيات السريعة */}
+                    {/* صف الإحصائيات السريعة (أسفل البطاقة) */}
                     <div className="grid grid-cols-3 gap-4 mt-8 pt-8 border-t border-white/5">
                         <StatItem label={t('profile_stats_cards')} value={analytics.totalCards} color="text-white" icon={<IconDna size={16}/>} />
                         <StatItem label={t('profile_stats_mastered')} value={analytics.masteredCards} color="text-yellow-400" icon={<IconCrown size={16}/>} />
@@ -5096,13 +5226,14 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                 </div>
             </div>
 
-            {/* 2. Neural Scan (تحليل الأداء) */}
+            {/* 2. Neural Scan (تحليل الأداء - يمين الشاشة الكبيرة) */}
             <div className="lg:col-span-4 bg-[#0a0a0a] border border-white/10 rounded-3xl p-6 flex flex-col items-center justify-center relative min-h-[300px]">
                 <div className={`flex items-center gap-2 absolute top-6 text-cyan-500/50 ${dir === 'rtl' ? 'right-6' : 'left-6'}`}>
                     <IconChartRadar size={18}/>
                     <span className="text-[10px] font-black tracking-widest uppercase">{t('profile_metrics')}</span>
                 </div>
                 
+                {/* الرسم البياني */}
                 <SkillRadar stats={analytics} />
                 
                 <div className="mt-4 text-center">
@@ -5112,7 +5243,7 @@ export default function CyberDeck({ user, stats, cards = [] }) {
             </div>
         </div>
 
-        {/* 3. Badges Grid (شبكة الأوسمة) */}
+        {/* 3. Badges Grid (شبكة الأوسمة - أسفل الصفحة) */}
         <div className="mt-8">
             <div className={`flex items-center gap-3 mb-6 px-2 ${dir === 'rtl' ? 'flex-row-reverse' : 'flex-row'}`}>
                 <IconMedal className="text-white/20" size={24} />
@@ -5137,7 +5268,9 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                                 </div>
                                 {/* تفاصيل الرتبة */}
                                 <div>
-                                    <h4 className={`text-sm font-bold ${isUnlocked ? 'text-white' : 'text-white/30'}`}>{r.name}</h4>
+                                    <h4 className={`text-sm font-bold ${isUnlocked ? 'text-white' : 'text-white/30'}`}>
+                                        {t('rank_' + r.id)}
+                                    </h4>
                                     <p className="text-[10px] font-mono text-white/30">
                                         {isUnlocked ? t('profile_unlocked') : `${t('profile_requires')} ${r.min} XP`}
                                     </p>
@@ -5160,7 +5293,7 @@ export default function CyberDeck({ user, stats, cards = [] }) {
   );
 }
 
-// --- مكون مساعد للإحصائيات الصغيرة ---
+// --- مكون مساعد للإحصائيات الصغيرة (معزول) ---
 const StatItem = ({ label, value, color, icon }) => (
     <div className="text-center">
         <div className="flex items-center justify-center gap-1 text-[10px] text-white/30 font-bold uppercase mb-1">
@@ -8708,30 +8841,27 @@ export const UIProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
 
   // --- نظام البث المباشر (Global Live System) ---
+  // يجب تعريف الحالة الابتدائية بدقة
   const [liveStream, setLiveStream] = useState({
-    isActive: false,      // هل البث يعمل؟
-    roomName: null,       // اسم الغرفة
-    isMinimized: false    // هل هو مصغر حالياً؟
+    isActive: false,
+    roomName: null,
+    isMinimized: false
   });
 
-  // دالة بدء البث (تستدعى من صفحة الدخول)
   const startBroadcast = (room) => {
     setLiveStream({ isActive: true, roomName: room, isMinimized: false });
-    setCurrentView('live'); // الانتقال لصفحة البث تلقائياً
+    setCurrentView('live');
   };
 
-  // دالة إنهاء البث
   const endBroadcast = () => {
     setLiveStream({ isActive: false, roomName: null, isMinimized: false });
   };
 
-  // دالة تبديل التصغير (يدوياً)
   const toggleMinimize = (minimize) => {
     setLiveStream(prev => ({ ...prev, isMinimized: minimize }));
   };
 
-  // --- التأثير الذكي للتصغير التلقائي ---
-  // يراقب تغيير الصفحة: إذا خرجت من 'live'، يصغر الفيديو. إذا عدت، يكبره.
+  // التأثير الذكي للتصغير التلقائي
   useEffect(() => {
     if (liveStream.isActive) {
       if (currentView !== 'live') {
@@ -8742,14 +8872,13 @@ export const UIProvider = ({ children }) => {
     }
   }, [currentView, liveStream.isActive]);
 
-  // --- نظام الإشعارات (Firebase Realtime) ---
+  // --- نظام الإشعارات ---
   useEffect(() => {
     if (!user) {
         setNotifications([]);
         return;
     }
     
-    // 1. جلب إشعارات المستخدم الحالي
     const myNotifsQuery = query(
         collection(db, "notifications"),
         where("userId", "==", user.uid)
@@ -8757,19 +8886,14 @@ export const UIProvider = ({ children }) => {
 
     const unsubMy = onSnapshot(myNotifsQuery, (snap) => {
         const myData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        
-        // نقوم بتحديث الحالة بذكاء لدمجها مع إشعارات الأدمن (إذا وجد)
         setNotifications(prev => {
-            // نحتفظ بإشعارات الأدمن الموجودة في الحالة الحالية ونحدث إشعاراتي
             const others = prev.filter(n => n.userId !== user.uid && n.target === 'admin');
             const all = [...others, ...myData];
-            // إزالة التكرار وترتيب حسب الوقت (الأحدث أولاً)
             const unique = Array.from(new Map(all.map(item => [item.id, item])).values());
             return unique.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
         });
     }, (e) => console.log("Notif error:", e));
 
-    // 2. إذا كان المستخدم هو "الماستر"، اجلب إشعارات النظام أيضاً
     let unsubAdmin = () => {};
     if (user.email === MASTER_EMAIL) {
         const adminQuery = query(
@@ -8800,20 +8924,23 @@ export const UIProvider = ({ children }) => {
     } catch (e) { console.error("Remove notif failed", e); }
   };
 
-  return (
-    <UIContext.Provider value={{ 
-        // Navigation & State
-        currentView, setCurrentView, 
-        activeCategory, setActiveCategory,
-        showSupport, setShowSupport,
-        activeOverlayGame, setActiveOverlayGame,
-        
-        // Notifications
-        notifications, removeNotification,
+  // تمرير القيم بدقة - liveState هنا هو الحل للخطأ
+  // لاحظ: اسم المتغير في RealLiveStream.jsx يجب أن يطابق الاسم هنا (liveStream)
+  // في الكود السابق كان هناك خلط بين liveState و liveStream. وحدت الاسم ليكون `liveStream`.
+  const value = {
+      currentView, setCurrentView, 
+      activeCategory, setActiveCategory,
+      showSupport, setShowSupport,
+      activeOverlayGame, setActiveOverlayGame,
+      notifications, removeNotification,
+      
+      // هنا الإصلاح: التأكد من تمرير liveStream وليس liveState
+      liveState: liveStream, 
+      startBroadcast, endBroadcast, toggleMinimize
+  };
 
-        // Live Stream System
-        liveStream, startBroadcast, endBroadcast, toggleMinimize
-    }}>
+  return (
+    <UIContext.Provider value={value}>
       {children}
     </UIContext.Provider>
   );
@@ -9955,11 +10082,8 @@ FILE: src\data\translations.js
 // src/data/translations.js
 
 export const translations = {
-  // =================================================================
-  // العربية (Arabic)
-  // =================================================================
   ar: {
-    // --- Navigation (القائمة السفلية) ---
+    // --- Navigation ---
     nav_home: "القاعدة",
     nav_games: "الألعاب",
     nav_live: "بث حي",
@@ -9971,7 +10095,7 @@ export const translations = {
     nav_admin: "تحكم",
     nav_support: "الدعم",
 
-    // --- Hero Section (الصفحة الرئيسية) ---
+    // --- Hero Section ---
     hero_status: "حالة النظام: متصل",
     hero_welcome: "أهلاً بعودتك،",
     hero_line1: "> الواجهة العصبية جاهزة.",
@@ -9983,7 +10107,7 @@ export const translations = {
     btn_hacking: "اختراق عصبي",
     hacking_sub: "بروتوكول الهجوم: جاهز",
 
-    // --- Data Modules (صفحة اختيار الأقسام) ---
+    // --- Data Modules & Archive ---
     modules_system_ready: "النظام جاهز",
     modules_available: "وحدة متاحة",
     modules_title_1: "أرشيف",
@@ -9991,32 +10115,41 @@ export const translations = {
     modules_search_placeholder: "بحث في السجلات...",
     modules_no_data: "لا توجد بيانات مطابقة",
     modules_esc: "خروج",
+    archive_header: "الأرشيف العصبي",
+    archive_items: "عنصر",
+    archive_search_placeholder: "بحث في قاعدة البيانات...",
+    archive_add_btn: "إضافة",
+    archive_load_more: "تحميل المزيد من البيانات",
+    archive_manage_groups: "إدارة المجموعات",
+    archive_edit: "تعديل",
+    archive_delete: "حذف",
     
-    // --- Games Page (صفحة الألعاب) ---
-    games_title: "صالة الألعاب",
-    games_subtitle: "اختر وحدة التدريب",
-    game_chrono_title: "مسافر عبر الزمن",
-    game_chrono_desc: "تعلم نظام الوقت الروسي.",
-    game_gravity_title: "بروتوكول الجاذبية",
-    game_gravity_desc: "أتقن حروف الجر.",
-    game_magnet_title: "المجال المغناطيسي",
-    game_magnet_desc: "استخرج جذور الكلمات.",
-    game_scale_title: "ميزان الكلمات",
-    game_scale_desc: "وازن فئات الكلمات.",
+    // --- Chat (Communication Hub) ---
+    chat_title: "الكتائب",
+    chat_no_freq: "لم يتم تحديد تردد",
+    chat_type_msg: "اكتب رسالة مشفرة...",
+    chat_invite: "دعوة",
+    chat_squad_invite: "تعزيزات",
+    chat_create_squad: "تأسيس كتيبة",
+    chat_squad_name: "اسم الكتيبة",
+    chat_security: "بروتوكول الأمان",
+    chat_public: "عام (مفتوح)",
+    chat_private: "مشفر (خاص)",
+    chat_cancel: "إلغاء",
+    chat_init: "تهيئة",
+    chat_server_public: "خادم عام",
+    chat_server_private: "خادم خاص",
 
-    // --- Live Stream (صفحة البث) ---
-    live_enter_id: "أدخل معرف الغرفة...",
-    live_connect_btn: "بدء الاتصال",
-    live_connecting: "جاري التشفير...",
-    live_secure_channel: "قناة آمنة",
-    live_active_msg: "الإشارة نشطة",
-    live_active_desc: "يمكنك التنقل بحرية. سيتم تصغير النافذة تلقائياً.",
-    live_log_ready: "النظام جاهز",
-    live_log_waiting: "بانتظار الإدخال...",
-    live_log_encrypt: "تشفير البيانات...",
-    live_log_established: "تم تأسيس الاتصال.",
-
-    // --- Profile (صفحة البروفايل) ---
+    // --- Ranks (Achievements) ---
+    rank_recruit: "مجند",
+    rank_soldier: "جندي",
+    rank_hacker: "هاكر",
+    rank_elite: "نخبة",
+    rank_commander: "قائد",
+    rank_legend: "أسطورة",
+    rank_cybergod: "إله سيبراني",
+    
+    // --- Profile ---
     profile_lvl: "مستوى",
     profile_class: "فئة",
     profile_exp: "خبرة",
@@ -10031,7 +10164,37 @@ export const translations = {
     profile_unlocked: "مفتوح",
     profile_requires: "يتطلب",
 
-    // --- Settings (صفحة الإعدادات) ---
+    // --- Admin Dashboard ---
+    admin_title: "محطة التحكم",
+    admin_overview: "نظرة عامة",
+    admin_operatives: "العملاء",
+    admin_squads: "الفرق",
+    admin_signals: "الإشارات",
+    admin_uplink: "اتصال الدعم",
+    admin_alert: "تنبيه عالمي",
+    admin_exit: "خروج",
+    admin_total_ops: "إجمالي العملاء",
+    admin_threats: "تهديدات نشطة",
+    admin_tickets: "تذاكر مفتوحة",
+    admin_commanders: "قادة",
+    admin_role: "الدور",
+    admin_status: "الحالة",
+    admin_actions: "إجراءات",
+    admin_ban: "حظر",
+    admin_unban: "إلغاء الحظر",
+    admin_broadcast_title: "تنبيه نظام عالمي",
+    admin_broadcast_ph: "أدخل رسالة التنبيه...",
+    admin_broadcast_exec: "تنفيذ البث",
+
+    // --- Live ---
+    live_enter_id: "أدخل معرف الغرفة...",
+    live_connect_btn: "بدء الاتصال",
+    live_connecting: "جاري التشفير...",
+    live_secure_channel: "قناة آمنة",
+    live_active_msg: "الإشارة نشطة",
+    live_active_desc: "يمكنك التنقل بحرية. سيتم تصغير النافذة تلقائياً.",
+
+    // --- Settings ---
     settings_title: "إعدادات النظام",
     settings_subtitle: "وحدة تفضيلات المستخدم",
     identity_title: "هوية العميل",
@@ -10053,11 +10216,8 @@ export const translations = {
     alert_error: "فشل التحديث"
   },
   
-  // =================================================================
-  // English (الإنجليزية)
-  // =================================================================
   en: {
-    // --- Navigation ---
+    // Navigation
     nav_home: "Base",
     nav_games: "Arcade",
     nav_live: "Live",
@@ -10069,7 +10229,7 @@ export const translations = {
     nav_admin: "Control",
     nav_support: "Support",
 
-    // --- Hero Section ---
+    // Hero
     hero_status: "SYSTEM STATUS: ONLINE",
     hero_welcome: "WELCOME BACK,",
     hero_line1: "> Neural Interface Ready.",
@@ -10081,7 +10241,7 @@ export const translations = {
     btn_hacking: "NEURAL BREACH",
     hacking_sub: "HACKING PROTOCOL: READY",
 
-    // --- Data Modules ---
+    // Data Modules & Archive
     modules_system_ready: "SYSTEM_READY",
     modules_available: "AVAILABLE",
     modules_title_1: "DATA",
@@ -10089,33 +10249,42 @@ export const translations = {
     modules_search_placeholder: "SEARCH PROTOCOLS...",
     modules_no_data: "NO MATCHING DATA",
     modules_esc: "ESC",
+    archive_header: "NEURAL ARCHIVE",
+    archive_items: "ITEMS",
+    archive_search_placeholder: "SEARCH DATABASE...",
+    archive_add_btn: "ADD",
+    archive_load_more: "LOAD MORE DATA",
+    archive_manage_groups: "MANAGE GROUPS",
+    archive_edit: "EDIT",
+    archive_delete: "DELETE",
 
-    // --- Games Page ---
-    games_title: "NEURAL ARCADE",
-    games_subtitle: "SELECT TRAINING MODULE",
-    game_chrono_title: "CHRONO MASTER",
-    game_chrono_desc: "Learn Russian time system.",
-    game_gravity_title: "GRAVITY PROTOCOL",
-    game_gravity_desc: "Master Russian prepositions.",
-    game_magnet_title: "MAGNETIC FIELD",
-    game_magnet_desc: "Extract word roots.",
-    game_scale_title: "WORD SCALE",
-    game_scale_desc: "Balance category weights.",
+    // Chat
+    chat_title: "SQUADS",
+    chat_no_freq: "NO FREQUENCY SELECTED",
+    chat_type_msg: "Type encrypted message...",
+    chat_invite: "Invite",
+    chat_squad_invite: "Reinforcements",
+    chat_create_squad: "Forge Squad",
+    chat_squad_name: "Squad Name",
+    chat_security: "Security Protocol",
+    chat_public: "Public (Open)",
+    chat_private: "Encrypted (Private)",
+    chat_cancel: "Cancel",
+    chat_init: "Initialize",
+    chat_server_public: "PUBLIC SERVER",
+    chat_server_private: "PRIVATE SERVER",
 
-    // --- Live Stream ---
-    live_enter_id: "ENTER ROOM ID...",
-    live_connect_btn: "INITIALIZE UPLINK",
-    live_connecting: "ENCRYPTING...",
-    live_secure_channel: "SECURE CHANNEL",
-    live_active_msg: "SIGNAL ACTIVE",
-    live_active_desc: "YOU CAN NAVIGATE FREELY. CONNECTION WILL MINIMIZE AUTOMATICALLY.",
-    live_log_ready: "SYSTEM_READY",
-    live_log_waiting: "WAITING_INPUT...",
-    live_log_encrypt: "ENCRYPTING...",
-    live_log_established: "UPLINK ESTABLISHED.",
+    // Ranks
+    rank_recruit: "RECRUIT",
+    rank_soldier: "SOLDIER",
+    rank_hacker: "HACKER",
+    rank_elite: "ELITE",
+    rank_commander: "COMMANDER",
+    rank_legend: "LEGEND",
+    rank_cybergod: "CYBER GOD",
 
-    // --- Profile ---
-    profile_level: "LVL",
+    // Profile
+    profile_lvl: "LVL",
     profile_class: "CLASS",
     profile_exp: "EXP",
     profile_next: "NEXT",
@@ -10129,7 +10298,37 @@ export const translations = {
     profile_unlocked: "UNLOCKED",
     profile_requires: "REQUIRES",
 
-    // --- Settings ---
+    // Admin
+    admin_title: "NEXUS ADMIN",
+    admin_overview: "Overview",
+    admin_operatives: "Operatives",
+    admin_squads: "Squad Control",
+    admin_signals: "Signals",
+    admin_uplink: "Support Uplink",
+    admin_alert: "Global Alert",
+    admin_exit: "Exit Terminal",
+    admin_total_ops: "Total Operatives",
+    admin_threats: "Active Threats",
+    admin_tickets: "Open Tickets",
+    admin_commanders: "Commanders",
+    admin_role: "Role",
+    admin_status: "Status",
+    admin_actions: "Actions",
+    admin_ban: "Ban Agent",
+    admin_unban: "Revoke Ban",
+    admin_broadcast_title: "Global System Alert",
+    admin_broadcast_ph: "ENTER ALERT MESSAGE...",
+    admin_broadcast_exec: "Execute Broadcast",
+
+    // Live
+    live_enter_id: "ENTER ROOM ID...",
+    live_connect_btn: "INITIALIZE UPLINK",
+    live_connecting: "ENCRYPTING...",
+    live_secure_channel: "SECURE CHANNEL",
+    live_active_msg: "SIGNAL ACTIVE",
+    live_active_desc: "YOU CAN NAVIGATE FREELY. CONNECTION WILL MINIMIZE AUTOMATICALLY.",
+
+    // Settings
     settings_title: "SYSTEM CONFIG",
     settings_subtitle: "USER_PREFERENCES_MODULE",
     identity_title: "OPERATIVE IDENTITY",
@@ -10151,11 +10350,8 @@ export const translations = {
     alert_error: "UPDATE FAILED"
   },
 
-  // =================================================================
-  // Russian (الروسية)
-  // =================================================================
   ru: {
-    // --- Navigation ---
+    // Nav
     nav_home: "База",
     nav_games: "Аркада",
     nav_live: "Эфир",
@@ -10167,7 +10363,7 @@ export const translations = {
     nav_admin: "Контроль",
     nav_support: "Помощь",
 
-    // --- Hero Section ---
+    // Hero
     hero_status: "СТАТУС: ОНЛАЙН",
     hero_welcome: "С ВОЗВРАЩЕНИЕМ,",
     hero_line1: "> Нейроинтерфейс готов.",
@@ -10179,7 +10375,7 @@ export const translations = {
     btn_hacking: "ВЗЛОМ",
     hacking_sub: "ПРОТОКОЛ АТАКИ: ГОТОВ",
 
-    // --- Data Modules ---
+    // Data & Archive
     modules_system_ready: "СИСТЕМА ГОТОВА",
     modules_available: "ДОСТУПНО",
     modules_title_1: "АРХИВ",
@@ -10187,32 +10383,41 @@ export const translations = {
     modules_search_placeholder: "ПОИСК ПРОТОКОЛОВ...",
     modules_no_data: "НЕТ ДАННЫХ",
     modules_esc: "ESC",
+    archive_header: "НЕЙРО АРХИВ",
+    archive_items: "ЭЛЕМЕНТОВ",
+    archive_search_placeholder: "ПОИСК В БАЗЕ...",
+    archive_add_btn: "ДОБАВИТЬ",
+    archive_load_more: "ЗАГРУЗИТЬ ЕЩЕ",
+    archive_manage_groups: "УПРАВЛЕНИЕ ГРУППАМИ",
+    archive_edit: "РЕД",
+    archive_delete: "УДАЛИТЬ",
 
-    // --- Games Page ---
-    games_title: "НЕЙРО-АРКАДА",
-    games_subtitle: "ВЫБЕРИТЕ МОДУЛЬ",
-    game_chrono_title: "ХРОНО МАСТЕР",
-    game_chrono_desc: "Изучение системы времени.",
-    game_gravity_title: "ГРАВИТАЦИЯ",
-    game_gravity_desc: "Предлоги и падежи.",
-    game_magnet_title: "МАГНИТНОЕ ПОЛЕ",
-    game_magnet_desc: "Корни слов.",
-    game_scale_title: "ВЕСЫ СЛОВ",
-    game_scale_desc: "Баланс категорий.",
+    // Chat
+    chat_title: "ОТРЯДЫ",
+    chat_no_freq: "ЧАСТОТА НЕ ВЫБРАНА",
+    chat_type_msg: "Введите сообщение...",
+    chat_invite: "Пригласить",
+    chat_squad_invite: "Подкрепление",
+    chat_create_squad: "Создать отряд",
+    chat_squad_name: "Название отряда",
+    chat_security: "Протокол безопасности",
+    chat_public: "Публичный",
+    chat_private: "Зашифрованный",
+    chat_cancel: "Отмена",
+    chat_init: "Инициализация",
+    chat_server_public: "ОБЩИЙ СЕРВЕР",
+    chat_server_private: "ПРИВАТНЫЙ СЕРВЕР",
 
-    // --- Live Stream ---
-    live_enter_id: "ВВЕДИТЕ ID КОМНАТЫ...",
-    live_connect_btn: "НАЧАТЬ СОЕДИНЕНИЕ",
-    live_connecting: "ШИФРОВАНИЕ...",
-    live_secure_channel: "ЗАЩИЩЕННЫЙ КАНАЛ",
-    live_active_msg: "СИГНАЛ АКТИВЕН",
-    live_active_desc: "ВЫ МОЖЕТЕ ПЕРЕМЕЩАТЬСЯ. ОКНО СВЕРНЕТСЯ АВТОМАТИЧЕСКИ.",
-    live_log_ready: "СИСТЕМА ГОТОВА",
-    live_log_waiting: "ОЖИДАНИЕ ВВОДА...",
-    live_log_encrypt: "ШИФРОВАНИЕ...",
-    live_log_established: "СВЯЗЬ УСТАНОВЛЕНА.",
+    // Ranks
+    rank_recruit: "НОВОБРАНЕЦ",
+    rank_soldier: "СОЛДАТ",
+    rank_hacker: "ХАКЕР",
+    rank_elite: "ЭЛИТА",
+    rank_commander: "КОМАНДИР",
+    rank_legend: "ЛЕГЕНДА",
+    rank_cybergod: "КИБЕР БОГ",
 
-    // --- Profile ---
+    // Profile
     profile_lvl: "УР",
     profile_class: "КЛАСС",
     profile_exp: "ОПЫТ",
@@ -10227,7 +10432,37 @@ export const translations = {
     profile_unlocked: "ОТКРЫТО",
     profile_requires: "ТРЕБУЕТСЯ",
 
-    // --- Settings ---
+    // Admin
+    admin_title: "ТЕРМИНАЛ АДМИНА",
+    admin_overview: "Обзор",
+    admin_operatives: "Оперативники",
+    admin_squads: "Управление отрядами",
+    admin_signals: "Сигналы",
+    admin_uplink: "Поддержка",
+    admin_alert: "Глобальная тревога",
+    admin_exit: "Выход",
+    admin_total_ops: "Всего оперативников",
+    admin_threats: "Угрозы",
+    admin_tickets: "Тикеты",
+    admin_commanders: "Командиры",
+    admin_role: "Роль",
+    admin_status: "Статус",
+    admin_actions: "Действия",
+    admin_ban: "Забанить",
+    admin_unban: "Разбанить",
+    admin_broadcast_title: "Системное оповещение",
+    admin_broadcast_ph: "ВВЕДИТЕ СООБЩЕНИЕ...",
+    admin_broadcast_exec: "Выполнить трансляцию",
+
+    // Live
+    live_enter_id: "ВВЕДИТЕ ID КОМНАТЫ...",
+    live_connect_btn: "НАЧАТЬ СОЕДИНЕНИЕ",
+    live_connecting: "ШИФРОВАНИЕ...",
+    live_secure_channel: "ЗАЩИЩЕННЫЙ КАНАЛ",
+    live_active_msg: "СИГНАЛ АКТИВЕН",
+    live_active_desc: "ВЫ МОЖЕТЕ ПЕРЕМЕЩАТЬСЯ. ОКНО СВЕРНЕТСЯ АВТОМАТИЧЕСКИ.",
+
+    // Settings
     settings_title: "НАСТРОЙКИ",
     settings_subtitle: "МОДУЛЬ ПОЛЬЗОВАТЕЛЯ",
     identity_title: "ЛИЧНОСТЬ",

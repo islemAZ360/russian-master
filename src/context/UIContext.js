@@ -4,25 +4,43 @@ import { db, MASTER_EMAIL } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './AuthContext'; 
 
-export const UIContext = createContext(null);
+// 1. تعريف الحالة الافتراضية بدقة لمنع الـ undefined
+const defaultLiveState = {
+  isActive: false,
+  roomName: null,
+  isMinimized: false
+};
+
+const defaultContextValue = {
+  currentView: 'home',
+  activeCategory: 'All',
+  showSupport: false,
+  activeOverlayGame: null,
+  notifications: [],
+  liveState: defaultLiveState, // تأمين القيمة هنا
+  startBroadcast: () => {},
+  endBroadcast: () => {},
+  toggleMinimize: () => {},
+  setCurrentView: () => {},
+  setActiveCategory: () => {},
+  setShowSupport: () => {},
+  setActiveOverlayGame: () => {},
+  removeNotification: () => {}
+};
+
+export const UIContext = createContext(defaultContextValue);
 
 export const UIProvider = ({ children }) => {
   const { user } = useAuth();
   
-  // --- حالات الواجهة الأساسية ---
   const [currentView, setCurrentView] = useState('home');
   const [activeCategory, setActiveCategory] = useState('All');
   const [showSupport, setShowSupport] = useState(false);
   const [activeOverlayGame, setActiveOverlayGame] = useState(null);
   const [notifications, setNotifications] = useState([]);
 
-  // --- نظام البث المباشر (Global Live System) ---
-  // يجب تعريف الحالة الابتدائية بدقة
-  const [liveStream, setLiveStream] = useState({
-    isActive: false,
-    roomName: null,
-    isMinimized: false
-  });
+  // تهيئة الحالة مع القيمة الافتراضية
+  const [liveStream, setLiveStream] = useState(defaultLiveState);
 
   const startBroadcast = (room) => {
     setLiveStream({ isActive: true, roomName: room, isMinimized: false });
@@ -37,7 +55,6 @@ export const UIProvider = ({ children }) => {
     setLiveStream(prev => ({ ...prev, isMinimized: minimize }));
   };
 
-  // التأثير الذكي للتصغير التلقائي
   useEffect(() => {
     if (liveStream.isActive) {
       if (currentView !== 'live') {
@@ -48,18 +65,13 @@ export const UIProvider = ({ children }) => {
     }
   }, [currentView, liveStream.isActive]);
 
-  // --- نظام الإشعارات ---
   useEffect(() => {
     if (!user) {
         setNotifications([]);
         return;
     }
     
-    const myNotifsQuery = query(
-        collection(db, "notifications"),
-        where("userId", "==", user.uid)
-    );
-
+    const myNotifsQuery = query(collection(db, "notifications"), where("userId", "==", user.uid));
     const unsubMy = onSnapshot(myNotifsQuery, (snap) => {
         const myData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setNotifications(prev => {
@@ -72,10 +84,7 @@ export const UIProvider = ({ children }) => {
 
     let unsubAdmin = () => {};
     if (user.email === MASTER_EMAIL) {
-        const adminQuery = query(
-            collection(db, "notifications"),
-            where("target", "==", "admin")
-        );
+        const adminQuery = query(collection(db, "notifications"), where("target", "==", "admin"));
         unsubAdmin = onSnapshot(adminQuery, (snap) => {
             const adminData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             setNotifications(prev => {
@@ -86,23 +95,14 @@ export const UIProvider = ({ children }) => {
             });
         });
     }
-
-    return () => {
-        unsubMy();
-        unsubAdmin();
-    };
+    return () => { unsubMy(); unsubAdmin(); };
   }, [user]);
 
   const removeNotification = async (id) => {
-    try {
-        await deleteDoc(doc(db, "notifications", id));
-        setNotifications(prev => prev.filter(n => n.id !== id));
-    } catch (e) { console.error("Remove notif failed", e); }
+    try { await deleteDoc(doc(db, "notifications", id)); setNotifications(prev => prev.filter(n => n.id !== id)); } 
+    catch (e) { console.error("Remove notif failed", e); }
   };
 
-  // تمرير القيم بدقة - liveState هنا هو الحل للخطأ
-  // لاحظ: اسم المتغير في RealLiveStream.jsx يجب أن يطابق الاسم هنا (liveStream)
-  // في الكود السابق كان هناك خلط بين liveState و liveStream. وحدت الاسم ليكون `liveStream`.
   const value = {
       currentView, setCurrentView, 
       activeCategory, setActiveCategory,
@@ -110,16 +110,12 @@ export const UIProvider = ({ children }) => {
       activeOverlayGame, setActiveOverlayGame,
       notifications, removeNotification,
       
-      // هنا الإصلاح: التأكد من تمرير liveStream وليس liveState
-      liveState: liveStream, 
+      // *** النقطة الحرجة: استخدام اسم موحد ***
+      liveState: liveStream, // تم ربط المتغير liveStream بالمفتاح liveState
       startBroadcast, endBroadcast, toggleMinimize
   };
 
-  return (
-    <UIContext.Provider value={value}>
-      {children}
-    </UIContext.Provider>
-  );
+  return <UIContext.Provider value={value}>{children}</UIContext.Provider>;
 };
 
 export const useUI = () => {
