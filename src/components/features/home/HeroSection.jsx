@@ -1,141 +1,165 @@
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
-import { IconRocket, IconTerminal, IconSparkles } from "@tabler/icons-react";
+import { IconRocket, IconTerminal, IconSparkles, IconActivity } from "@tabler/icons-react";
 import { BorderBeam } from "@/components/ui/BorderBeam";
 import { DecryptText } from "@/components/ui/DecryptText";
 import { MagneticButton } from "@/components/ui/MagneticButton";
 import { useSettings } from "@/context/SettingsContext";
-import { useLanguage } from "@/hooks/useLanguage"; // استدعاء هوك اللغة
+import { useLanguage } from "@/hooks/useLanguage";
 
 export function HeroSection({ onStart, onOpenGame, user }) {
-  const userName = user?.displayName || user?.email?.split('@')[0].toUpperCase() || "OPERATIVE";
   const { isDark } = useSettings();
-  const { t, dir } = useLanguage(); // استخدام الترجمة
+  const { t, dir, isRTL } = useLanguage();
+
+  // تحديد الاسم الذي سيظهر في التأثير المشفر
+  const userName = user?.displayName || user?.email?.split('@')[0]?.toUpperCase() || t('rank_recruit');
 
   return (
-    // إضافة dir هنا لضمان الاتجاه الصحيح للنصوص
-    <div className="w-full h-full flex flex-col md:flex-row items-center justify-between p-6 md:p-12 relative z-10 gap-10" dir={dir}>
+    <div 
+      className="w-full h-full flex flex-col md:flex-row items-center justify-between p-6 md:p-12 relative z-10 gap-12" 
+      dir={dir}
+    >
+      {/* القسم الأيسر: نصوص الترحيب والحالة */}
       <motion.div 
-        initial={{ opacity: 0, x: dir === 'rtl' ? 50 : -50 }} // عكس الحركة حسب اللغة
+        initial={{ opacity: 0, x: isRTL ? 50 : -50 }} 
         animate={{ opacity: 1, x: 0 }} 
-        transition={{ duration: 0.5, ease: "easeOut" }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
         className="flex-1 space-y-8"
       >
-        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-mono tracking-widest ${
+        {/* شارة حالة النظام */}
+        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-[10px] font-black tracking-[0.2em] uppercase ${
           isDark 
             ? 'border-cyan-500/30 bg-cyan-950/20 text-cyan-400' 
-            : 'border-blue-400/50 bg-blue-50 text-blue-600 shadow-sm'
+            : 'border-emerald-200 bg-emerald-50 text-emerald-600 shadow-sm'
         }`}>
-            <span className={`w-2 h-2 rounded-full animate-pulse ${isDark ? 'bg-cyan-400' : 'bg-blue-500'}`}></span> 
+            <span className={`w-2 h-2 rounded-full animate-pulse ${isDark ? 'bg-cyan-400 shadow-[0_0_8px_#06b6d4]' : 'bg-emerald-500'}`}></span> 
             {t('hero_status')}
         </div>
         
-        <div>
-            <h1 className={`text-4xl md:text-6xl lg:text-7xl font-black leading-tight mb-2 ${
-              isDark ? 'text-white' : 'text-slate-800'
+        <div className={isRTL ? "text-right" : "text-left"}>
+            <h1 className={`text-5xl md:text-7xl font-black leading-tight mb-4 tracking-tighter ${
+              isDark ? 'text-white' : 'text-zinc-900'
             }`}>
                 {t('hero_welcome')} <br/>
-                <span className={`text-transparent bg-clip-text ${
+                <span className={`text-transparent bg-clip-text drop-shadow-sm ${
                   isDark 
                     ? 'bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500' 
-                    : 'bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600'
+                    : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-emerald-600'
                 }`}>
                     <DecryptText text={userName} />
                 </span>
             </h1>
             
-            <div className={`font-mono text-sm md:text-base border-l-2 pl-4 mt-4 ${
+            <div className={`font-mono text-sm md:text-base border-l-4 pl-6 mt-6 py-2 ${
               isDark 
-                ? 'text-white/40 border-purple-500' 
-                : 'text-slate-500 border-blue-400'
+                ? 'text-white/40 border-purple-500/50 bg-white/[0.02]' 
+                : 'text-zinc-500 border-indigo-400 bg-black/[0.02]'
             }`}>
-                <p>{t('hero_line1')}</p>
+                <p className="mb-1">{t('hero_line1')}</p>
                 <p>{t('hero_line2')}</p>
             </div>
         </div>
 
-        {!isDark && (
-          <motion.div 
+        {/* كروت الإحصائيات الصغيرة */}
+        <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="flex gap-4 mt-6"
-          >
-            <div className="px-4 py-3 bg-white/80 backdrop-blur-sm rounded-xl border border-blue-200 shadow-sm">
-              <div className="text-2xl font-black text-blue-600">1000+</div>
-              <div className="text-xs text-slate-500 font-medium">{t('hero_stat_words')}</div>
-            </div>
-            <div className="px-4 py-3 bg-white/80 backdrop-blur-sm rounded-xl border border-purple-200 shadow-sm">
-              <div className="text-2xl font-black text-purple-600">4</div>
-              <div className="text-xs text-slate-500 font-medium">{t('hero_stat_games')}</div>
-            </div>
-            <div className="px-4 py-3 bg-white/80 backdrop-blur-sm rounded-xl border border-indigo-200 shadow-sm">
-              <div className="text-2xl font-black text-indigo-600">∞</div>
-              <div className="text-xs text-slate-500 font-medium">{t('hero_stat_practice')}</div>
-            </div>
-          </motion.div>
-        )}
+            transition={{ delay: 0.5 }}
+            className="flex flex-wrap gap-4 mt-10"
+        >
+            <StatPill value="1400+" label={t('hero_stat_words')} color="text-cyan-500" isDark={isDark} />
+            <StatPill value="4" label={t('hero_stat_games')} color="text-purple-500" isDark={isDark} />
+            <StatPill value="∞" label={t('hero_stat_practice')} color="text-emerald-500" isDark={isDark} />
+        </motion.div>
       </motion.div>
 
+      {/* القسم الأيمن: أزرار العمليات الكبيرة */}
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }} 
         animate={{ opacity: 1, scale: 1 }} 
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="flex-1 flex flex-col items-center justify-center gap-8 relative"
+        transition={{ duration: 0.8, delay: 0.3 }}
+        className="flex-1 flex flex-col items-center justify-center gap-10 relative"
       >
-        <MagneticButton onClick={onStart} className="group relative w-56 h-56 md:w-64 md:h-64 flex items-center justify-center focus:outline-none">
-            <div className={`absolute inset-0 rounded-full border-2 border-dashed animate-[spin_10s_linear_infinite] ${
-              isDark ? 'border-cyan-500/30' : 'border-blue-400/40'
+        {/* زر بدء المهمة (المغناطيسي) */}
+        <MagneticButton 
+            onClick={onStart} 
+            className="group relative w-64 h-64 md:w-72 md:h-72 flex items-center justify-center focus:outline-none"
+        >
+            <div className={`absolute inset-0 rounded-full border-2 border-dashed animate-[spin_15s_linear_infinite] ${
+              isDark ? 'border-cyan-500/20' : 'border-indigo-400/30'
             }`}></div>
-            <div className={`w-44 h-44 md:w-48 md:h-48 rounded-full border flex flex-col items-center justify-center z-10 relative overflow-hidden ${
+            
+            <div className={`w-52 h-52 md:w-56 md:h-56 rounded-full border flex flex-col items-center justify-center z-10 relative overflow-hidden transition-transform group-hover:scale-105 ${
               isDark 
-                ? 'bg-gradient-to-br from-[#0a0a0a] to-[#1a1a1a] border-white/5 shadow-[0_0_50px_rgba(6,182,212,0.2)]' 
-                : 'bg-gradient-to-br from-white to-blue-50 border-blue-200 shadow-[0_10px_40px_rgba(59,130,246,0.2)]'
+                ? 'bg-gradient-to-br from-[#0a0a0a] to-[#121212] border-white/10 shadow-[0_0_60px_rgba(6,182,212,0.15)]' 
+                : 'bg-white border-zinc-200 shadow-[0_20px_50px_rgba(0,0,0,0.1)]'
             }`}>
                 <BorderBeam 
-                  size={200} 
-                  duration={8} 
-                  colorFrom={isDark ? "#00f2ff" : "#3b82f6"} 
-                  colorTo={isDark ? "#7000ff" : "#8b5cf6"} 
+                  size={250} 
+                  duration={10} 
+                  colorFrom={isDark ? "#06b6d4" : "#4f46e5"} 
+                  colorTo={isDark ? "#a855f7" : "#10b981"} 
                 />
-                <IconRocket size={48} className={isDark ? 'text-white mb-2' : 'text-blue-600 mb-2'} />
-                <span className={`text-xl md:text-2xl font-black tracking-[0.2em] ${
-                  isDark ? 'text-white' : 'text-slate-700'
-                }`}>{t('btn_start')}</span>
+                <IconRocket size={56} className={isDark ? 'text-white mb-4' : 'text-indigo-600 mb-4'} />
+                <span className={`text-xl md:text-2xl font-black tracking-[0.2em] uppercase ${
+                  isDark ? 'text-white' : 'text-zinc-800'
+                }`}>
+                    {t('btn_start')}
+                </span>
             </div>
         </MagneticButton>
 
+        {/* زر التسلل العصبي */}
         <MagneticButton 
           onClick={onOpenGame} 
-          className={`relative group w-full max-w-sm overflow-hidden rounded-xl border px-6 py-4 transition-all ${
+          className={`relative group w-full max-w-sm overflow-hidden rounded-[1.5rem] border p-6 transition-all active:scale-95 ${
             isDark 
-              ? 'border-red-500/30 bg-red-950/10 hover:bg-red-950/30 hover:border-red-500' 
-              : 'border-orange-300 bg-gradient-to-r from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 hover:border-orange-400 shadow-sm'
+              ? 'border-red-500/30 bg-red-950/10 hover:bg-red-950/20 hover:border-red-500' 
+              : 'border-orange-200 bg-orange-50 hover:bg-orange-100 hover:border-orange-400 shadow-sm'
           }`}
         >
             <BorderBeam 
-              size={150} 
-              duration={5} 
-              colorFrom={isDark ? "#ff0000" : "#f97316"} 
-              colorTo={isDark ? "#ff5555" : "#ef4444"} 
+              size={180} 
+              duration={6} 
+              colorFrom={isDark ? "#ef4444" : "#f97316"} 
+              colorTo={isDark ? "#dc2626" : "#ea580c"} 
             />
             <div className="relative z-10 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <IconTerminal size={24} className={isDark ? 'text-red-500' : 'text-orange-600'}/>
-                    <div className={`text-${dir === 'rtl' ? 'right' : 'left'}`}>
-                        <div className={`text-sm font-bold tracking-widest ${
-                          isDark ? 'text-red-500' : 'text-orange-700'
+                <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-xl ${isDark ? 'bg-red-500/20' : 'bg-white shadow-sm'}`}>
+                        <IconTerminal size={28} className={isDark ? 'text-red-500' : 'text-orange-600'}/>
+                    </div>
+                    <div className={isRTL ? "text-right" : "text-left"}>
+                        <div className={`text-sm font-black tracking-widest uppercase ${
+                          isDark ? 'text-red-500' : 'text-orange-800'
                         }`}>{t('btn_hacking')}</div>
-                        <div className={`text-[10px] font-mono ${
-                          isDark ? 'text-red-400/50' : 'text-orange-500/70'
+                        <div className={`text-[10px] font-mono font-bold mt-1 opacity-60 ${
+                          isDark ? 'text-red-400' : 'text-orange-600'
                         }`}>{t('hacking_sub')}</div>
                     </div>
                 </div>
-                <IconSparkles className={isDark ? 'text-red-500/20' : 'text-orange-400/40'} size={32} />
+                <IconSparkles className={isDark ? 'text-red-500/20' : 'text-orange-400/30'} size={32} />
             </div>
         </MagneticButton>
       </motion.div>
     </div>
   );
+}
+
+/**
+ * مكون فرعي للإحصائيات (Stat Pill)
+ */
+function StatPill({ value, label, color, isDark }) {
+    return (
+        <div className={`px-5 py-3 rounded-2xl border backdrop-blur-md flex items-center gap-3 transition-all hover:-translate-y-1 ${
+            isDark ? 'bg-white/[0.03] border-white/10' : 'bg-black/[0.02] border-black/5 shadow-sm'
+        }`}>
+            <IconActivity size={16} className={color} />
+            <div>
+                <div className={`text-lg font-black leading-none ${isDark ? 'text-white' : 'text-zinc-900'}`}>{value}</div>
+                <div className="text-[9px] font-black uppercase tracking-wider opacity-40 mt-1">{label}</div>
+            </div>
+        </div>
+    );
 }
