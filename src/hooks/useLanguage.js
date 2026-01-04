@@ -3,24 +3,24 @@ import { useSettings } from "@/context/SettingsContext";
 import { translations } from "@/data/translations";
 
 export const useLanguage = () => {
-  const { settings } = useSettings();
+  const { settings, mounted } = useSettings();
   
-  // صمام أمان: التأكد من وجود قيمة للغة، وإذا كانت غير موجودة في القاموس نستخدم 'ar'
-  const lang = settings?.systemLanguage || 'ar';
+  // حل مشكلة الانهيار: نستخدم اللغة من الإعدادات أو "العربية" كقيمة افتراضية صلبة
+  const lang = (mounted && settings?.systemLanguage) ? settings.systemLanguage : 'ar';
   
-  // الحصول على مجموعة الترجمة بأمان
-  const translationSet = translations[lang] || translations['ar'] || {};
-
-  // دالة الترجمة مع حماية ضد المفاتيح المفقودة
   const t = (key) => {
-    if (!translationSet[key]) {
-      // إذا كان المفتاح مفقوداً في اللغة الحالية، جربه في العربية، وإذا لم يوجد أرجع المفتاح نفسه
-      return translations['ar'][key] || key;
+    // التأكد من أن القاموس موجود للغة المحددة، وإلا العودة للعربية
+    const dictionary = translations[lang] || translations['ar'];
+    
+    // إذا لم يجد المفتاح، يعيد المفتاح نفسه بدلاً من undefined
+    if (!dictionary[key]) {
+      // محاولة البحث في الإنجليزية كحل أخير قبل إظهار الكود
+      return translations['en'][key] || key;
     }
-    return translationSet[key];
+    
+    return dictionary[key];
   };
 
-  // اتجاه النص (عربي = يمين، الباقي = يسار)
   const dir = lang === 'ar' ? 'rtl' : 'ltr';
   const isRTL = lang === 'ar';
 
