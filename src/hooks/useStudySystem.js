@@ -9,14 +9,13 @@ import {
 import { useUI } from './useUI';
 import { useAuth } from './useAuth';
 
-// إصدار النظام
-const SYSTEM_PATCH_VERSION = "5.1.0-FIX-DEFAULTS";
+// قمنا بتحديث رقم الإصدار لتطبيق الإصلاح فوراً
+const SYSTEM_PATCH_VERSION = "5.2.1-AUTH-FIX";
 
 export const useStudySystem = (firebaseUser) => {
   const { activeCategory } = useUI();
   const { userData, isTeacher, isStudent, isUser, isAdmin } = useAuth();
   
-  // --- الحالات الأساسية ---
   const [cards, setCards] = useState([]); 
   const [stats, setStats] = useState({ xp: 0, streak: 0 });
   const [currentCard, setCurrentCard] = useState(null);
@@ -26,11 +25,35 @@ export const useStudySystem = (firebaseUser) => {
   const [progressMap, setProgressMap] = useState({});
 
   /**
-   * 1. دمج المحتوى مع التقدم
+   * 1. إصلاح مشكلة الكاش (The Fix)
+   * هذا الكود ينظف الذاكرة القديمة دون تخريب تسجيل الدخول
    */
   useEffect(() => {
-    // إذا لم يكن هناك محتوى خام، نعيد مصفوفة فارغة
-    // ملاحظة: للأدمن واليوزر، rawContent سيحتوي على fullDatabase كحد أدنى
+    if (typeof window === 'undefined') return;
+    
+    const savedVersion = localStorage.getItem('RM_SYSTEM_VERSION');
+    
+    if (savedVersion !== SYSTEM_PATCH_VERSION) {
+      console.warn("System Update: Smart Cache Cleaning...");
+      
+      // نمر على كل المفاتيح في التخزين المحلي
+      Object.keys(localStorage).forEach((key) => {
+        // شرط هام: لا تحذف مفاتيح Firebase (Auth) ولا إعدادات الثيم
+        if (!key.startsWith('firebase:') && key !== 'russian_master_config_v4') {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      localStorage.setItem('RM_SYSTEM_VERSION', SYSTEM_PATCH_VERSION);
+      // إعادة تحميل الصفحة لمرة واحدة لتطبيق التنظيف
+      window.location.reload();
+    }
+  }, []);
+
+  /**
+   * 2. دمج المحتوى مع التقدم
+   */
+  useEffect(() => {
     if (!rawContent.length) {
         setCards([]);
         return;
@@ -43,15 +66,15 @@ export const useStudySystem = (firebaseUser) => {
 
     setCards(merged);
     
-    // محاولة اختيار بطاقة فقط إذا لم تكن هناك بطاقة محددة
-    setTimeout(() => {
+    const timer = setTimeout(() => {
         setCurrentCard(prev => prev || pickCardInternal(merged, activeCategory));
-    }, 0);
+    }, 100);
     
+    return () => clearTimeout(timer);
   }, [rawContent, progressMap, activeCategory]);
 
   /**
-   * 2. جلب المحتوى (Source of Truth) - التعديل الجوهري هنا
+   * 3. جلب المحتوى (Source of Truth)
    */
   useEffect(() => {
     if (!firebaseUser || !userData) {
@@ -62,7 +85,7 @@ export const useStudySystem = (firebaseUser) => {
     setLoading(true);
     let unsubContent = () => {};
 
-    // أ. الأستاذ: يرى فقط ما أنشأه
+    // أ. الأستاذ
     if (isTeacher) {
         const q = collection(db, "users", firebaseUser.uid, "content");
         unsubContent = onSnapshot(q, (snap) => {
@@ -71,7 +94,7 @@ export const useStudySystem = (firebaseUser) => {
             setLoading(false);
         });
     }
-    // ب. الطالب: يرى محتوى أستاذه فقط
+    // ب. الطالب
     else if (isStudent) {
         if (userData.teacherId) {
             const q = collection(db, "users", userData.teacherId, "content");
@@ -85,22 +108,15 @@ export const useStudySystem = (firebaseUser) => {
             setLoading(false);
         }
     }
-    // ج. المستخدم العادي / الأدمن: يرى الافتراضي + الشخصي
+    // ج. المستخدم العادي / الأدمن
     else {
-        // خطوة 1: تعيين البيانات الافتراضية فوراً لضمان عدم ظهور الشاشة فارغة
-        setRawContent(fullDatabase);
-
-        // خطوة 2: الاستماع للبيانات الإضافية الخاصة ودمجها
+        setRawContent(fullDatabase); // تحميل فوري للافتراضي
+        
         const q = collection(db, "users", firebaseUser.uid, "content");
         unsubContent = onSnapshot(q, (snap) => {
             const personalContent = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            
-            // دمج الافتراضي مع الشخصي (الشخصي يكتب فوق الافتراضي إذا تشابهت المعرفات)
-            // نستخدم Map لضمان عدم تكرار العناصر
             const combined = [...fullDatabase, ...personalContent];
-            // في حال أردنا إزالة التكرار بناءً على ID (اختياري، لكن جيد للأداء)
             const uniqueMap = new Map(combined.map(item => [item.id, item]));
-            
             setRawContent(Array.from(uniqueMap.values()));
             setLoading(false);
         });
@@ -110,7 +126,7 @@ export const useStudySystem = (firebaseUser) => {
   }, [firebaseUser, userData, isTeacher, isStudent]);
 
   /**
-   * 3. جلب تقدم المستخدم
+   * 4. جلب تقدم المستخدم
    */
   useEffect(() => {
     if (!firebaseUser) return;
@@ -136,7 +152,7 @@ export const useStudySystem = (firebaseUser) => {
     };
   }, [firebaseUser]);
 
-  // دالة مساعدة لاختيار البطاقة (خارج الـ Hook لتستخدم داخل useEffect أيضا)
+  // دالة مساعدة لاختيار البطاقة
   const pickCardInternal = (list, category, excludeId = null) => {
       if (!list || list.length === 0) return null;
       const now = Date.now();
@@ -151,17 +167,11 @@ export const useStudySystem = (firebaseUser) => {
       return null;
   };
 
-  /**
-   * 4. خوارزمية اختيار الكارت
-   */
   const pickNextCard = useCallback((currentList, excludeId = null) => {
     const next = pickCardInternal(currentList, activeCategory, excludeId);
     setCurrentCard(next);
   }, [activeCategory]);
 
-  /**
-   * 5. معالجة السحب
-   */
   const handleSwipe = useCallback(async (direction) => {
     if (!currentCard || !firebaseUser) return;
     
@@ -177,7 +187,6 @@ export const useStudySystem = (firebaseUser) => {
     const newCards = cards.map(c => c.id === currentCard.id ? updatedCard : c);
     setCards(newCards);
     
-    // اختيار التالي فوراً
     pickNextCard(newCards, currentCard.id);
 
     try {
@@ -219,9 +228,7 @@ export const useStudySystem = (firebaseUser) => {
     if (isStudent) return; 
     if (firebaseUser) {
         try {
-            // محاولة الحذف من البيانات الشخصية
             await deleteDoc(doc(db, "users", firebaseUser.uid, "content", String(cardId)));
-            // ملاحظة: لا يمكن حذف البيانات الافتراضية لأنها hardcoded في الملف، ولكن هذا سيحذفها من العرض إذا كانت مضافة
         } catch (e) { console.error(e); }
     }
   }, [firebaseUser, isStudent]);
@@ -230,7 +237,6 @@ export const useStudySystem = (firebaseUser) => {
     if (isStudent) return;
     if (firebaseUser) {
         try {
-            // إذا كانت الكلمة أصلية (من fullDatabase)، سنقوم بإنشاء نسخة معدلة منها في الـ content الخاص بالمستخدم
             await setDoc(doc(db, "users", firebaseUser.uid, "content", String(cardId)), newData, { merge: true });
         } catch (e) { console.error(e); }
     }

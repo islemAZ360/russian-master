@@ -7,7 +7,7 @@ import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/fi
 import { motion, AnimatePresence } from 'framer-motion'; 
 import { 
   IconBell, IconX, IconUserPlus, IconAward, 
-  IconMessageCircle, IconShieldAlert, IconCheck, IconLoader
+  IconMessageCircle, IconShieldAlert, IconCheck, IconLoader2 
 } from '@tabler/icons-react';
 import { useLanguage } from '@/hooks/useLanguage';
 
@@ -18,26 +18,13 @@ export default function NotificationCenter() {
   const [processingId, setProcessingId] = useState(null);
   const { t, dir } = useLanguage();
 
-  // === FIX 1: حماية ضد البيانات غير المعرفة ===
-  // نضمن أن المتغير دائماً مصفوفة حتى لو كانت البيانات لم تحمل بعد
+  // FIX: التأكد من أن الإشعارات مصفوفة دائماً
   const safeNotifications = Array.isArray(notifications) ? notifications : [];
-
-  // === FIX 2: دالة آمنة لتنسيق الوقت ===
-  // هذه الدالة تمنع الانهيار إذا كان التاريخ null (يحدث لحظة الإنشاء)
-  const formatTime = (timestamp) => {
-      if (!timestamp) return "Processing..."; 
-      if (timestamp.toDate) {
-          try {
-              return new Date(timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-          } catch (e) { return "Now"; }
-      }
-      return "Now";
-  };
 
   const handleAcceptInvite = async (notification) => {
     if (!user || !notification.actionPayload) return;
     
-    setProcessingId(notification.id); // تفعيل مؤشر التحميل
+    setProcessingId(notification.id);
 
     try {
         const { teacherId, newRole } = notification.actionPayload;
@@ -45,14 +32,15 @@ export default function NotificationCenter() {
         // 1. تحديث بيانات المستخدم ليصبح طالباً
         const userRef = doc(db, "users", user.uid);
         await updateDoc(userRef, {
-            role: newRole,      // student
+            role: newRole,
             teacherId: teacherId,
             updatedAt: serverTimestamp()
         });
 
-        // 2. إرسال إشعار للأستاذ
+        // 2. إشعار الأستاذ
         await addDoc(collection(db, "notifications"), {
-            userId: teacherId, // إشعار موجه للأستاذ
+            userId: teacherId,
+            target: 'teacher',
             type: "info",
             title: "RECRUITMENT SUCCESSFUL",
             message: `${user.displayName || "Agent"} has joined your squad.`,
@@ -63,12 +51,11 @@ export default function NotificationCenter() {
         // 3. حذف الدعوة
         await removeNotification(notification.id);
 
-        // 4. إعادة تحميل الصفحة لتطبيق الواجهة الجديدة
+        // 4. إعادة تحميل الصفحة
         window.location.reload();
 
     } catch (error) {
         console.error("Invite Error:", error);
-        alert("System Error: Could not process uplink.");
         setProcessingId(null);
     }
   };
@@ -79,7 +66,6 @@ export default function NotificationCenter() {
   };
 
   const handleNavigation = (n) => {
-    // الدعوات لا تقوم بالتوجيه، بل تتطلب ضغط زر القبول/الرفض
     if (n.type === 'invite') return;
 
     if (n.type === 'support_reply') setShowSupport(true);
@@ -92,17 +78,28 @@ export default function NotificationCenter() {
 
   const getNotifTitle = (type) => {
     const map = {
-      'invite': t('notif_type_invite'),
-      'rank': t('notif_type_rank'),
-      'support_reply': t('notif_type_support'),
-      'admin_alert': t('notif_type_admin')
+      'invite': t('notif_type_invite') || "INVITATION",
+      'rank': t('notif_type_rank') || "PROMOTION",
+      'support_reply': t('notif_type_support') || "SUPPORT",
+      'admin_alert': t('notif_type_admin') || "ALERT",
+      'info': "SYSTEM INFO"
     };
     return map[type] || "SYSTEM ALERT";
   };
 
+  // FIX: دالة آمنة لتنسيق الوقت لمنع الانهيار
+  const formatTime = (timestamp) => {
+      if (!timestamp) return "Processing..."; 
+      if (timestamp?.toDate) {
+          try {
+              return new Date(timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+          } catch (e) { return "Now"; }
+      }
+      return "Now";
+  };
+
   return (
     <div className={`fixed top-6 ${dir === 'rtl' ? 'left-6' : 'right-6'} z-[9999]`} dir={dir}>
-      {/* زر الجرس */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className={`p-3 rounded-2xl border transition-all duration-300 shadow-2xl group relative
@@ -120,7 +117,6 @@ export default function NotificationCenter() {
         )}
       </button>
 
-      {/* القائمة المنسدلة */}
       <AnimatePresence>
         {isOpen && (
             <motion.div 
@@ -133,7 +129,7 @@ export default function NotificationCenter() {
                 <div className="p-5 bg-white/5 border-b border-white/10 flex justify-between items-center">
                     <div className="flex items-center gap-2">
                         <span className="w-2 h-2 bg-cyan-500 rounded-full"></span>
-                        <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">{t('notif_title')}</span>
+                        <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">{t('notif_title') || "NOTIFICATIONS"}</span>
                     </div>
                     <button onClick={()=>setIsOpen(false)} className="p-1 hover:bg-white/10 rounded-lg text-white/20 hover:text-white transition-colors">
                         <IconX size={18}/>
@@ -145,7 +141,7 @@ export default function NotificationCenter() {
                         <div className="p-16 text-center">
                             <IconBell size={48} className="mx-auto mb-4 text-white/5" />
                             <p className="text-[10px] font-black text-white/20 uppercase tracking-widest leading-relaxed">
-                                {t('notif_empty')}
+                                {t('notif_empty') || "NO NEW SIGNALS"}
                             </p>
                         </div>
                     ) : (
@@ -156,10 +152,11 @@ export default function NotificationCenter() {
                                 className={`p-5 border-b border-white/5 flex gap-4 items-start group transition-all relative overflow-hidden ${n.type !== 'invite' ? 'cursor-pointer hover:bg-white/5' : ''}`}
                             >
                                 <div className="mt-1 shrink-0 p-2.5 rounded-xl bg-white/5 border border-white/10 text-cyan-400">
-                                    {n.type === 'invite' && <IconUserPlus size={20}/>}
-                                    {n.type === 'rank' && <IconAward size={20}/>}
-                                    {n.type === 'support_reply' && <IconMessageCircle size={20}/>}
-                                    {n.type === 'admin_alert' && <IconShieldAlert size={20}/>}
+                                    {n.type === 'invite' ? <IconUserPlus size={20}/> :
+                                     n.type === 'rank' ? <IconAward size={20}/> :
+                                     n.type === 'support_reply' ? <IconMessageCircle size={20}/> :
+                                     n.type === 'admin_alert' ? <IconShieldAlert size={20}/> :
+                                     <IconBell size={20}/>}
                                 </div>
 
                                 <div className="flex-1 min-w-0">
@@ -167,7 +164,6 @@ export default function NotificationCenter() {
                                         <h4 className="text-xs font-black text-white uppercase tracking-tight truncate">
                                             {getNotifTitle(n.type)}
                                         </h4>
-                                        {/* استخدام الدالة الآمنة للوقت */}
                                         <span className="text-[8px] font-mono text-white/20 uppercase">
                                             {formatTime(n.createdAt)}
                                         </span>
@@ -177,7 +173,6 @@ export default function NotificationCenter() {
                                         {n.message}
                                     </p>
                                     
-                                    {/* أزرار الدعوة الخاصة */}
                                     {n.type === 'invite' && (
                                         <div className="flex gap-2 mt-2">
                                             <button 
@@ -185,7 +180,7 @@ export default function NotificationCenter() {
                                                 disabled={processingId === n.id}
                                                 className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg transition-all"
                                             >
-                                                {processingId === n.id ? <IconLoader className="animate-spin" size={12}/> : <IconCheck size={12}/>}
+                                                {processingId === n.id ? <IconLoader2 className="animate-spin" size={12}/> : <IconCheck size={12}/>}
                                                 ACCEPT
                                             </button>
                                             <button 

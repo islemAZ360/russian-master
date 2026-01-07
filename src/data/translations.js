@@ -13,6 +13,14 @@ export const translations = {
     nav_settings: "الإعدادات",
     nav_admin: "تحكم",
     nav_support: "الدعم",
+    
+    // --- روابط الأستاذ والطالب (New) ---
+    nav_create_db: "إدارة المحتوى",
+    nav_students: "إدارة الطلاب",
+    nav_test_cards: "اختبار المحتوى",
+    nav_progress: "متابعة التقدم",
+    nav_data: "بنك المعلومات",
+    nav_rewards: "الجوائز والأوسمة",
 
     // --- واجهة الدخول والتسجيل (Auth System) ---
     auth_welcome: "مرحباً بك في الواجهة",
@@ -80,7 +88,7 @@ export const translations = {
     // --- أرشيف البيانات (Archive & Data Manager) ---
     archive_header: "الأرشيف العصبي المركز",
     archive_items: "سجل",
-    archive_search_placeholder: "البحث في قاعدة البيانات المركزية...",
+    archive_search_placeholder: "البحث في قاعدة البيانات...",
     archive_add_btn: "إضافة سجل",
     archive_load_more: "تحميل المزيد من السجلات",
     archive_manage_groups: "إدارة المجموعات",
@@ -112,10 +120,10 @@ export const translations = {
     notif_title: "مركز التنبيهات",
     notif_empty: "لا توجد إشارات جديدة",
     notif_now: "الآن",
-    notif_type_invite: "دعوة انضمام",
+    notif_type_invite: "دعوة انضمام للفصل",
     notif_type_rank: "ترقية عسكرية",
     notif_type_support: "رد من الدعم",
-    notif_type_admin: "تنبيه من القيادة",
+    notif_type_admin: "تنبيه إداري",
 
     // --- الرتب والإنجازات (Ranks) ---
     rank_recruit: "مجند",
@@ -203,7 +211,8 @@ export const translations = {
     theme_auto: "مزامنة تلقائية",
     logout_btn: "إنهاء الجلسة الأمنية",
     alert_saved: "تم تحديث الهوية بنجاح",
-    alert_error: "فشل في تحديث البيانات"
+    alert_error: "فشل في تحديث البيانات",
+    support_placeholder: "اكتب رسالتك للدعم الفني..."
   },
   
   en: {
@@ -217,6 +226,14 @@ export const translations = {
     nav_settings: "Config",
     nav_admin: "Control",
     nav_support: "Support",
+    
+    // New Role Links
+    nav_create_db: "Content DB",
+    nav_students: "Students",
+    nav_test_cards: "Test Mode",
+    nav_progress: "Progress",
+    nav_data: "Knowledge Base",
+    nav_rewards: "Achievements",
 
     auth_welcome: "Welcome to Interface",
     auth_step_name: "Identification",
@@ -308,7 +325,7 @@ export const translations = {
     notif_title: "NOTIFICATION CENTER",
     notif_empty: "NO NEW SIGNALS",
     notif_now: "NOW",
-    notif_type_invite: "SQUAD INVITE",
+    notif_type_invite: "CLASS INVITATION",
     notif_type_rank: "RANK PROMOTION",
     notif_type_support: "SUPPORT REPLY",
     notif_type_admin: "ADMIN ALERT",
@@ -393,7 +410,8 @@ export const translations = {
     theme_auto: "AUTO SYNC",
     logout_btn: "TERMINATE SESSION",
     alert_saved: "UPDATED",
-    alert_error: "FAILED"
+    alert_error: "FAILED",
+    support_placeholder: "Enter support request..."
   },
 
   ru: {
@@ -407,6 +425,14 @@ export const translations = {
     nav_settings: "Настр.",
     nav_admin: "Контроль",
     nav_support: "Помощь",
+    
+    // New Role Links
+    nav_create_db: "Контент",
+    nav_students: "Студенты",
+    nav_test_cards: "Тест",
+    nav_progress: "Прогресс",
+    nav_data: "База Знаний",
+    nav_rewards: "Награды",
 
     auth_welcome: "Добро пожаловать",
     auth_step_name: "Личность",
@@ -580,6 +606,7 @@ export const translations = {
     theme_auto: "АВТО",
     logout_btn: "ВЫХОД",
     alert_saved: "СОХРАНЕНО",
-    alert_error: "ОШИБКА"
+    alert_error: "ОШИБКА",
+    support_placeholder: "Ваше сообщение..."
   }
 };

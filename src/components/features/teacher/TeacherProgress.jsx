@@ -17,11 +17,11 @@ export default function TeacherProgress() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // جلب بيانات الطلاب في الوقت الفعلي
+  // 1. جلب بيانات الطلاب التابعين للأستاذ
   useEffect(() => {
     if (!user) return;
 
-    // استعلام لجلب الطلاب التابعين للأستاذ مرتبين حسب آخر ظهور
+    // جلب الطلاب وترتيبهم حسب آخر ظهور (الأحدث أولاً)
     const q = query(
       collection(db, "users"),
       where("teacherId", "==", user.uid),
@@ -37,22 +37,22 @@ export default function TeacherProgress() {
     return () => unsub();
   }, [user]);
 
-  // حساب الإحصائيات العامة للفصل
+  // 2. حساب الإحصائيات العامة للفصل
   const classStats = useMemo(() => {
     const total = students.length;
     if (total === 0) return { avgXp: 0, activeToday: 0, topStudent: null };
 
     const totalXp = students.reduce((acc, s) => acc + (s.xp || 0), 0);
     
-    // حساب النشطين اليوم (آخر ظهور خلال 24 ساعة)
+    // حساب عدد الطلاب النشطين اليوم (خلال آخر 24 ساعة)
     const now = new Date();
     const activeToday = students.filter(s => {
         if (!s.lastLogin) return false;
         const last = s.lastLogin.toDate();
-        return (now - last) < 86400000; // 24 ساعة بالميلي ثانية
+        return (now - last) < 86400000; // 24 ساعة
     }).length;
 
-    // الطالب الأفضل
+    // تحديد الطالب الأفضل (الأكثر XP)
     const topStudent = [...students].sort((a, b) => (b.xp || 0) - (a.xp || 0))[0];
 
     return {
@@ -62,7 +62,7 @@ export default function TeacherProgress() {
     };
   }, [students]);
 
-  // دالة تنسيق التاريخ
+  // دالة مساعدة لتنسيق الوقت (منذ متى)
   const formatLastSeen = (timestamp) => {
       if (!timestamp) return "Never";
       const date = timestamp.toDate();
@@ -78,19 +78,20 @@ export default function TeacherProgress() {
   return (
     <div className="w-full h-full flex flex-col p-6 md:p-10 font-sans pb-32" dir={dir}>
         
-        {/* Header & Class Stats */}
+        {/* Header Section */}
         <div className="mb-10">
             <div className="flex items-center gap-3 text-yellow-500 mb-2">
                 <IconChartBar size={32} />
                 <span className="text-[10px] font-black uppercase tracking-[0.3em]">Performance_Analytics</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter mb-8">
-                Class Progress
+                {t('nav_progress') || "Class Progress"}
             </h1>
 
             {/* بطاقات الإحصائيات العلوية */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* 1. Average Level */}
+                
+                {/* 1. Average Level Card */}
                 <div className="bg-[#0a0a0a] border border-white/10 p-6 rounded-3xl relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-4 opacity-10 text-cyan-500"><IconActivity size={64}/></div>
                     <div className="text-[10px] text-white/40 uppercase tracking-widest font-black mb-2">AVG. CLASS LEVEL</div>
@@ -100,13 +101,14 @@ export default function TeacherProgress() {
                     <div className="text-xs text-cyan-500 mt-1 font-bold">{classStats.avgXp} XP Avg</div>
                 </div>
 
-                {/* 2. Active Duty */}
+                {/* 2. Active Duty Card */}
                 <div className="bg-[#0a0a0a] border border-white/10 p-6 rounded-3xl relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-4 opacity-10 text-emerald-500"><IconClock size={64}/></div>
                     <div className="text-[10px] text-white/40 uppercase tracking-widest font-black mb-2">ACTIVE TODAY</div>
                     <div className="text-4xl font-black text-white font-mono">
                         {classStats.activeToday} <span className="text-lg text-white/20">/ {students.length}</span>
                     </div>
+                    {/* شريط نسبة الحضور */}
                     <div className="w-full bg-white/10 h-1.5 mt-3 rounded-full overflow-hidden">
                         <div 
                             className="h-full bg-emerald-500 transition-all duration-1000" 
@@ -115,7 +117,7 @@ export default function TeacherProgress() {
                     </div>
                 </div>
 
-                {/* 3. Top Operative */}
+                {/* 3. Top Student Card */}
                 <div className="bg-[#0a0a0a] border border-white/10 p-6 rounded-3xl relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-4 opacity-10 text-yellow-500"><IconTrophy size={64}/></div>
                     <div className="text-[10px] text-white/40 uppercase tracking-widest font-black mb-2">TOP OPERATIVE</div>
@@ -160,7 +162,7 @@ export default function TeacherProgress() {
                             const currentLevelBaseXp = (currentLevel - 1) * 500;
                             const progressPercent = Math.min(100, ((student.xp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100);
                             
-                            // التحقق من حالة الخطر (لم يدخل منذ أسبوع)
+                            // تنبيه إذا لم يدخل الطالب منذ أسبوع
                             const isInactive = student.lastLogin && (new Date() - student.lastLogin.toDate()) > 604800000;
 
                             return (

@@ -1,24 +1,15 @@
 "use client";
 import React from 'react';
 import SettingsView from './SettingsView';
-import { auth } from '../../lib/firebase';
+import { useAuth } from '@/context/AuthContext';
 
-// هذا المكون يجب أن يكون بسيطاً جداً
 export default function SettingsViewWrapper(props) {
-  
-  const handleLogout = async () => {
-    try {
-      await auth.signOut();
-      window.location.reload();
-    } catch (error) {
-      console.error("Logout failed", error);
-    }
-  };
+  const { logout } = useAuth();
 
   return (
     <SettingsView 
       {...props} 
-      onLogout={handleLogout} 
+      onLogout={logout} 
     />
   );
 }

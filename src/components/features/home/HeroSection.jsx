@@ -1,19 +1,43 @@
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
-import { IconRocket, IconTerminal, IconSparkles, IconActivity } from "@tabler/icons-react";
+import { IconRocket, IconTerminal, IconSparkles, IconActivity, IconSchool, IconShieldLock } from "@tabler/icons-react";
 import { BorderBeam } from "@/components/ui/BorderBeam";
 import { DecryptText } from "@/components/ui/DecryptText";
 import { MagneticButton } from "@/components/ui/MagneticButton";
 import { useSettings } from "@/context/SettingsContext";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useAuth } from "@/context/AuthContext"; // استدعاء هوك المصادقة
 
-export function HeroSection({ onStart, onOpenGame, user }) {
+export function HeroSection({ onStart, onOpenGame }) {
   const { isDark } = useSettings();
   const { t, dir, isRTL } = useLanguage();
+  const { user, userData, isTeacher, isStudent, isAdmin } = useAuth(); // جلب الرتب
+
+  // تحديد النصوص والأيقونات بناءً على الرتبة
+  let roleTitle = "OPERATIVE";
+  let mainActionText = t('btn_start');
+  let statusText = t('hero_status');
+  let RoleIcon = IconRocket;
+
+  if (isAdmin) {
+      roleTitle = "COMMANDER";
+      mainActionText = "SYSTEM CONTROL";
+      statusText = "SYSTEM: ROOT ACCESS";
+      RoleIcon = IconShieldLock;
+  } else if (isTeacher) {
+      roleTitle = "INSTRUCTOR";
+      mainActionText = "MANAGE CLASS";
+      statusText = "SYSTEM: CLASSROOM ACTIVE";
+      RoleIcon = IconSchool;
+  } else if (isStudent) {
+      roleTitle = "STUDENT";
+      mainActionText = "CONTINUE STUDY";
+      statusText = "SYSTEM: LEARNING MODE";
+  }
 
   // تحديد الاسم الذي سيظهر في التأثير المشفر
-  const userName = user?.displayName || user?.email?.split('@')[0]?.toUpperCase() || t('rank_recruit');
+  const userName = user?.displayName || user?.email?.split('@')[0]?.toUpperCase() || roleTitle;
 
   return (
     <div 
@@ -34,7 +58,7 @@ export function HeroSection({ onStart, onOpenGame, user }) {
             : 'border-emerald-200 bg-emerald-50 text-emerald-600 shadow-sm'
         }`}>
             <span className={`w-2 h-2 rounded-full animate-pulse ${isDark ? 'bg-cyan-400 shadow-[0_0_8px_#06b6d4]' : 'bg-emerald-500'}`}></span> 
-            {t('hero_status')}
+            {statusText}
         </div>
         
         <div className={isRTL ? "text-right" : "text-left"}>
@@ -68,9 +92,9 @@ export function HeroSection({ onStart, onOpenGame, user }) {
             transition={{ delay: 0.5 }}
             className="flex flex-wrap gap-4 mt-10"
         >
-            <StatPill value="1400+" label={t('hero_stat_words')} color="text-cyan-500" isDark={isDark} />
-            <StatPill value="4" label={t('hero_stat_games')} color="text-purple-500" isDark={isDark} />
-            <StatPill value="∞" label={t('hero_stat_practice')} color="text-emerald-500" isDark={isDark} />
+            <StatPill value={userData?.xp || 0} label={t('profile_exp')} color="text-cyan-500" isDark={isDark} />
+            <StatPill value={Math.floor((userData?.xp||0)/500)+1} label={t('profile_lvl')} color="text-purple-500" isDark={isDark} />
+            <StatPill value={userData?.streak || 0} label="STREAK" color="text-emerald-500" isDark={isDark} />
         </motion.div>
       </motion.div>
 
@@ -81,9 +105,23 @@ export function HeroSection({ onStart, onOpenGame, user }) {
         transition={{ duration: 0.8, delay: 0.3 }}
         className="flex-1 flex flex-col items-center justify-center gap-10 relative"
       >
-        {/* زر بدء المهمة (المغناطيسي) */}
+        {/* زر الإجراء الرئيسي (المغناطيسي) */}
         <MagneticButton 
-            onClick={onStart} 
+            onClick={() => {
+                // توجيه ذكي حسب الرتبة
+                if (isTeacher) {
+                    // الأستاذ يذهب لصفحة الطلاب أو المحتوى (هنا اخترنا المحتوى)
+                    // يمكنك تغييرها لـ onStart() التي توجه لـ category في page.js
+                    // ولكن بما أننا في ViewManager وجهنا الـ links، فزر الهيرو يفضل أن يذهب لأهم صفحة
+                    // سنستخدم onStart الافتراضي وسيعالج page.js التوجيه
+                    onStart(); 
+                } else if (isAdmin) {
+                    // الأدمن يذهب للوحة التحكم (عبر onOpenAdmin لو كانت ممررة، أو onStart)
+                    onStart(); // حالياً يذهب للدراسة، يمكن تعديله في page.js
+                } else {
+                    onStart(); // الطالب والمستخدم يذهبون للدراسة
+                }
+            }} 
             className="group relative w-64 h-64 md:w-72 md:h-72 flex items-center justify-center focus:outline-none"
         >
             <div className={`absolute inset-0 rounded-full border-2 border-dashed animate-[spin_15s_linear_infinite] ${
@@ -101,16 +139,16 @@ export function HeroSection({ onStart, onOpenGame, user }) {
                   colorFrom={isDark ? "#06b6d4" : "#4f46e5"} 
                   colorTo={isDark ? "#a855f7" : "#10b981"} 
                 />
-                <IconRocket size={56} className={isDark ? 'text-white mb-4' : 'text-indigo-600 mb-4'} />
-                <span className={`text-xl md:text-2xl font-black tracking-[0.2em] uppercase ${
+                <RoleIcon size={56} className={isDark ? 'text-white mb-4' : 'text-indigo-600 mb-4'} />
+                <span className={`text-xl md:text-2xl font-black tracking-[0.2em] uppercase text-center px-4 leading-none ${
                   isDark ? 'text-white' : 'text-zinc-800'
                 }`}>
-                    {t('btn_start')}
+                    {mainActionText}
                 </span>
             </div>
         </MagneticButton>
 
-        {/* زر التسلل العصبي */}
+        {/* زر التسلل العصبي (الألعاب) */}
         <MagneticButton 
           onClick={onOpenGame} 
           className={`relative group w-full max-w-sm overflow-hidden rounded-[1.5rem] border p-6 transition-all active:scale-95 ${

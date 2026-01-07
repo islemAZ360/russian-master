@@ -4,11 +4,11 @@ import { motion } from "framer-motion";
 import { 
   IconUser, IconTrophy, IconFlame, IconTarget, 
   IconActivity, IconLock, IconMedal, IconCrown, 
-  IconDna, IconChartRadar
+  IconDna, IconChartRadar, IconSchool, IconShieldCheck
 } from "@tabler/icons-react";
 import { useLanguage } from "@/hooks/useLanguage";
 
-// --- تكوين الرتب (Global Ranks Config) ---
+// --- تكوين الرتب بناءً على XP (للطلاب والمستخدمين) ---
 const RANKS_CONFIG = [
     { id: "recruit", min: 0, color: "text-zinc-400", bg: "bg-zinc-500", icon: <IconUser /> },
     { id: "soldier", min: 100, color: "text-emerald-400", bg: "bg-emerald-500", icon: <IconTarget /> },
@@ -19,14 +19,13 @@ const RANKS_CONFIG = [
     { id: "cybergod", min: 10000, color: "text-red-500", bg: "bg-red-500", icon: <IconFlame /> },
 ];
 
-// --- مكون مخطط الرادار (Skill Radar) ---
-const SkillRadar = ({ stats, t }) => {
+const SkillRadar = ({ stats, color }) => {
   const values = [
-    Math.min(100, (stats.totalCards / 200) * 100), // سعة الذاكرة
-    Math.min(100, (stats.streak / 30) * 100),      // الاستمرارية
-    Math.min(100, (stats.xp / 5000) * 100),        // مستوى الخبرة
-    Math.min(100, stats.masteryRate),              // معدل الإتقان
-    Math.min(100, stats.activityScore)             // النشاط
+    Math.min(100, (stats.totalCards / 200) * 100),
+    Math.min(100, (stats.streak / 30) * 100),
+    Math.min(100, (stats.xp / 5000) * 100),
+    Math.min(100, stats.masteryRate),
+    Math.min(100, stats.activityScore)
   ];
 
   const points = values.map((val, i) => {
@@ -50,13 +49,13 @@ const SkillRadar = ({ stats, t }) => {
           animate={{ opacity: 0.6, scale: 1 }}
           transition={{ duration: 1.5, ease: "circOut" }}
           points={points} 
-          fill="rgba(6, 182, 212, 0.2)" 
-          stroke="#06b6d4" 
+          fill={`${color}33`} // إضافة شفافية للون
+          stroke={color} 
           strokeWidth="2" 
         />
       </svg>
       <div className="absolute inset-0 pointer-events-none text-[7px] font-black text-white/30 font-mono uppercase tracking-tighter">
-          <span className="absolute top-[-10px] left-1/2 -translate-x-1/2 text-cyan-500">MEM</span>
+          <span className="absolute top-[-10px] left-1/2 -translate-x-1/2">DATA</span>
           <span className="absolute top-[30%] right-[-15px]">STRK</span>
           <span className="absolute bottom-[-5px] right-[5px]">EXP</span>
           <span className="absolute bottom-[-5px] left-[5px]">MSTR</span>
@@ -66,9 +65,8 @@ const SkillRadar = ({ stats, t }) => {
   );
 };
 
-// --- المكون الرئيسي ---
 export default function CyberDeck({ user, stats, cards = [] }) {
-  const { t, dir, isRTL } = useLanguage();
+  const { t, dir } = useLanguage();
 
   const analytics = useMemo(() => {
     const xp = stats?.xp || 0;
@@ -78,25 +76,49 @@ export default function CyberDeck({ user, stats, cards = [] }) {
     const learningCards = cards.filter(c => c.level > 0 && c.level < 5).length;
     const masteryRate = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
     
+    // حساب الرتبة الافتراضية بناءً على XP
     const rankIndex = RANKS_CONFIG.findIndex((r, i) => {
         const next = RANKS_CONFIG[i + 1];
         return xp >= r.min && (!next || xp < next.min);
     });
-    const currentRank = RANKS_CONFIG[rankIndex] || RANKS_CONFIG[0];
+    const xpRank = RANKS_CONFIG[rankIndex] || RANKS_CONFIG[0];
     const nextRank = RANKS_CONFIG[rankIndex + 1];
     
     let rankProgress = 100;
     if (nextRank) {
-        rankProgress = Math.min(100, ((xp - currentRank.min) / (nextRank.min - currentRank.min)) * 100);
+        rankProgress = Math.min(100, ((xp - xpRank.min) / (nextRank.min - xpRank.min)) * 100);
     }
 
     const activityScore = Math.min(100, (learningCards * 10 + streak * 5));
 
+    // تحديد العرض النهائي بناءً على الدور (Role)
+    let displayRank = xpRank;
+    let customTitle = null;
+
+    if (user?.role === 'master') {
+        displayRank = { color: "text-red-500", bg: "bg-red-500", icon: <IconCrown /> };
+        customTitle = t('rank_cybergod');
+    } else if (user?.role === 'admin') {
+        displayRank = { color: "text-purple-500", bg: "bg-purple-500", icon: <IconShieldCheck /> };
+        customTitle = t('rank_commander');
+    } else if (user?.role === 'teacher') {
+        displayRank = { color: "text-emerald-400", bg: "bg-emerald-500", icon: <IconSchool /> };
+        customTitle = "INSTRUCTOR";
+    }
+
     return {
         xp, streak, totalCards, masteredCards,
-        masteryRate, currentRank, nextRank, rankProgress, activityScore
+        masteryRate, displayRank, nextRank, rankProgress, activityScore, customTitle,
+        xpRankId: xpRank.id // نحتفظ بمعرف الرتبة الأصلية لحساب الأوسمة
     };
-  }, [stats, cards]);
+  }, [stats, cards, user, t]);
+
+  // تحديد اللون الرئيسي للرادار
+  const themeColor = analytics.displayRank.color.includes('text-') 
+    ? (analytics.displayRank.color === 'text-red-500' ? '#ef4444' : 
+       analytics.displayRank.color === 'text-purple-500' ? '#a855f7' : 
+       analytics.displayRank.color === 'text-emerald-400' ? '#34d399' : '#06b6d4')
+    : '#06b6d4';
 
   return (
     <div className="w-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20" dir={dir}>
@@ -117,7 +139,7 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                             </div>
                         </div>
                         <div className="absolute -bottom-4 inset-x-0 flex justify-center">
-                            <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] bg-black border border-white/10 shadow-xl ${analytics.currentRank.color}`}>
+                            <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] bg-black border border-white/10 shadow-xl ${analytics.displayRank.color}`}>
                                 LVL.{Math.floor(analytics.xp / 500) + 1}
                             </span>
                         </div>
@@ -125,9 +147,9 @@ export default function CyberDeck({ user, stats, cards = [] }) {
 
                     <div className="flex-1 w-full text-center md:text-left">
                         <div className={`flex items-center gap-2 mb-3 justify-center md:justify-start`}>
-                            <div className={`w-2 h-2 rounded-full animate-pulse ${analytics.currentRank.bg}`}></div>
-                            <span className={`text-xs font-black tracking-[0.3em] uppercase ${analytics.currentRank.color}`}>
-                                {t(`rank_${analytics.currentRank.id}`)} {t('profile_class')}
+                            <div className={`w-2 h-2 rounded-full animate-pulse ${analytics.displayRank.bg}`}></div>
+                            <span className={`text-xs font-black tracking-[0.3em] uppercase ${analytics.displayRank.color}`}>
+                                {analytics.customTitle || t(`rank_${analytics.xpRankId}`) || "AGENT"} {t('profile_class')}
                             </span>
                         </div>
                         
@@ -138,14 +160,14 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                         <div className="space-y-2">
                             <div className="flex justify-between text-[10px] font-mono text-white/30 uppercase tracking-widest">
                                 <span>{t('profile_exp')}: {analytics.xp}</span>
-                                <span>{t('profile_next')}: {analytics.nextRank ? analytics.nextRank.min : "MAX_CAP"}</span>
+                                <span>{t('profile_next')}: {analytics.nextRank ? analytics.nextRank.min : "MAX"}</span>
                             </div>
                             <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden border border-white/5 p-0.5">
                                 <motion.div 
                                     initial={{ width: 0 }}
                                     animate={{ width: `${analytics.rankProgress}%` }}
                                     transition={{ duration: 2, ease: "circOut" }}
-                                    className={`h-full rounded-full ${analytics.currentRank.bg} shadow-[0_0_15px_rgba(255,255,255,0.1)]`}
+                                    className={`h-full rounded-full ${analytics.displayRank.bg} shadow-[0_0_15px_rgba(255,255,255,0.1)]`}
                                 />
                             </div>
                         </div>
@@ -162,17 +184,16 @@ export default function CyberDeck({ user, stats, cards = [] }) {
             {/* 2. Performance Metrics */}
             <div className="lg:col-span-4 bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-8 flex flex-col items-center justify-center relative shadow-2xl overflow-hidden min-h-[400px]">
                 <div className="absolute top-8 left-8 flex items-center gap-2 opacity-30">
-                    <IconChartRadar size={20} className="text-cyan-500"/>
+                    <IconChartRadar size={20} className={analytics.displayRank.color}/>
                     <span className="text-[10px] font-black tracking-[0.3em] uppercase">{t('profile_metrics')}</span>
                 </div>
                 
-                <SkillRadar stats={analytics} t={t} />
+                <SkillRadar stats={analytics} color={themeColor} />
                 
                 <div className="mt-6 text-center">
                     <div className="text-5xl font-black text-white tracking-tighter">{analytics.masteryRate}%</div>
                     <div className="text-[10px] text-white/20 uppercase tracking-[0.4em] mt-2 font-black">{t('profile_efficiency')}</div>
                 </div>
-                <div className="absolute bottom-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent"></div>
             </div>
         </div>
 
