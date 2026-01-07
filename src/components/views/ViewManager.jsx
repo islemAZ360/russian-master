@@ -1,7 +1,7 @@
 "use client";
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { IconLoader2 } from '@tabler/icons-react'; // أيقونة للتحميل
+import { IconLoader2 } from '@tabler/icons-react';
 
 // استيراد الهوكس الأساسية
 import { useUI } from '@/hooks/useUI';
@@ -22,54 +22,31 @@ import SettingsViewWrapper from './SettingsViewWrapper';
 import CommunicationHub from '@/components/features/chat/CommunicationHub';
 import { CategorySelect } from '@/components/features/study/CategorySelect';
 
-// === استيراد صفحات الأستاذ الجديدة ===
+// === استيراد صفحات الأستاذ (تأكدنا من المسارات والفصل بينها) ===
 import TeacherStudents from '@/components/features/teacher/TeacherStudents';
 import TeacherProgress from '@/components/features/teacher/TeacherProgress';
 
-/**
- * مدير العروض المركزي (ViewManager)
- * تم إصلاح مشكلة اختفاء المحتوى عند التنقل
- */
 export default function ViewManager(props) {
   const { currentView, setActiveCategory, activeCategory, setCurrentView } = useUI();
-  const { isJunior, isAdmin, isTeacher, isStudent } = useAuth();
-  const { t, dir, isRTL, isLoaded } = useLanguage();
+  const { isJunior, isAdmin, isTeacher } = useAuth();
+  const { dir, isLoaded } = useLanguage();
 
-  // إعدادات الحركة (Transitions) - تم تبسيطها لمنع التعليق
+  // إعدادات الحركة
   const pageVariants = {
-    initial: { 
-      opacity: 0, 
-      scale: 0.98,
-      filter: "blur(4px)"
-    },
-    animate: { 
-      opacity: 1, 
-      scale: 1, 
-      filter: "blur(0px)",
-      transition: { duration: 0.3, ease: "easeOut" }
-    },
-    exit: { 
-      opacity: 0, 
-      scale: 1.02,
-      filter: "blur(4px)",
-      transition: { duration: 0.2, ease: "easeIn" }
-    }
+    initial: { opacity: 0, scale: 0.98, filter: "blur(4px)" },
+    animate: { opacity: 1, scale: 1, filter: "blur(0px)", transition: { duration: 0.3, ease: "easeOut" } },
+    exit: { opacity: 0, scale: 1.02, filter: "blur(4px)", transition: { duration: 0.2, ease: "easeIn" } }
   };
 
-  // دالة عرض المحتوى بناءً على الحالة
   const renderViewContent = () => {
     switch (currentView) {
-      // --- الصفحة الرئيسية ---
-      case 'home':
-        return <HeroView />;
+      case 'home': return <HeroView />;
+      
+      case 'admin_panel': return (isJunior || isAdmin) ? <AdminView /> : <AccessDenied />;
 
-      // --- لوحة الأدمن ---
-      case 'admin_panel':
-        if (isJunior || isAdmin) return <AdminView />;
-        return <AccessDenied />;
-
-      // --- صفحات الأستاذ ---
-      case 'teacher_db':
+      // === صفحات الأستاذ (تم الفصل بشكل صحيح) ===
+      
+      case 'teacher_db': // صفحة إنشاء المحتوى
         if (!isTeacher) return <AccessDenied />;
         return (
           <DataView 
@@ -81,41 +58,29 @@ export default function ViewManager(props) {
           />
         );
 
-      case 'teacher_students':
+      case 'teacher_students': // صفحة إدارة الطلاب وإرسال الدعوات
         if (!isTeacher) return <AccessDenied />;
-        return <TeacherStudents />;
+        // هنا كان الخطأ المحتمل: التأكد من استدعاء TeacherStudents وليس Progress
+        return <TeacherStudents />; 
 
-      case 'teacher_progress':
+      case 'teacher_progress': // صفحة الإحصائيات والتحليلات
         if (!isTeacher) return <AccessDenied />;
-        return <TeacherProgress />;
+        return <TeacherProgress />; 
 
-      // --- الألعاب ---
-      case 'games':
-        return <GamesView />;
-
-      // --- البث المباشر ---
-      case 'live':
-        return <LiveView />;
-
-      // --- الدردشة ---
-      case 'chat':
-        return <CommunicationHub />;
-
-      // --- الدراسة (اختيار التصنيف) ---
+      case 'games': return <GamesView />;
+      case 'live': return <LiveView />;
+      case 'chat': return <CommunicationHub />;
+      
       case 'category':
         return (
           <CategorySelect 
             categories={props.categories} 
             cards={props.cards}
             activeCategory={activeCategory} 
-            onSelect={(cat) => { 
-                setActiveCategory(cat); 
-                setCurrentView('study'); 
-            }} 
+            onSelect={(cat) => { setActiveCategory(cat); setCurrentView('study'); }} 
           />
         );
 
-      // --- الدراسة (البطاقات) ---
       case 'study':
         return (
           <StudyView 
@@ -129,7 +94,6 @@ export default function ViewManager(props) {
           />
         );
 
-      // --- الأرشيف (Data View) ---
       case 'data':
         const canEdit = isTeacher || isAdmin || isJunior;
         return (
@@ -142,29 +106,14 @@ export default function ViewManager(props) {
           />
         );
 
-      // --- السجل والترتيب ---
-      case 'leaderboard':
-        return (
-          <LeaderboardView 
-            cards={props.cards} 
-            stats={props.stats} 
-          />
-        );
+      case 'leaderboard': return <LeaderboardView cards={props.cards} stats={props.stats} />;
+      case 'settings': return <SettingsViewWrapper resetProgress={props.resetProgress} />;
 
-      // --- الإعدادات ---
-      case 'settings':
-        return (
-          <SettingsViewWrapper 
-            resetProgress={props.resetProgress} 
-          />
-        );
-
-      default:
-        return <HeroView />;
+      default: return <HeroView />;
     }
   };
 
-  // FIX: إذا لم يتم تحميل الإعدادات بعد، نعرض شاشة تحميل بدلاً من null لتجنب اختفاء الواجهة
+  // حل مشكلة الشاشة السوداء/الفارغة عند التنقل
   if (!isLoaded) {
     return (
       <div className="flex items-center justify-center h-full w-full">
@@ -175,7 +124,6 @@ export default function ViewManager(props) {
 
   return (
     <div className="w-full h-full relative flex flex-col items-center" dir={dir}>
-        {/* استخدام mode="wait" يضمن خروج الصفحة القديمة قبل دخول الجديدة */}
         <AnimatePresence mode="wait">
           <motion.div 
             key={currentView}
@@ -183,15 +131,12 @@ export default function ViewManager(props) {
             initial="initial"
             animate="animate"
             exit="exit"
-            className="w-full h-full flex flex-col flex-1" // flex-1 يضمن ملء المساحة
+            className="w-full h-full flex flex-col flex-1"
           >
             {renderViewContent()}
           </motion.div>
         </AnimatePresence>
-
-        <style jsx>{`
-            div { scrollbar-gutter: stable; }
-        `}</style>
+        <style jsx>{`div { scrollbar-gutter: stable; }`}</style>
     </div>
   );
 }
@@ -199,6 +144,6 @@ export default function ViewManager(props) {
 const AccessDenied = () => (
   <div className="h-full flex flex-col items-center justify-center text-red-500 font-mono tracking-widest gap-4 text-center p-4">
       <span className="text-4xl">⚠️</span>
-      <span className="font-black uppercase text-xs md:text-sm">Access_Denied: Unauthorized_Clearance_Level</span>
+      <span className="font-black uppercase text-xs md:text-sm">Access_Denied</span>
   </div>
 );

@@ -1,241 +1,257 @@
 "use client";
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import { 
-  IconChartBar, IconTrophy, IconActivity, IconClock, 
-  IconFlame, IconAlertTriangle, IconUser 
+  collection, query, where, onSnapshot, 
+  addDoc, updateDoc, doc, serverTimestamp, limit, orderBy 
+} from "firebase/firestore";
+import { 
+  IconUsers, IconUserPlus, IconSearch, IconUserX, 
+  IconSchool, IconCircleCheck, IconLoader2 
 } from '@tabler/icons-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 
-export default function TeacherProgress() {
+export default function TeacherStudents() {
   const { user } = useAuth();
   const { t, dir } = useLanguage();
-  
-  const [students, setStudents] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  // 1. جلب بيانات الطلاب التابعين للأستاذ
+  const [myStudents, setMyStudents] = useState([]);
+  const [potentialUsers, setPotentialUsers] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [inviteStatus, setInviteStatus] = useState({});
+
+  // 1. جلب طلابي الحاليين (الذين لديهم teacherId الخاص بي)
   useEffect(() => {
     if (!user) return;
-
-    // جلب الطلاب وترتيبهم حسب آخر ظهور (الأحدث أولاً)
-    const q = query(
-      collection(db, "users"),
-      where("teacherId", "==", user.uid),
-      orderBy("lastLogin", "desc")
-    );
-
+    
+    // مراقبة قائمة الطلاب
+    const q = query(collection(db, "users"), where("teacherId", "==", user.uid));
     const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setStudents(data);
+      setMyStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     }, (error) => {
-      console.error("Progress Fetch Error:", error);
+      console.error("Error fetching students:", error);
       setLoading(false);
     });
-
+    
     return () => unsub();
   }, [user]);
 
-  // 2. حساب الإحصائيات العامة للفصل
-  const classStats = useMemo(() => {
-    const total = students.length;
-    if (total === 0) return { avgXp: 0, activeToday: 0, topStudent: null };
+  // 2. جلب المستخدمين المتاحين للدعوة
+  useEffect(() => {
+    // جلب المستخدمين العاديين (role == 'user')
+    // نقوم بجلب آخر 50 مستخدم لضمان ظهور المسجلين الجدد
+    const q = query(
+        collection(db, "users"),
+        where("role", "==", "user"),
+        limit(50)
+    );
 
-    const totalXp = students.reduce((acc, s) => acc + (s.xp || 0), 0);
+    const unsub = onSnapshot(q, (snap) => {
+        let users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        // ترتيب يدوي (الأحدث أولاً) لأن الفايربيس يحتاج Index للترتيب مع Where
+        users.sort((a, b) => {
+            const dateA = a.createdAt?.seconds || 0;
+            const dateB = b.createdAt?.seconds || 0;
+            return dateB - dateA;
+        });
+
+        // التصفية المحلية حسب البحث
+        if (searchQuery.trim()) {
+            const lowerQuery = searchQuery.toLowerCase();
+            users = users.filter(u => 
+                (u.displayName && u.displayName.toLowerCase().includes(lowerQuery)) ||
+                (u.email && u.email.toLowerCase().includes(lowerQuery))
+            );
+        }
+
+        setPotentialUsers(users);
+    });
+
+    return () => unsub();
+  }, [searchQuery]);
+
+  // --- العمليات ---
+
+  const handleInvite = async (targetUser) => {
+    setInviteStatus(prev => ({ ...prev, [targetUser.id]: 'loading' }));
     
-    // حساب عدد الطلاب النشطين اليوم (خلال آخر 24 ساعة)
-    const now = new Date();
-    const activeToday = students.filter(s => {
-        if (!s.lastLogin?.toDate) return false;
-        const last = s.lastLogin.toDate();
-        return (now - last) < 86400000; // 24 ساعة بالميلي ثانية
-    }).length;
+    try {
+        // إرسال إشعار منظم بدقة
+        await addDoc(collection(db, "notifications"), {
+            userId: targetUser.id, // المستلم
+            senderId: user.uid,    // المرسل (الأستاذ)
+            senderName: user.displayName || "Teacher",
+            type: "invite",        // نوع الإشعار (مهم جداً لـ NotificationCenter)
+            title: "ACADEMY INVITATION",
+            message: `Commander ${user.displayName || "Unknown"} wants to recruit you to their squad.`,
+            createdAt: serverTimestamp(),
+            read: false,
+            // البيانات اللازمة لتنفيذ القبول
+            actionPayload: {
+                teacherId: user.uid,
+                newRole: 'student'
+            }
+        });
 
-    // تحديد الطالب الأفضل (الأكثر XP)
-    const topStudent = [...students].sort((a, b) => (b.xp || 0) - (a.xp || 0))[0];
+        setInviteStatus(prev => ({ ...prev, [targetUser.id]: 'sent' }));
+        
+        // إعادة الزر لحالته الطبيعية
+        setTimeout(() => {
+            setInviteStatus(prev => {
+                const newState = { ...prev };
+                delete newState[targetUser.id];
+                return newState;
+            });
+        }, 3000);
 
-    return {
-        avgXp: Math.floor(totalXp / total),
-        activeToday,
-        topStudent
-    };
-  }, [students]);
+    } catch (error) {
+        console.error("Invite Failed:", error);
+        setInviteStatus(prev => ({ ...prev, [targetUser.id]: 'error' }));
+    }
+  };
 
-  // دالة مساعدة لتنسيق الوقت (منذ متى)
-  const formatLastSeen = (timestamp) => {
-      if (!timestamp || !timestamp.toDate) return "Never";
-      const date = timestamp.toDate();
-      const now = new Date();
-      const diffMinutes = Math.floor((now - date) / 60000);
-      
-      if (diffMinutes < 1) return "Just now";
-      if (diffMinutes < 60) return `${diffMinutes}m ago`;
-      if (diffMinutes < 1440) return `${Math.floor(diffMinutes/60)}h ago`;
-      return date.toLocaleDateString();
+  const handleRemoveStudent = async (studentId) => {
+      if(!confirm("Are you sure you want to discharge this operative from your squad?")) return;
+      try {
+          // إعادة الطالب لرتبة مستخدم عادي وفك الارتباط
+          await updateDoc(doc(db, "users", studentId), { 
+              teacherId: null, 
+              role: 'user' 
+          });
+      } catch (e) { console.error(e); }
   };
 
   return (
     <div className="w-full h-full flex flex-col p-6 md:p-10 font-sans pb-32" dir={dir}>
-        
-        {/* Header Section */}
-        <div className="mb-10 animate-in fade-in slide-in-from-top-4">
-            <div className="flex items-center gap-3 text-yellow-500 mb-2">
-                <IconChartBar size={32} />
-                <span className="text-[10px] font-black uppercase tracking-[0.3em]">Performance_Analytics</span>
-            </div>
-            <h1 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter mb-8">
-                {t('nav_progress') || "Class Progress"}
-            </h1>
+      
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-end mb-10 gap-6 animate-in fade-in slide-in-from-top-4">
+          <div>
+              <div className="flex items-center gap-3 text-cyan-500 mb-2">
+                  <IconUsers size={32} />
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em]">Squad_Management</span>
+              </div>
+              <h1 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter">
+                  {t('nav_students') || "My Students"}
+              </h1>
+          </div>
+          
+          <div className="bg-white/5 border border-white/10 px-6 py-3 rounded-2xl flex items-center gap-4">
+              <div className="text-right">
+                  <div className="text-2xl font-black text-white leading-none">{myStudents.length}</div>
+                  <div className="text-[9px] text-white/40 uppercase tracking-wider">Active Operatives</div>
+              </div>
+              <div className="h-8 w-px bg-white/10"></div>
+              <IconSchool className="text-emerald-500" size={24} />
+          </div>
+      </div>
 
-            {/* بطاقات الإحصائيات العلوية */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                
-                {/* 1. Average Level Card */}
-                <div className="bg-[#0a0a0a] border border-white/10 p-6 rounded-3xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 text-cyan-500"><IconActivity size={64}/></div>
-                    <div className="text-[10px] text-white/40 uppercase tracking-widest font-black mb-2">AVG. CLASS LEVEL</div>
-                    <div className="text-4xl font-black text-white font-mono">
-                        LVL.{Math.floor(classStats.avgXp / 500) + 1}
-                    </div>
-                    <div className="text-xs text-cyan-500 mt-1 font-bold">{classStats.avgXp} XP Avg</div>
-                </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full min-h-0">
+          
+          {/* العمود 1: طلابي الحاليين */}
+          <div className="flex flex-col bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-6 shadow-2xl overflow-hidden relative">
+              <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500/50"></div>
+              <h3 className="text-lg font-black text-white mb-6 flex items-center gap-2 uppercase tracking-tight">
+                  <IconCircleCheck className="text-emerald-500" size={20}/> Current Squad
+              </h3>
+              
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
+                  {loading ? (
+                      <div className="text-center py-10 opacity-30 text-xs font-mono">SCANNING...</div>
+                  ) : myStudents.length === 0 ? (
+                      <div className="text-center py-20 flex flex-col items-center opacity-30">
+                          <IconUsers size={48} className="mb-4"/>
+                          <p className="text-xs font-black uppercase tracking-widest">No operatives assigned.</p>
+                      </div>
+                  ) : (
+                      <AnimatePresence>
+                          {myStudents.map(student => (
+                              <motion.div 
+                                  key={student.id}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  exit={{ opacity: 0, x: 20 }}
+                                  className="group flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 hover:border-white/10 rounded-2xl transition-all"
+                              >
+                                  <div className="flex items-center gap-4">
+                                      <div className="w-10 h-10 rounded-xl bg-zinc-800 overflow-hidden">
+                                          <img src={student.photoURL || "/avatars/avatar1.png"} className="w-full h-full object-cover"/>
+                                      </div>
+                                      <div>
+                                          <div className="font-bold text-white text-sm">{student.displayName}</div>
+                                          <div className="text-[9px] text-white/30 font-mono">{student.email}</div>
+                                      </div>
+                                  </div>
+                                  <button 
+                                    onClick={() => handleRemoveStudent(student.id)} 
+                                    className="p-2 text-white/20 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                                    title="Discharge Student"
+                                  >
+                                    <IconUserX size={18} />
+                                  </button>
+                              </motion.div>
+                          ))}
+                      </AnimatePresence>
+                  )}
+              </div>
+          </div>
 
-                {/* 2. Active Duty Card */}
-                <div className="bg-[#0a0a0a] border border-white/10 p-6 rounded-3xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 text-emerald-500"><IconClock size={64}/></div>
-                    <div className="text-[10px] text-white/40 uppercase tracking-widest font-black mb-2">ACTIVE TODAY</div>
-                    <div className="text-4xl font-black text-white font-mono">
-                        {classStats.activeToday} <span className="text-lg text-white/20">/ {students.length}</span>
-                    </div>
-                    {/* شريط نسبة الحضور */}
-                    <div className="w-full bg-white/10 h-1.5 mt-3 rounded-full overflow-hidden">
-                        <div 
-                            className="h-full bg-emerald-500 transition-all duration-1000" 
-                            style={{ width: `${students.length > 0 ? (classStats.activeToday / students.length) * 100 : 0}%` }}
-                        />
-                    </div>
-                </div>
+          {/* العمود 2: البحث والإضافة (Recruit New) */}
+          <div className="flex flex-col bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-6 shadow-2xl overflow-hidden relative">
+              <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500/50"></div>
+              <h3 className="text-lg font-black text-white mb-6 flex items-center gap-2 uppercase tracking-tight">
+                  <IconUserPlus className="text-cyan-500" size={20}/> Recruit New
+              </h3>
 
-                {/* 3. Top Student Card */}
-                <div className="bg-[#0a0a0a] border border-white/10 p-6 rounded-3xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 text-yellow-500"><IconTrophy size={64}/></div>
-                    <div className="text-[10px] text-white/40 uppercase tracking-widest font-black mb-2">TOP OPERATIVE</div>
-                    {classStats.topStudent ? (
-                        <>
-                            <div className="text-xl font-black text-white truncate uppercase">
-                                {classStats.topStudent.displayName}
-                            </div>
-                            <div className="flex items-center gap-2 mt-2">
-                                <IconFlame size={16} className="text-orange-500 fill-orange-500"/>
-                                <span className="text-xs text-orange-500 font-bold">{classStats.topStudent.streak || 0} Day Streak</span>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="text-white/20 text-sm font-mono">N/A</div>
-                    )}
-                </div>
-            </div>
-        </div>
+              <div className="relative group mb-6">
+                  <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-cyan-500 transition-colors" size={20} />
+                  <input 
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search name/email..."
+                      className="w-full bg-black border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white text-sm font-medium focus:border-cyan-500 outline-none transition-all placeholder:text-white/20"
+                  />
+              </div>
 
-        {/* قائمة الطلاب التفصيلية */}
-        <div className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-6 shadow-2xl overflow-hidden flex flex-col min-h-0">
-            <div className="flex justify-between items-center mb-6 px-2">
-                <h3 className="text-lg font-black text-white uppercase tracking-tight">Operative Roster</h3>
-                <div className="text-[9px] font-mono text-white/30 uppercase">Live Data Feed</div>
-            </div>
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
+                  {potentialUsers.length === 0 ? (
+                      <div className="text-center py-10 opacity-30 text-xs font-mono">NO RECRUITS AVAILABLE</div>
+                  ) : (
+                      potentialUsers.map(u => (
+                          <div key={u.id} className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-2xl hover:bg-white/5 transition-all">
+                              <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-xl bg-zinc-800 overflow-hidden opacity-60">
+                                      <img src={u.photoURL || "/avatars/avatar1.png"} className="w-full h-full object-cover"/>
+                                  </div>
+                                  <div>
+                                      <div className="font-bold text-white text-sm">{u.displayName || "Unknown"}</div>
+                                      <div className="text-[9px] text-white/30 font-mono truncate max-w-[150px]">{u.email}</div>
+                                  </div>
+                              </div>
+                              
+                              <button 
+                                  onClick={() => handleInvite(u)}
+                                  disabled={inviteStatus[u.id] === 'sent' || inviteStatus[u.id] === 'loading'}
+                                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-2
+                                  ${inviteStatus[u.id] === 'sent' 
+                                      ? 'bg-emerald-500/20 text-emerald-500 border border-emerald-500/50 cursor-default'
+                                      : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-900/20'}`}
+                              >
+                                  {inviteStatus[u.id] === 'loading' && <IconLoader2 className="animate-spin" size={12}/>}
+                                  {inviteStatus[u.id] === 'sent' ? 'SENT' : 'INVITE'}
+                              </button>
+                          </div>
+                      ))
+                  )}
+              </div>
+          </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
-                {loading ? (
-                    <div className="text-center py-10 opacity-30 text-xs font-mono animate-pulse">SYNCING DATA...</div>
-                ) : students.length === 0 ? (
-                    <div className="text-center py-20 flex flex-col items-center opacity-30">
-                        <IconUser size={48} className="mb-4"/>
-                        <p className="text-xs font-black uppercase tracking-widest">No operatives in roster</p>
-                    </div>
-                ) : (
-                    <div className="space-y-3">
-                        {students.map((student, i) => {
-                            // حساب نسبة التقدم للمستوى التالي
-                            const currentLevel = Math.floor((student.xp || 0) / 500) + 1;
-                            const nextLevelXp = currentLevel * 500;
-                            const currentLevelBaseXp = (currentLevel - 1) * 500;
-                            const progressPercent = Math.min(100, Math.max(0, ((student.xp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100));
-                            
-                            // تنبيه إذا لم يدخل الطالب منذ أسبوع
-                            const isInactive = student.lastLogin?.toDate && (new Date() - student.lastLogin.toDate()) > 604800000;
-
-                            return (
-                                <motion.div 
-                                    key={student.id}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: i * 0.05 }}
-                                    className="group flex flex-col md:flex-row items-center gap-4 p-4 bg-white/[0.02] border border-white/5 hover:border-white/10 rounded-2xl transition-all"
-                                >
-                                    {/* 1. الترتيب والصورة */}
-                                    <div className="flex items-center gap-4 w-full md:w-auto">
-                                        <div className="text-white/20 font-black font-mono text-lg w-6 text-center">
-                                            #{i + 1}
-                                        </div>
-                                        <div className="relative">
-                                            <div className="w-12 h-12 rounded-xl bg-zinc-800 overflow-hidden border border-white/10">
-                                                <img src={student.photoURL || "/avatars/avatar1.png"} className="w-full h-full object-cover"/>
-                                            </div>
-                                            {isInactive && (
-                                                <div className="absolute -top-1 -right-1 bg-red-500 rounded-full p-0.5 border-2 border-[#0a0a0a]" title="Inactive > 7 days">
-                                                    <IconAlertTriangle size={10} className="text-white"/>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex-1 md:w-40">
-                                            <div className="font-bold text-white text-sm truncate uppercase">{student.displayName}</div>
-                                            <div className="text-[9px] text-white/30 font-mono flex items-center gap-1">
-                                                <div className={`w-1.5 h-1.5 rounded-full ${student.lastLogin?.toDate && (new Date() - student.lastLogin.toDate() < 300000) ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-600'}`}></div>
-                                                {formatLastSeen(student.lastLogin)}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* 2. شريط التقدم */}
-                                    <div className="flex-1 w-full px-4">
-                                        <div className="flex justify-between text-[9px] font-black uppercase mb-1">
-                                            <span className="text-cyan-500">LVL.{currentLevel}</span>
-                                            <span className="text-white/20">{student.xp || 0} / {nextLevelXp} XP</span>
-                                        </div>
-                                        <div className="h-2 w-full bg-black rounded-full overflow-hidden border border-white/5">
-                                            <motion.div 
-                                                initial={{ width: 0 }}
-                                                animate={{ width: `${progressPercent}%` }}
-                                                transition={{ duration: 1, delay: 0.5 }}
-                                                className="h-full bg-gradient-to-r from-cyan-600 to-blue-600 relative"
-                                            >
-                                                <div className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]"></div>
-                                            </motion.div>
-                                        </div>
-                                    </div>
-
-                                    {/* 3. الإحصائيات السريعة */}
-                                    <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 border-white/5 pt-3 md:pt-0 mt-2 md:mt-0">
-                                        <div className="flex flex-col items-center">
-                                            <IconFlame size={16} className="text-orange-500 mb-1"/>
-                                            <span className="text-[10px] font-black text-white">{student.streak || 0}</span>
-                                        </div>
-                                        <div className="flex flex-col items-center">
-                                            <IconTrophy size={16} className="text-yellow-500 mb-1"/>
-                                            <span className="text-[10px] font-black text-white">{Math.floor((student.xp||0)/1000)}k</span>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-        </div>
+      </div>
     </div>
   );
 }
