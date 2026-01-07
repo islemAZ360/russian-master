@@ -1,51 +1,92 @@
 "use client";
 import React, { useState } from 'react';
 import { useUI } from '../../context/UIContext';
+import { useAuth } from '@/context/AuthContext'; // نحتاج هذا لنعرف من هو المستخدم الحالي لتحديث بياناته
+import { db } from '@/lib/firebase';
+import { doc, updateDoc, deleteDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion'; 
 import { 
   IconBell, IconX, IconUserPlus, IconAward, 
-  IconMessageCircle, IconShieldAlert, IconArrowRight 
+  IconMessageCircle, IconShieldAlert, IconCheck, IconLoader
 } from '@tabler/icons-react';
 import { useLanguage } from '@/hooks/useLanguage';
 
 export default function NotificationCenter() {
   const { notifications, removeNotification, setCurrentView, setShowSupport } = useUI();
+  const { user } = useAuth(); // المستخدم الحالي
   const [isOpen, setIsOpen] = useState(false);
+  const [processingId, setProcessingId] = useState(null); // لتتبع الإشعار الذي يتم معالجته حالياً
   const { t, dir } = useLanguage();
 
-  // تأمين البيانات: نضمن أن المكون يتعامل مع مصفوفة دائماً
   const safeNotifications = Array.isArray(notifications) ? notifications : [];
 
   /**
-   * معالجة الضغط على الإشعار
-   * تم تعديل المنطق ليدعم "المبادرة بالدردشة" من قبل الأدمن
+   * معالجة قبول الدعوة (Accept Invite)
+   * هذه الدالة هي التي تحول المستخدم العادي إلى طالب
    */
-  const handleAction = (n) => {
-    // 1. إذا كان رد من الدعم أو مبادرة من الأدمن -> فتح نافذة الدعم فوراً
-    if (n.type === 'support_reply') {
-        setShowSupport(true);
-    } 
-    // 2. إذا كانت دعوة فريق -> الذهاب لصفحة الدردشة
-    else if (n.type === 'invite') {
-        setCurrentView('chat');
-    } 
-    // 3. إذا كانت ترقية رتبة -> الذهاب لسجل الرتب
-    else if (n.type === 'rank') {
-        setCurrentView('leaderboard');
-    } 
-    // 4. إذا كان تنبيه إداري عام -> الذهاب للوحة التحكم (للأدمن فقط عادة)
-    else if (n.type === 'admin_alert') {
-        setCurrentView('admin_panel');
-    }
+  const handleAcceptInvite = async (notification) => {
+    if (!user || !notification.actionPayload) return;
+    
+    setProcessingId(notification.id);
 
-    // حذف الإشعار بعد التفاعل معه ليبقى المركز نظيفاً
-    removeNotification(n.id);
-    setIsOpen(false);
+    try {
+        const { teacherId, newRole } = notification.actionPayload;
+
+        // 1. تحديث مستند المستخدم الحالي
+        const userRef = doc(db, "users", user.uid);
+        await updateDoc(userRef, {
+            role: newRole,      // تحويله إلى 'student'
+            teacherId: teacherId, // ربطه بالأستاذ
+            updatedAt: serverTimestamp()
+        });
+
+        // 2. إشعار الأستاذ بأن الطالب قبل الدعوة
+        await addDoc(collection(db, "notifications"), {
+            userId: teacherId,
+            type: "info",
+            title: "RECRUITMENT SUCCESSFUL",
+            message: `${user.displayName || "Agent"} has joined your squad.`,
+            createdAt: serverTimestamp(),
+            read: false
+        });
+
+        // 3. حذف إشعار الدعوة
+        await removeNotification(notification.id);
+
+        // 4. إعادة تحميل الصفحة لتطبيق الصلاحيات الجديدة (الواجهة ستتغير بالكامل)
+        window.location.reload();
+
+    } catch (error) {
+        console.error("Failed to accept invite:", error);
+        alert("System Error: Could not process uplink.");
+        setProcessingId(null);
+    }
   };
 
   /**
-   * الحصول على عنوان مترجم بناءً على نوع الإشعار
+   * معالجة الرفض أو الحذف العادي
    */
+  const handleDismiss = async (e, id) => {
+      e.stopPropagation();
+      await removeNotification(id);
+  };
+
+  /**
+   * معالجة الضغط على الإشعارات الأخرى (التوجيه)
+   */
+  const handleNavigation = (n) => {
+    if (n.type === 'invite') return; // الدعوات لا تقوم بالتوجيه، بل تتطلب إجراء
+
+    if (n.type === 'support_reply') setShowSupport(true);
+    else if (n.type === 'rank') setCurrentView('leaderboard');
+    else if (n.type === 'admin_alert') setCurrentView('admin_panel');
+    
+    // إغلاق القائمة بعد التوجيه
+    setIsOpen(false);
+    // يمكننا حذف الإشعار أو تركه، سنحذفه ليبقى المركز نظيفاً
+    removeNotification(n.id);
+  };
+
   const getNotifTitle = (type) => {
     const map = {
       'invite': t('notif_type_invite'),
@@ -53,7 +94,7 @@ export default function NotificationCenter() {
       'support_reply': t('notif_type_support'),
       'admin_alert': t('notif_type_admin')
     };
-    return map[type] || t('notif_type_admin');
+    return map[type] || "SYSTEM ALERT";
   };
 
   return (
@@ -76,7 +117,7 @@ export default function NotificationCenter() {
         )}
       </button>
 
-      {/* قائمة الإشعارات المنسدلة */}
+      {/* قائمة الإشعارات */}
       <AnimatePresence>
         {isOpen && (
             <motion.div 
@@ -84,9 +125,9 @@ export default function NotificationCenter() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
                 className={`absolute top-16 ${dir === 'rtl' ? 'left-0' : 'right-0'} w-85 bg-[#0d0d0d] border border-white/10 rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden backdrop-blur-2xl`}
-                style={{ width: '340px' }}
+                style={{ width: '360px' }}
             >
-                {/* رأس القائمة */}
+                {/* Header */}
                 <div className="p-5 bg-white/5 border-b border-white/10 flex justify-between items-center">
                     <div className="flex items-center gap-2">
                         <span className="w-2 h-2 bg-cyan-500 rounded-full"></span>
@@ -97,7 +138,7 @@ export default function NotificationCenter() {
                     </button>
                 </div>
                 
-                {/* محتوى الإشعارات */}
+                {/* Content */}
                 <div className="max-h-[450px] overflow-y-auto custom-scrollbar">
                     {safeNotifications.length === 0 ? (
                         <div className="p-16 text-center">
@@ -110,14 +151,11 @@ export default function NotificationCenter() {
                         safeNotifications.map(n => (
                             <div 
                                 key={n.id} 
-                                onClick={() => handleAction(n)} 
-                                className="p-5 border-b border-white/5 hover:bg-white/5 cursor-pointer flex gap-4 items-start group transition-all relative overflow-hidden"
+                                onClick={() => handleNavigation(n)}
+                                className={`p-5 border-b border-white/5 flex gap-4 items-start group transition-all relative overflow-hidden ${n.type !== 'invite' ? 'cursor-pointer hover:bg-white/5' : ''}`}
                             >
-                                {/* مؤشر جانبي للحركة */}
-                                <div className="absolute left-0 top-0 w-1 h-full bg-cyan-600 scale-y-0 group-hover:scale-y-100 transition-transform origin-top"></div>
-
-                                {/* أيقونة الإشعار بناءً على النوع */}
-                                <div className="mt-1 shrink-0 p-2.5 rounded-xl bg-white/5 border border-white/10 text-cyan-400 group-hover:scale-110 group-hover:bg-cyan-500/10 transition-all">
+                                {/* Icon */}
+                                <div className="mt-1 shrink-0 p-2.5 rounded-xl bg-white/5 border border-white/10 text-cyan-400">
                                     {n.type === 'invite' && <IconUserPlus size={20}/>}
                                     {n.type === 'rank' && <IconAward size={20}/>}
                                     {n.type === 'support_reply' && <IconMessageCircle size={20}/>}
@@ -126,33 +164,49 @@ export default function NotificationCenter() {
 
                                 <div className="flex-1 min-w-0">
                                     <div className="flex justify-between items-start mb-1">
-                                        <h4 className="text-xs font-black text-white group-hover:text-cyan-400 transition-colors uppercase tracking-tight truncate">
+                                        <h4 className="text-xs font-black text-white uppercase tracking-tight truncate">
                                             {getNotifTitle(n.type)}
                                         </h4>
                                         <span className="text-[8px] font-mono text-white/20 uppercase">
-                                            {n.createdAt?.toDate ? new Date(n.createdAt.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : t('notif_now')}
+                                            {n.createdAt?.toDate ? new Date(n.createdAt.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "NOW"}
                                         </span>
                                     </div>
                                     
-                                    <p className="text-[11px] text-white/50 leading-relaxed line-clamp-2 font-medium">
+                                    <p className="text-[11px] text-white/50 leading-relaxed font-medium mb-3">
                                         {n.message}
                                     </p>
                                     
-                                    <div className="mt-3 flex items-center gap-1 text-[8px] font-black text-cyan-500/60 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0">
-                                        <span>Initialize Link</span>
-                                        <IconArrowRight size={10} />
-                                    </div>
+                                    {/* Invite Actions - أزرار القبول والرفض للدعوات فقط */}
+                                    {n.type === 'invite' && (
+                                        <div className="flex gap-2 mt-2">
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleAcceptInvite(n); }}
+                                                disabled={processingId === n.id}
+                                                className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg transition-all"
+                                            >
+                                                {processingId === n.id ? <IconLoader className="animate-spin" size={12}/> : <IconCheck size={12}/>}
+                                                ACCEPT
+                                            </button>
+                                            <button 
+                                                onClick={(e) => handleDismiss(e, n.id)}
+                                                disabled={processingId === n.id}
+                                                className="py-2 px-3 bg-white/5 hover:bg-red-500/20 text-white/40 hover:text-red-500 border border-white/10 hover:border-red-500/30 rounded-lg transition-all"
+                                            >
+                                                <IconX size={14}/>
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))
                     )}
                 </div>
                 
-                {/* تذييل القائمة */}
+                {/* Footer */}
                 {safeNotifications.length > 0 && (
                     <div className="p-3 bg-black/40 border-t border-white/5 text-center">
                         <span className="text-[8px] font-mono text-gray-600 uppercase tracking-widest">
-                            Secure Communication Channel v4.0
+                            Secure Uplink v4.2
                         </span>
                     </div>
                 )}

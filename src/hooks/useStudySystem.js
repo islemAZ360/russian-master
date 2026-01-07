@@ -1,54 +1,147 @@
 "use client";
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { fullDatabase } from '../data/fullDatabase'; 
 import { db } from '../lib/firebase';
 import { 
-  doc, setDoc, collection, getDocs, updateDoc, 
-  deleteDoc, writeBatch, onSnapshot, serverTimestamp 
+  doc, setDoc, collection, updateDoc, 
+  deleteDoc, onSnapshot, serverTimestamp 
 } from "firebase/firestore";
 import { useUI } from './useUI';
+import { useAuth } from './useAuth'; // إضافة استدعاء useAuth
 
-// إصدار النظام: تحديث هذا الرقم سيؤدي لتصفير الكاش لدى كافة المستخدمين لضمان الاستقرار
-const SYSTEM_PATCH_VERSION = "4.2.0";
+// إصدار النظام: لضمان تحديث الكاش عند التغييرات الجذرية
+const SYSTEM_PATCH_VERSION = "5.0.0-RBAC";
 
 /**
  * هوك نظام الدراسة المركزي (useStudySystem)
- * المسؤول عن خوارزمية التعلم، مزامنة البيانات، وإدارة مستودع الكلمات
+ * النسخة المحدثة: تدعم تعدد المصادر بناءً على الرتبة (RBAC)
  */
-export const useStudySystem = (user) => {
+export const useStudySystem = (firebaseUser) => {
   const { activeCategory } = useUI();
+  // نحصل على بيانات الرتبة وتفاصيل المستخدم من الكونتكست مباشرة
+  const { userData, isTeacher, isStudent, isUser, isAdmin } = useAuth();
   
   // --- الحالات الأساسية ---
-  const [cards, setCards] = useState(fullDatabase); 
-  const [stats, setStats] = useState({ xp: 0, streak: 0, role: 'user' });
+  const [cards, setCards] = useState([]); 
+  const [stats, setStats] = useState({ xp: 0, streak: 0 });
   const [currentCard, setCurrentCard] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isBanned, setIsBanned] = useState(false);
+  
+  // تخزين المحتوى الخام (الكلمات) والتقدم (المستويات) بشكل منفصل لدمجهما
+  const [rawContent, setRawContent] = useState([]);
+  const [progressMap, setProgressMap] = useState({});
 
   /**
-   * 1. بروتوكول صيانة النظام (Maintenance Protocol)
-   * يقوم بتنظيف localStorage عند رصد تحديث جديد للنظام
+   * 1. دمج المحتوى مع التقدم (Data Merging Logic)
+   * تأخذ الكلمات وتدمج معها مستوى الحفظ الخاص بالمستخدم الحالي
    */
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const savedVersion = localStorage.getItem('RM_SYSTEM_VERSION');
-    
-    if (savedVersion !== SYSTEM_PATCH_VERSION) {
-      console.warn("System Update Detected. Synchronizing Neural Cache...");
-      // تنظيف الكاش مع الحفاظ على بيانات الجلسة (Auth)
-      const authKey = Object.keys(localStorage).find(k => k.includes('firebase:authUser'));
-      const authVal = authKey ? localStorage.getItem(authKey) : null;
-      
-      localStorage.clear();
-      
-      if (authKey && authVal) localStorage.setItem(authKey, authVal);
-      localStorage.setItem('RM_SYSTEM_VERSION', SYSTEM_PATCH_VERSION);
+    if (!rawContent.length) {
+        setCards([]);
+        return;
     }
-  }, []);
+
+    const merged = rawContent.map(card => {
+        // البحث عن تقدم المستخدم لهذه البطاقة
+        const userProgress = progressMap[card.id];
+        return userProgress ? { ...card, ...userProgress } : { ...card, level: 0 };
+    });
+
+    setCards(merged);
+    
+    // إذا لم تكن هناك بطاقة محددة حالياً، نختار واحدة
+    // (نستخدم setTimeout لتجنب تعارض تحديث الحالة أثناء الرندرة)
+    setTimeout(() => {
+        pickNextCard(merged);
+    }, 0);
+    
+  }, [rawContent, progressMap]); // إعادة الدمج عند تغير المحتوى أو التقدم
 
   /**
-   * 2. خوارزمية اختيار الكارت التالي (Smart Picker)
-   * تختار الكارت بناءً على: الفئة النشطة، مستوى الإتقان، وعدم التكرار الفوري
+   * 2. جلب "محتوى" الكلمات (Source of Truth)
+   * يختلف المصدر بناءً على الرتبة
+   */
+  useEffect(() => {
+    if (!firebaseUser || !userData) {
+        setLoading(false);
+        return;
+    }
+
+    setLoading(true);
+    let unsubContent = () => {};
+
+    // أ. الأستاذ: يرى المحتوى الذي أنشأه في مجموعته الخاصة
+    if (isTeacher) {
+        const q = collection(db, "users", firebaseUser.uid, "content");
+        unsubContent = onSnapshot(q, (snap) => {
+            const teacherContent = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setRawContent(teacherContent);
+            setLoading(false);
+        });
+    }
+    // ب. الطالب: يرى محتوى أستاذه فقط
+    else if (isStudent) {
+        if (userData.teacherId) {
+            const q = collection(db, "users", userData.teacherId, "content");
+            unsubContent = onSnapshot(q, (snap) => {
+                const teacherContent = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                setRawContent(teacherContent);
+                setLoading(false);
+            });
+        } else {
+            // طالب بدون أستاذ؟ (حالة نادرة)
+            setRawContent([]); 
+            setLoading(false);
+        }
+    }
+    // ج. المستخدم العادي / الأدمن: يرى البيانات الافتراضية + إضافاته الشخصية
+    else {
+        // أولاً نضع البيانات الافتراضية
+        // ثم نراقب الإضافات الشخصية
+        const q = collection(db, "users", firebaseUser.uid, "content");
+        unsubContent = onSnapshot(q, (snap) => {
+            const personalContent = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            // دمج الافتراضي مع الشخصي
+            setRawContent([...fullDatabase, ...personalContent]);
+            setLoading(false);
+        });
+    }
+
+    return () => unsubContent();
+  }, [firebaseUser, userData, isTeacher, isStudent]);
+
+  /**
+   * 3. جلب "تقدم" المستخدم (User Progress)
+   * هذا دائماً في مجموعة المستخدم الخاصة، بغض النظر عن رتبته
+   */
+  useEffect(() => {
+    if (!firebaseUser) return;
+
+    // مراقبة إحصائيات XP والستريك
+    const userRef = doc(db, "users", firebaseUser.uid);
+    const unsubStats = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setStats({ xp: data.xp || 0, streak: data.streak || 0 });
+      }
+    });
+
+    // مراقبة تقدم الكروت (Level, NextReview)
+    const progressColl = collection(db, "users", firebaseUser.uid, "progress");
+    const unsubProgress = onSnapshot(progressColl, (snap) => {
+        const map = {};
+        snap.docs.forEach(d => { map[d.id] = d.data(); });
+        setProgressMap(map);
+    });
+
+    return () => {
+        unsubStats();
+        unsubProgress();
+    };
+  }, [firebaseUser]);
+
+  /**
+   * 4. خوارزمية اختيار الكارت (Smart Picker)
    */
   const pickNextCard = useCallback((currentList, excludeId = null) => {
     if (!currentList || currentList.length === 0) {
@@ -58,173 +151,105 @@ export const useStudySystem = (user) => {
 
     const now = Date.now();
     
-    // أ. التصفية حسب الفئة المختارة (إذا لم تكن 'All')
+    // التصفية حسب الفئة
     let pool = activeCategory === 'All' 
       ? currentList 
       : currentList.filter(c => c.category === activeCategory);
 
-    // ب. استبعاد الكارت الحالي لمنع التكرار الممل
-    if (excludeId) {
-        pool = pool.filter(c => c.id !== excludeId);
-    }
+    if (excludeId) pool = pool.filter(c => c.id !== excludeId);
 
-    // ج. البحث عن الكروت التي حان موعد مراجعتها (Due Cards)
-    // الكروت الجديدة (Level 0) لها أولوية قصوى
-    const due = pool.filter(c => 
-        (c.level || 0) < 5 && 
-        (!c.nextReview || c.nextReview <= now)
-    );
+    // البحث عن المستحق للمراجعة
+    const due = pool.filter(c => (c.level || 0) < 5 && (!c.nextReview || c.nextReview <= now));
 
     if (due.length > 0) {
-      // اختيار عشوائي من قائمة "المستحق للمراجعة"
-      const randomIndex = Math.floor(Math.random() * due.length);
-      setCurrentCard(due[randomIndex]);
+      setCurrentCard(due[Math.floor(Math.random() * due.length)]);
     } else if (pool.length > 0) {
-      // إذا انتهت المراجعات، ندخل في وضع "المراجعة المستمرة" (Overdrive)
-      const randomIndex = Math.floor(Math.random() * pool.length);
-      setCurrentCard(pool[randomIndex]);
+      setCurrentCard(pool[Math.floor(Math.random() * pool.length)]);
     } else {
       setCurrentCard(null);
     }
   }, [activeCategory]);
 
   /**
-   * 3. مزامنة البيانات مع Firestore
-   */
-  useEffect(() => {
-    if (!user) {
-        setLoading(false);
-        return;
-    }
-
-    // مراقبة إحصائيات المستخدم (XP) في الوقت الفعلي
-    const userRef = doc(db, "users", user.uid);
-    const unsubStats = onSnapshot(userRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setStats(data);
-        if (data.isBanned) setIsBanned(true);
-      }
-    });
-
-    // جلب تقدم المستخدم في الكروت
-    const fetchUserProgress = async () => {
-      try {
-        const cardsCollection = collection(db, "users", user.uid, "personal_cards");
-        const snapshot = await getDocs(cardsCollection);
-        
-        if (!snapshot.empty) {
-          const userProgressMap = new Map(snapshot.docs.map(d => [d.id, d.data()]));
-          
-          // دمج قاعدة البيانات الشاملة مع تقدم المستخدم الحالي
-          const merged = fullDatabase.map(card => {
-            const progress = userProgressMap.get(String(card.id));
-            return progress ? { ...card, ...progress } : { ...card, level: 0 };
-          });
-          
-          setCards(merged);
-          pickNextCard(merged);
-        } else {
-          // مستخدم جديد: تهيئة الواجهة بالقاعدة الافتراضية
-          setCards(fullDatabase.map(c => ({...c, level: 0})));
-          pickNextCard(fullDatabase);
-        }
-      } catch (err) {
-        console.error("Neural Data Fetch Failed:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserProgress();
-    return () => unsubStats();
-  }, [user, pickNextCard]);
-
-  /**
-   * 4. معالجة التفاعل (Swipe Logic)
-   * تحديث مستوى الكارت وحفظ التقدم في السحابة
+   * 5. معالجة السحب (Swipe) - تسجيل التقدم
    */
   const handleSwipe = useCallback(async (direction) => {
-    if (!currentCard || !user || isBanned) return;
+    if (!currentCard || !firebaseUser) return;
     
     const known = direction === 'right';
     const oldLevel = currentCard.level || 0;
-    
-    // خوارزمية التكرار المتباعد (SRS Logic)
-    // المستوى 5 هو الإتقان الكامل
     const nextLevel = known ? Math.min(oldLevel + 1, 5) : 0;
     
-    // تحديد موعد المراجعة القادم (مضاعفات زمنية)
-    const reviewIntervals = [
-        60000,           // Level 0 -> 1 min
-        3600000,         // Level 1 -> 1 hour
-        86400000,        // Level 2 -> 1 day
-        259200000,       // Level 3 -> 3 days
-        604800000,       // Level 4 -> 1 week
-        2592000000       // Level 5 -> 1 month (Mastered)
-    ];
-    
-    const nextReview = Date.now() + (known ? reviewIntervals[nextLevel] : 30000);
+    // فواصل زمنية للمراجعة (SRS)
+    const intervals = [1, 60, 1440, 4320, 10080, 43200]; // بالدقيقة
+    const minutesToAdd = known ? intervals[nextLevel] : 5;
+    const nextReview = Date.now() + (minutesToAdd * 60 * 1000);
 
-    const updatedCard = { 
-        ...currentCard, 
-        level: nextLevel, 
-        nextReview,
-        lastStudied: Date.now() 
-    };
+    // تحديث محلي سريع (Optimistic)
+    const updatedCard = { ...currentCard, level: nextLevel, nextReview };
+    const newCards = cards.map(c => c.id === currentCard.id ? updatedCard : c);
+    setCards(newCards);
+    pickNextCard(newCards, currentCard.id);
 
-    // أ. تحديث الحالة المحلية فوراً (Optimistic UI)
-    const newCardsList = cards.map(c => c.id === currentCard.id ? updatedCard : c);
-    setCards(newCardsList);
-    
-    // اختيار الكارت التالي فوراً
-    pickNextCard(newCardsList, currentCard.id);
-
-    // ب. المزامنة مع Firestore في الخلفية
+    // حفظ في Firestore (في كولكشن progress دائماً)
     try {
-      const cardRef = doc(db, "users", user.uid, "personal_cards", String(currentCard.id));
-      await setDoc(cardRef, { 
+      const progressRef = doc(db, "users", firebaseUser.uid, "progress", String(currentCard.id));
+      await setDoc(progressRef, { 
           level: nextLevel, 
-          nextReview, 
-          category: currentCard.category,
-          russian: currentCard.russian,
-          arabic: currentCard.arabic
+          nextReview,
+          lastStudied: serverTimestamp()
       }, { merge: true });
       
       if (known) {
-        await updateDoc(doc(db, "users", user.uid), { 
+        await updateDoc(doc(db, "users", firebaseUser.uid), { 
             xp: (stats.xp || 0) + 10,
             lastActivity: serverTimestamp()
         });
       }
-    } catch (e) { console.error("Database Update Desync:", e); }
-  }, [currentCard, user, cards, stats.xp, isBanned, pickNextCard]);
+    } catch (e) { console.error("Save Progress Error:", e); }
+  }, [currentCard, firebaseUser, cards, stats.xp, pickNextCard]);
 
-  // --- وظائف الإدارة (Admin Functions) ---
+  // --- وظائف الإدارة (CRUD Functions) ---
 
   const addCard = useCallback(async (cardData) => {
-    const newId = Date.now();
-    const newCard = { ...cardData, id: newId, level: 0, nextReview: Date.now() };
-    setCards(prev => [newCard, ...prev]);
-    
-    if (user) {
-      await setDoc(doc(db, "users", user.uid, "personal_cards", String(newId)), newCard);
+    // الطالب ممنوع من الإضافة
+    if (isStudent) {
+        alert("Students cannot create new cards.");
+        return;
     }
-  }, [user]);
+
+    const newId = String(Date.now());
+    // الأستاذ والمستخدم يضيفون في المحتوى الخاص بهم
+    const collectionPath = isTeacher || isUser || isAdmin ? "content" : null;
+    
+    if (collectionPath && firebaseUser) {
+        await setDoc(doc(db, "users", firebaseUser.uid, collectionPath, newId), {
+            ...cardData,
+            createdAt: serverTimestamp()
+        });
+    }
+  }, [firebaseUser, isStudent, isTeacher, isUser, isAdmin]);
 
   const deleteCard = useCallback(async (cardId) => {
-    setCards(prev => prev.filter(c => c.id !== cardId));
-    if (user) {
-      await deleteDoc(doc(db, "users", user.uid, "personal_cards", String(cardId)));
+    if (isStudent) return; // الطالب لا يحذف
+
+    // محاولة الحذف من المحتوى الخاص
+    if (firebaseUser) {
+        try {
+            await deleteDoc(doc(db, "users", firebaseUser.uid, "content", String(cardId)));
+        } catch (e) { console.error(e); }
     }
-  }, [user]);
+  }, [firebaseUser, isStudent]);
 
   const updateCard = useCallback(async (cardId, newData) => {
-    setCards(prev => prev.map(c => c.id === cardId ? { ...c, ...newData } : c));
-    if (user) {
-      await updateDoc(doc(db, "users", user.uid, "personal_cards", String(cardId)), newData);
+    if (isStudent) return; // الطالب لا يعدل المحتوى
+
+    if (firebaseUser) {
+        try {
+            await updateDoc(doc(db, "users", firebaseUser.uid, "content", String(cardId)), newData);
+        } catch (e) { console.error(e); }
     }
-  }, [user]);
+  }, [firebaseUser, isStudent]);
 
   return { 
     cards, 
@@ -235,6 +260,6 @@ export const useStudySystem = (user) => {
     addCard, 
     deleteCard, 
     updateCard,
-    isBanned 
+    isBanned: userData?.isBanned || false
   };
 };

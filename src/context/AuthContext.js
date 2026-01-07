@@ -14,6 +14,7 @@ export const AuthProvider = ({ children }) => {
   /**
    * دالة تهيئة الملف الشخصي (Profile Initialization)
    * تُستخدم لإنشاء مستند المستخدم في Firestore لأول مرة
+   * الرتبة الافتراضية هنا هي 'user' (يوزر عادي)
    */
   const initializeUserProfile = useCallback(async (firebaseUser) => {
     if (!firebaseUser) return;
@@ -24,13 +25,15 @@ export const AuthProvider = ({ children }) => {
       
       // إذا كان المستخدم جديداً تماماً (لم يتم إنشاء مستنده بعد)
       if (!snap.exists()) {
+        // إذا كان الإيميل هو إيميل الماستر، نعطيه رتبة ماستر، غير ذلك رتبة يوزر عادي
         const initialRole = firebaseUser.email?.toLowerCase() === MASTER_EMAIL?.toLowerCase() ? 'master' : 'user';
         
         const newProfile = {
           email: firebaseUser.email,
-          displayName: firebaseUser.displayName || 'Agent', // اسم مؤقت لحين اختيار الاسم الرمزي
+          displayName: firebaseUser.displayName || 'Novice Agent', // اسم مؤقت
           photoURL: firebaseUser.photoURL || "/avatars/avatar1.png",
-          role: initialRole,
+          role: initialRole, // user, student, teacher, admin, master
+          teacherId: null,   // معرف الأستاذ (للطلبة فقط)
           xp: 0,
           streak: 0,
           isBanned: false,
@@ -64,7 +67,7 @@ export const AuthProvider = ({ children }) => {
             const data = docSnap.data();
             setUserData(data);
             
-            // بروتوكول الحظر الفوري
+            // بروتوكول الحظر الفوري (لأي شخص غير الماستر)
             if (data.isBanned && firebaseUser.email?.toLowerCase() !== MASTER_EMAIL?.toLowerCase()) {
               signOut(auth);
             }
@@ -92,11 +95,14 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
         await signOut(auth);
-        window.location.reload(); // إعادة تحميل النظام لتصفير كافة الحالات (Clean Slate)
+        window.location.reload(); // إعادة تحميل النظام لتصفير كافة الحالات
     } catch (e) {
         console.error("Security Termination Failed:", e);
     }
   };
+
+  // تحديد الرتبة الحالية لسهولة الاستخدام
+  const currentRole = userData?.role || 'user';
 
   // القيم التي سيتم تصديرها لكافة أنحاء التطبيق
   const value = {
@@ -104,10 +110,25 @@ export const AuthProvider = ({ children }) => {
     userData, 
     loading, 
     logout,
-    // مساعدات برمجية سريعة لفحص الصلاحيات
-    isAdmin: userData?.role === 'admin' || userData?.role === 'master',
-    isJunior: ['junior','admin','master'].includes(userData?.role),
-    isMaster: userData?.role === 'master' || user?.email?.toLowerCase() === MASTER_EMAIL?.toLowerCase(),
+    
+    // --- نظام الصلاحيات الجديد (RBAC) ---
+    role: currentRole, // user, student, teacher, admin, master
+    
+    // 1. صلاحيات الماستر والأدمن (يديرون الموقع والأساتذة)
+    isMaster: currentRole === 'master',
+    isAdmin: currentRole === 'admin' || currentRole === 'master',
+    
+    // 2. صلاحيات الأستاذ (واجهة خاصة، إدارة طلبة، إنشاء محتوى خاص)
+    isTeacher: currentRole === 'teacher',
+    
+    // 3. صلاحيات الطالب (يتبع لأستاذ، محتوى محدد، شات محدد)
+    isStudent: currentRole === 'student',
+    
+    // 4. صلاحيات المستخدم العادي (محتوى عام، شات عام)
+    isUser: currentRole === 'user',
+
+    // --- بيانات إضافية للعلاقات ---
+    teacherId: userData?.teacherId || null, // للطلاب: معرف أستاذهم
     isBanned: userData?.isBanned === true
   };
 

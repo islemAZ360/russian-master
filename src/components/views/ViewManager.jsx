@@ -7,7 +7,7 @@ import { useUI } from '@/hooks/useUI';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 
-// استيراد كافة العروض (Views) - تم التأكد من المسارات الصحيحة
+// استيراد العروض (Views)
 import HeroView from './HeroView';
 import AdminView from './AdminView';
 import StudyView from './StudyView';
@@ -26,7 +26,7 @@ import { CategorySelect } from '@/components/features/study/CategorySelect';
  */
 export default function ViewManager(props) {
   const { currentView, setActiveCategory, activeCategory, setCurrentView } = useUI();
-  const { isJunior, isAdmin } = useAuth();
+  const { isJunior, isAdmin, isTeacher, isStudent } = useAuth();
   const { t, dir, isRTL, isLoaded } = useLanguage();
 
   // --- إعدادات الأنيميشن السينمائي (Motion Variants) ---
@@ -63,35 +63,70 @@ export default function ViewManager(props) {
 
   /**
    * وظيفة رندرة المحتوى بناءً على حالة العرض الحالية
-   * تضمن تمرير كافة الوظائف المستلمة من Page.js دون أي حذف
    */
   const renderViewContent = () => {
-    // 1. انتظار تحميل محرك اللغة لمنع الومضات البرمجية
+    // انتظار تحميل محرك اللغة لمنع الومضات البرمجية
     if (!isLoaded) return null;
 
     switch (currentView) {
+      // 1. الصفحة الرئيسية
       case 'home':
         return <HeroView />;
 
+      // 2. لوحة تحكم الأدمن
       case 'admin_panel':
-        // فحص أمني مزدوج للوصول للوحة الإدارة
         if (isJunior || isAdmin) return <AdminView />;
+        return <AccessDenied />;
+
+      // 3. واجهات الأستاذ الخاصة
+      case 'teacher_db': // صفحة إنشاء قاعدة البيانات للأستاذ
+        if (!isTeacher) return <AccessDenied />;
+        // الأستاذ يستخدم DataView لكن بصلاحيات كاملة لإضافة الكلمات
         return (
-            <div className="h-full flex flex-col items-center justify-center text-red-500 font-mono tracking-widest gap-4">
-                <span className="text-4xl">⚠️</span>
-                <span className="font-black uppercase text-xs">Access_Denied: Unauthorized_Clearance_Level</span>
-            </div>
+          <DataView 
+            cards={props.cards} 
+            addCard={props.addCard} 
+            deleteCard={props.deleteCard} 
+            updateCard={props.updateCard} 
+            isTeacherMode={true} // سنستخدم هذا في DataView لاحقاً
+          />
         );
 
+      case 'teacher_students': // صفحة إدارة الطلاب
+        if (!isTeacher) return <AccessDenied />;
+        // سنقوم بإنشاء مكون TeacherStudents لاحقاً، حالياً نعرض رسالة مؤقتة
+        return (
+          <div className="flex flex-col items-center justify-center h-full text-center p-8">
+            <h2 className="text-3xl font-black text-cyan-500 mb-4">STUDENT MANAGEMENT</h2>
+            <p className="text-white/50 font-mono text-sm">System Module Loading...</p>
+            {/* هنا سيتم استبداله بـ <TeacherStudents /> في الخطوات القادمة */}
+          </div>
+        );
+
+      case 'teacher_progress': // صفحة متابعة التقدم
+        if (!isTeacher) return <AccessDenied />;
+        // سنقوم بإنشاء مكون TeacherProgress لاحقاً
+        return (
+          <div className="flex flex-col items-center justify-center h-full text-center p-8">
+            <h2 className="text-3xl font-black text-yellow-500 mb-4">CLASS PROGRESS</h2>
+            <p className="text-white/50 font-mono text-sm">Analytics Module Loading...</p>
+            {/* هنا سيتم استبداله بـ <TeacherProgress /> في الخطوات القادمة */}
+          </div>
+        );
+
+      // 4. الألعاب
       case 'games':
         return <GamesView />;
 
+      // 5. البث المباشر
       case 'live':
         return <LiveView />;
 
+      // 6. الدردشة
       case 'chat':
         return <CommunicationHub />;
 
+      // 7. اختيار التصنيف للدراسة
       case 'category':
         return (
           <CategorySelect 
@@ -105,6 +140,7 @@ export default function ViewManager(props) {
           />
         );
 
+      // 8. وضع الدراسة (البطاقات)
       case 'study':
         return (
           <StudyView 
@@ -118,16 +154,22 @@ export default function ViewManager(props) {
           />
         );
 
+      // 9. عرض البيانات (الأرشيف)
       case 'data':
+        // الطالب يرى البيانات فقط ولا يعدلها
+        // الأستاذ والأدمن يمكنهم التعديل
+        const canEdit = isTeacher || isAdmin || isJunior;
         return (
           <DataView 
             cards={props.cards} 
-            addCard={props.addCard} 
-            deleteCard={props.deleteCard} 
-            updateCard={props.updateCard} 
+            addCard={canEdit ? props.addCard : null} 
+            deleteCard={canEdit ? props.deleteCard : null} 
+            updateCard={canEdit ? props.updateCard : null} 
+            readOnly={!canEdit}
           />
         );
 
+      // 10. السجل والجوائز
       case 'leaderboard':
         return (
           <LeaderboardView 
@@ -136,6 +178,7 @@ export default function ViewManager(props) {
           />
         );
 
+      // 11. الإعدادات
       case 'settings':
         return (
           <SettingsViewWrapper 
@@ -144,7 +187,6 @@ export default function ViewManager(props) {
         );
 
       default:
-        // العودة للقاعدة في حال وجود أي حالة غير معرفة
         return <HeroView />;
     }
   };
@@ -152,10 +194,9 @@ export default function ViewManager(props) {
   return (
     <div className="w-full h-full relative overflow-hidden flex flex-col items-center" dir={dir}>
         
-        {/* AnimatePresence تضمن خروج الصفحة السابقة تماماً قبل رندرة الجديدة (mode="wait") */}
         <AnimatePresence mode="wait" initial={false}>
           <motion.div 
-            key={currentView} // المفتاح الذي يراقب التغيير لتشغيل الأنيميشن
+            key={currentView}
             variants={pageVariants}
             initial="initial"
             animate="animate"
@@ -166,7 +207,6 @@ export default function ViewManager(props) {
           </motion.div>
         </AnimatePresence>
 
-        {/* ستايلات محلية لضمان ثبات الواجهة أثناء التنقل */}
         <style jsx>{`
             div {
                 scrollbar-gutter: stable;
@@ -175,3 +215,11 @@ export default function ViewManager(props) {
     </div>
   );
 }
+
+// مكون بسيط لرفض الوصول
+const AccessDenied = () => (
+  <div className="h-full flex flex-col items-center justify-center text-red-500 font-mono tracking-widest gap-4 text-center p-4">
+      <span className="text-4xl">⚠️</span>
+      <span className="font-black uppercase text-xs md:text-sm">Access_Denied: Unauthorized_Clearance_Level</span>
+  </div>
+);

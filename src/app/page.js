@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { 
   IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
-  IconShield, IconMessageCircle, IconDeviceGamepad, IconBroadcast, IconLifebuoy 
+  IconShield, IconMessageCircle, IconDeviceGamepad, IconBroadcast, 
+  IconLifebuoy, IconUsers, IconChartBar, IconPencil
 } from '@tabler/icons-react';
 
 // استيراد الهوكس
@@ -41,7 +42,8 @@ const LoadingFallback = () => (
 
 export default function Page() {
   // 1. استدعاء كافة الهوكس اللازمة
-  const { user, loading, isAdmin, isJunior, isBanned } = useAuth();
+  // نستخدم المتغيرات الجديدة من AuthContext
+  const { user, loading, isAdmin, isTeacher, isStudent, isUser, isBanned } = useAuth();
   const { 
     currentView, setCurrentView, 
     showSupport, setShowSupport, 
@@ -52,6 +54,7 @@ export default function Page() {
   const { speak, playSFX } = useAudio();
   
   // 2. إدارة حالة نظام الدراسة
+  // سيتم تعديل useStudySystem لاحقاً ليدعم جلب البيانات حسب الرتبة
   const { 
     cards, currentCard, stats, handleSwipe, 
     resetProgress, addCard, deleteCard, updateCard, 
@@ -79,32 +82,74 @@ export default function Page() {
     [cards]
   );
 
-  // 6. روابط التنقل السفلي (Floating Dock) - مترجمة بالكامل
+  // 6. روابط التنقل السفلي (Floating Dock) - بناءً على الرتبة
   const navLinks = useMemo(() => {
     const iconClass = "w-full transition-all duration-300";
+    let links = [];
+
+    // --- واجهة الأستاذ (Teacher Interface) ---
+    if (isTeacher) {
+      links = [
+        // صفحة إنشاء قاعدة البيانات
+        { title: t('nav_create_db') || "Database", icon: <IconPencil className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('teacher_db') },
+        // صفحة إدارة الطلاب
+        { title: t('nav_students') || "Students", icon: <IconUsers className={`${iconClass} text-cyan-400`} />, onClick: () => setCurrentView('teacher_students') },
+        // صفحة اختبار البطاقات (تجربة ما أنشأه)
+        { title: t('nav_test_cards') || "Test", icon: <IconCpu className={`${iconClass} text-purple-400`} />, onClick: () => setCurrentView('category') },
+        // صفحة الدردشة (مع الطلاب)
+        { title: t('nav_chat') || "Chat", icon: <IconMessageCircle className={`${iconClass} text-blue-400`} />, onClick: () => setCurrentView('chat') },
+        // صفحة البث المباشر
+        { title: t('nav_live') || "Live", icon: <IconBroadcast className={`${iconClass} text-red-500`} />, onClick: () => setCurrentView('live') },
+        // صفحة متابعة التقدم
+        { title: t('nav_progress') || "Progress", icon: <IconChartBar className={`${iconClass} text-yellow-400`} />, onClick: () => setCurrentView('teacher_progress') },
+        // صفحة الدعم (للتواصل مع الأدمن)
+        { title: t('nav_support') || "Support", icon: <IconLifebuoy className={`${iconClass} text-orange-500`} />, onClick: () => setShowSupport(true) },
+      ];
+    } 
     
-    const links = [
-      { title: t('nav_home'), icon: <IconHome className={`${iconClass} text-white/70`} />, onClick: () => setCurrentView('home') },
-      { title: t('nav_games'), icon: <IconDeviceGamepad className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('games') },
-      { title: t('nav_live'), icon: <IconBroadcast className={`${iconClass} text-red-500`} />, onClick: () => setCurrentView('live') },
-      { title: t('nav_chat'), icon: <IconMessageCircle className={`${iconClass} text-cyan-400`} />, onClick: () => setCurrentView('chat') },
-      { title: t('nav_study'), icon: <IconCpu className={`${iconClass} text-purple-400`} />, onClick: () => setCurrentView('category') },
-      { title: t('nav_archive'), icon: <IconDatabase className={`${iconClass} text-amber-500`} />, onClick: () => setCurrentView('data') }, 
-      { title: t('nav_rank'), icon: <IconTrophy className={`${iconClass} text-yellow-400`} />, onClick: () => setCurrentView('leaderboard') },
-      { title: t('nav_settings'), icon: <IconSettings className={`${iconClass} text-zinc-400`} />, onClick: () => setCurrentView('settings') },
-    ];
-    
-    // إضافة أزرار الصلاحيات الخاصة
-    if (isJunior) {
-      links.push({ title: t('nav_admin'), icon: <IconShield className={`${iconClass} text-red-600`} />, onClick: () => setCurrentView('admin_panel') });
+    // --- واجهة الطالب (Student Interface) ---
+    else if (isStudent) {
+      links = [
+        // صفحة البطاقات (للدراسة)
+        { title: t('nav_study') || "Study", icon: <IconCpu className={`${iconClass} text-purple-400`} />, onClick: () => setCurrentView('category') },
+        // صفحة البيانات (للاطلاع فقط)
+        { title: t('nav_data') || "Data", icon: <IconDatabase className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('data') },
+        // صفحة الدردشة (مع الأستاذ)
+        { title: t('nav_chat') || "Class", icon: <IconMessageCircle className={`${iconClass} text-cyan-400`} />, onClick: () => setCurrentView('chat') },
+        // صفحة الجوائز
+        { title: t('nav_rewards') || "Rewards", icon: <IconTrophy className={`${iconClass} text-yellow-400`} />, onClick: () => setCurrentView('leaderboard') },
+        // صفحة الإعدادات
+        { title: t('nav_settings') || "Settings", icon: <IconSettings className={`${iconClass} text-zinc-400`} />, onClick: () => setCurrentView('settings') },
+        // صفحة الدعم
+        { title: t('nav_support') || "Support", icon: <IconLifebuoy className={`${iconClass} text-orange-500`} />, onClick: () => setShowSupport(true) },
+      ];
     }
-    
-    if (!isAdmin) {
-      links.push({ title: t('nav_support'), icon: <IconLifebuoy className={`${iconClass} text-orange-500`} />, onClick: () => setShowSupport(true) });
+
+    // --- واجهة المستخدم العادي / الأدمن (Default Interface) ---
+    else {
+      // (User Or Admin)
+      links = [
+        { title: t('nav_home'), icon: <IconHome className={`${iconClass} text-white/70`} />, onClick: () => setCurrentView('home') },
+        { title: t('nav_games'), icon: <IconDeviceGamepad className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('games') },
+        { title: t('nav_live'), icon: <IconBroadcast className={`${iconClass} text-red-500`} />, onClick: () => setCurrentView('live') },
+        { title: t('nav_chat'), icon: <IconMessageCircle className={`${iconClass} text-cyan-400`} />, onClick: () => setCurrentView('chat') },
+        { title: t('nav_study'), icon: <IconCpu className={`${iconClass} text-purple-400`} />, onClick: () => setCurrentView('category') },
+        { title: t('nav_archive'), icon: <IconDatabase className={`${iconClass} text-amber-500`} />, onClick: () => setCurrentView('data') }, 
+        { title: t('nav_rank'), icon: <IconTrophy className={`${iconClass} text-yellow-400`} />, onClick: () => setCurrentView('leaderboard') },
+        { title: t('nav_settings'), icon: <IconSettings className={`${iconClass} text-zinc-400`} />, onClick: () => setCurrentView('settings') },
+      ];
+
+      // إضافة زر الأدمن إذا كان يملك الصلاحية
+      if (isAdmin) {
+        links.push({ title: t('nav_admin'), icon: <IconShield className={`${iconClass} text-red-600`} />, onClick: () => setCurrentView('admin_panel') });
+      } else {
+        // إضافة زر الدعم لليوزر العادي
+        links.push({ title: t('nav_support'), icon: <IconLifebuoy className={`${iconClass} text-orange-500`} />, onClick: () => setShowSupport(true) });
+      }
     }
     
     return links;
-  }, [isJunior, isAdmin, setCurrentView, setShowSupport, t]);
+  }, [isTeacher, isStudent, isAdmin, setCurrentView, setShowSupport, t]);
 
   // 7. معالجة حالات التحميل والأمن
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
@@ -134,7 +179,7 @@ export default function Page() {
             {showSupport && <SupportModal user={user} onClose={() => setShowSupport(false)} />}
         </AnimatePresence>
 
-        {/* طبقة الألعاب المنبثقة (Pop-up Overlays) */}
+        {/* طبقة الألعاب المنبثقة (Pop-up Overlays) - متاحة للجميع ما عدا وضع الأدمن */}
         {!isAdminMode && (
             <AnimatePresence>
               {activeOverlayGame === 'time_traveler' && <TimeTraveler onClose={() => setActiveOverlayGame(null)} />}
@@ -177,7 +222,7 @@ export default function Page() {
              />
         </div>
 
-        {/* شريط التنقل السفلي المترجم */}
+        {/* شريط التنقل السفلي المترجم والديناميكي */}
         {!isAdminMode && (
             <div className="fixed bottom-8 left-0 w-full z-[60] flex justify-center pointer-events-none">
                 <motion.div 
