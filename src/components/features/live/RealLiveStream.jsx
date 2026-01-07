@@ -17,24 +17,22 @@ export default function RealLiveStream() {
   const { t, dir } = useLanguage();
   
   const [roomName, setRoomName] = useState("");
-  const [status, setStatus] = useState("idle"); // idle, scanning, notifying, connected
+  const [status, setStatus] = useState("idle");
   const [logs, setLogs] = useState([]);
 
-  // سجلات النظام (Log Console)
+  // دالة لإضافة السجلات (Logs)
   const addLog = (msg) => setLogs(prev => [...prev.slice(-3), `> ${msg}`]);
 
-  // --- 1. بدء البث للأستاذ (Command Center) ---
+  // --- 1. بدء البث للأستاذ ---
   const handleStartClass = async () => {
       setStatus("scanning");
       addLog("INITIALIZING CLASSROOM PROTOCOL...");
       
-      // اسم الغرفة الثابت للأستاذ
       const classRoomId = `CLASS_${user.uid}`;
       
       try {
           addLog("SCANNING SQUAD ROSTER...");
-          
-          // جلب الطلاب لإرسال إشعار لهم
+          // جلب الطلاب لإرسال إشعار
           const q = query(collection(db, "users"), where("teacherId", "==", user.uid));
           const snapshot = await getDocs(q);
           
@@ -42,12 +40,11 @@ export default function RealLiveStream() {
               setStatus("notifying");
               addLog(`FOUND ${snapshot.size} OPERATIVES. SENDING SIGNAL...`);
               
-              // إرسال الإشعارات
               const notificationsPromises = snapshot.docs.map(studentDoc => {
                   return addDoc(collection(db, "notifications"), {
                       userId: studentDoc.id,
                       target: 'student',
-                      type: 'live_start', // عند الضغط عليه في مركز الإشعارات سيتم توجيه الطالب للغرفة
+                      type: 'live_start',
                       title: "🔴 LIVE CLASS STARTED",
                       message: `Commander ${user.displayName || "Teacher"} is live. Tap to join immediately!`,
                       roomId: classRoomId, 
@@ -70,12 +67,12 @@ export default function RealLiveStream() {
       setTimeout(() => {
           setStatus("connected");
           addLog("SECURE CHANNEL ESTABLISHED.");
+          // بدء البث
           setTimeout(() => startBroadcast(classRoomId), 500); 
       }, 1500);
   };
 
-  // --- 2. انضمام الطالب (Receiver Mode) ---
-  // الطالب لا ينشئ غرفة، بل ينضم حصرياً لغرفة أستاذه
+  // --- 2. انضمام الطالب ---
   const handleJoinClass = () => {
       if (!userData?.teacherId) {
           addLog("ERROR: NO COMMANDER ASSIGNED.");
@@ -85,7 +82,7 @@ export default function RealLiveStream() {
       setStatus("scanning");
       addLog("SYNCING WITH COMMANDER FREQUENCY...");
       
-      // معرف الغرفة يجب أن يطابق معرف غرفة الأستاذ
+      // الدخول لنفس غرفة الأستاذ
       const targetRoomId = `CLASS_${userData.teacherId}`;
       
       setTimeout(() => {
@@ -95,7 +92,7 @@ export default function RealLiveStream() {
       }, 1500);
   };
 
-  // --- 3. انضمام يدوي (للمستخدمين العاديين فقط) ---
+  // --- 3. انضمام يدوي (عام) ---
   const handleManualJoin = () => {
     if (!roomName.trim()) return;
     setStatus("scanning");
@@ -108,7 +105,7 @@ export default function RealLiveStream() {
     }, 1500);
   };
 
-  // --- العرض: في حالة البث النشط ---
+  // --- عرض: حالة البث النشط ---
   if (liveState.isActive) {
       return (
         <div className="flex flex-col items-center justify-center h-full w-full text-center" dir={dir}>
@@ -137,11 +134,9 @@ export default function RealLiveStream() {
             animate={{ opacity: 1, y: 0 }}
             className="w-full max-w-md bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden group"
         >
-            {/* الخلفية الديكورية */}
             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.05] pointer-events-none"></div>
             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 blur-[50px] rounded-full pointer-events-none"></div>
 
-            {/* الأيقونة العلوية حسب الدور */}
             <div className="text-center mb-10 relative z-10">
                 <div className={`w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6 border shadow-[0_0_40px_rgba(0,0,0,0.3)] transition-all duration-500
                     ${isTeacher 
@@ -162,10 +157,9 @@ export default function RealLiveStream() {
                 </div>
             </div>
 
-            {/* منطقة الإجراءات (Actions) */}
             <div className="space-y-6 relative z-10">
                 
-                {/* --- واجهة الأستاذ (البادئ) --- */}
+                {/* 1. واجهة الأستاذ */}
                 {isTeacher && (
                     <div className="space-y-4">
                         <button 
@@ -175,22 +169,21 @@ export default function RealLiveStream() {
                         >
                             {status === "idle" ? <IconBroadcast size={24} className="group-hover/btn:animate-pulse"/> : <IconLoader className="animate-spin" size={24} />}
                             <span className="tracking-widest text-xs uppercase">
-                                {status === "idle" ? "START CLASS SESSION" : "NOTIFYING SQUAD..."}
+                                {status === "idle" ? (dir === 'rtl' ? "بدء حصة مباشرة" : "START CLASS SESSION") : (dir === 'rtl' ? "جاري الإشعار..." : "NOTIFYING SQUAD...")}
                             </span>
                         </button>
                         <div className="text-center text-[10px] text-emerald-500/50 font-mono flex items-center justify-center gap-2">
                             <IconUsers size={12}/>
-                            <span>Sending wake-up signal to {userData?.studentCount || "all"} students</span>
+                            <span>Auto-notify {userData?.studentCount || "all"} students</span>
                         </div>
                     </div>
                 )}
 
-                {/* --- واجهة الطالب (المستقبل) --- */}
+                {/* 2. واجهة الطالب */}
                 {isStudent && (
                     <div className="space-y-4">
                         {userData?.teacherId ? (
                             <>
-                                {/* زر الانضمام اليدوي (احتياطي) */}
                                 <button 
                                     onClick={handleJoinClass}
                                     disabled={status !== "idle"}
@@ -198,18 +191,17 @@ export default function RealLiveStream() {
                                 >
                                     {status === "idle" ? <IconSchool size={24} /> : <IconLoader className="animate-spin" size={24} />}
                                     <span className="tracking-widest text-xs uppercase">
-                                        CONNECT TO LIVE FEED
+                                        {/* النص الآن ديناميكي حسب اللغة */}
+                                        {dir === 'rtl' ? "انضمام لغرفة القائد" : "JOIN COMMANDER'S ROOM"}
                                     </span>
                                 </button>
-                                
-                                {/* رسالة توضيحية */}
                                 <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-center">
                                     <div className="flex justify-center mb-2 text-indigo-400"><IconLock size={16}/></div>
                                     <p className="text-[10px] text-indigo-200/70 font-bold uppercase tracking-wide leading-relaxed">
-                                        Waiting for Commander's Signal...
+                                        Secure Channel Ready
                                     </p>
                                     <p className="text-[9px] text-white/20 mt-1 font-mono">
-                                        You will receive a notification when the class starts.
+                                        Waiting for signal...
                                     </p>
                                 </div>
                             </>
@@ -223,7 +215,7 @@ export default function RealLiveStream() {
                     </div>
                 )}
 
-                {/* --- واجهة المستخدم العادي (يدوي) --- */}
+                {/* 3. واجهة المستخدم العادي */}
                 {(!isTeacher && !isStudent) && (
                     <div className="space-y-4">
                         <div className="relative group/input">
@@ -255,7 +247,6 @@ export default function RealLiveStream() {
                 </div>
             </div>
 
-            {/* Background Decoration Bar */}
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
         </motion.div>
     </div>

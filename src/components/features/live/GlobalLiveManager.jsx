@@ -6,8 +6,7 @@ import { useUI } from "@/context/UIContext";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { 
-  IconX, IconMaximize, IconMinimize, IconBroadcast, 
-  IconPlayerRecord, IconMicrophone, IconVideo 
+  IconX, IconMaximize, IconMinimize, IconBroadcast 
 } from "@tabler/icons-react";
 
 // تحميل Jitsi ديناميكياً لتجنب مشاكل الـ SSR
@@ -37,26 +36,37 @@ export default function GlobalLiveManager() {
   const [timer, setTimer] = useState("00:00");
   const timerInterval = useRef(null);
 
-  // إعدادات Jitsi المحسنة لتخفيف القيود
-  // ملاحظة: لتجاوز حد الـ 5 دقائق بشكل مضمون 100%، يفضل استخدام AppID من 8x8 (مجاني)
-  // لكن هذه الإعدادات تخفي الكثير من واجهات "الديمو" المزعجة
+  // ==========================================
+  // 🔥 الحل الجذري: سيرفرات المجتمع (Community Servers)
+  // هذه السيرفرات لا تفرض حد الـ 5 دقائق الموجود في meet.jit.si
+  // ==========================================
+  
+  // خيار 1 (مستقر جداً): "meet.guifi.net"
+  // خيار 2 (تابع لشركة Matrix): "jitsi.riot.im"
+  // خيار 3 (ألماني سريع): "meet.golem.de"
+  
+  const COMMUNITY_DOMAIN = "meet.guifi.net"; 
+
+  // إعدادات Jitsi المحسنة
   const configOverwrite = useMemo(() => ({
     startWithAudioMuted: true,
     startWithVideoMuted: true,
-    prejoinPageEnabled: false,        // تجاوز صفحة الانتظار
-    disableThirdPartyRequests: true,  // منع الطلبات الخارجية
-    disableDeepLinking: true,         // منع فتح التطبيق
-    enablePromo: false,               // إخفاء الإعلانات
+    prejoinPageEnabled: false,       // تجاوز صفحة الانتظار للدخول المباشر
+    disableThirdPartyRequests: true,
+    disableDeepLinking: true,
+    enablePromo: false,              // إخفاء الإعلانات
     toolbarButtons: [
        'microphone', 'camera', 'desktop', 'chat', 'raisehand', 
        'tileview', 'hangup', 'fullscreen', 'participants-pane', 'settings'
     ],
-    // إعدادات الجودة لتقليل استهلاك البيانات
-    resolution: 480, 
+    resolution: 720,
     constraints: {
-        video: { height: { ideal: 480, max: 720, min: 240 } }
-    }
-  }), []);
+        video: { height: { ideal: 720, max: 720, min: 240 } }
+    },
+    // إخفاء العدادات والهوامش غير الضرورية
+    hideConferenceTimer: true,
+    subject: liveState.roomName || "Classroom"
+  }), [liveState.roomName]);
 
   const interfaceConfigOverwrite = useMemo(() => ({
     SHOW_JITSI_WATERMARK: false,
@@ -66,9 +76,13 @@ export default function GlobalLiveManager() {
     TOOLBAR_ALWAYS_VISIBLE: false,
     filmStripOnly: false,
     DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
+    LANG_DETECTION: true,
+    APP_NAME: "Russian Master",
+    NATIVE_APP_NAME: "Russian Master",
+    PROVIDER_NAME: "Russian Master"
   }), []);
 
-  // إدارة وقت الجلسة
+  // إدارة مؤقت الجلسة (للعرض فقط في الواجهة الخاصة بنا)
   useEffect(() => {
     if (liveState.isActive) {
       let seconds = 0;
@@ -92,7 +106,7 @@ export default function GlobalLiveManager() {
 
   if (!liveState?.isActive) return null;
 
-  // إعدادات الحركة للتبديل بين الوضع الكامل والمصغر
+  // إعدادات الحركة (Animation Variants)
   const layoutVariants = {
     full: {
       position: "fixed",
@@ -119,9 +133,9 @@ export default function GlobalLiveManager() {
     }
   };
 
-  // توليد اسم غرفة فريد لتجنب التصادم
-  // نستخدم اسم الغرفة + بادئة خاصة لضمان عدم دخول غرباء
-  const secureRoomName = `RM_SECURE_CHANNEL_${liveState.roomName || 'GENERAL'}`;
+  // توليد اسم غرفة فريد وآمن
+  // ملاحظة: في سيرفرات المجتمع، الأسماء القصيرة قد تكون محجوزة، لذا نستخدم بادئة طويلة
+  const secureRoomName = `RM_SECURE_V4_${liveState.roomName || 'GENERAL'}_${new Date().getFullYear()}`;
 
   return (
     <motion.div
@@ -132,7 +146,7 @@ export default function GlobalLiveManager() {
       transition={{ type: "spring", stiffness: 150, damping: 25 }}
       className="bg-black overflow-hidden flex flex-col group shadow-2xl"
     >
-        {/* 1. شريط التحكم المصغر (يظهر فقط عند التصغير) */}
+        {/* 1. الشريط العلوي المصغر (يظهر فقط عند التصغير) */}
         <AnimatePresence>
             {liveState.isMinimized && (
                 <motion.div 
@@ -151,14 +165,14 @@ export default function GlobalLiveManager() {
                         <button 
                             onClick={() => { toggleMinimize(false); setCurrentView('live'); }} 
                             className="p-1.5 hover:bg-white/10 rounded-lg text-white transition-colors"
-                            title="Maximize"
+                            title="تكبير الشاشة"
                         >
                             <IconMaximize size={14}/>
                         </button>
                         <button 
                             onClick={handleTerminateLink} 
                             className="p-1.5 hover:bg-red-500/20 rounded-lg text-red-500 transition-colors"
-                            title="End Call"
+                            title="إنهاء المكالمة"
                         >
                             <IconX size={14}/>
                         </button>
@@ -167,22 +181,23 @@ export default function GlobalLiveManager() {
             )}
         </AnimatePresence>
 
-        {/* 2. منطقة الفيديو (Jitsi) */}
+        {/* 2. منطقة Jitsi Meet */}
         <div className="flex-1 relative bg-black">
              {/* طبقة حماية للتفاعل في الوضع المصغر */}
              {liveState.isMinimized && (
                <div 
                  className="absolute inset-0 z-10 cursor-pointer bg-transparent" 
                  onDoubleClick={() => { toggleMinimize(false); setCurrentView('live'); }}
-                 title="Double click to maximize"
+                 title="انقر مرتين للتكبير"
                />
              )}
              
              <JitsiMeeting
-                domain="meet.jit.si"
+                domain={COMMUNITY_DOMAIN} // استخدام الدومين المجتمعي المفتوح
                 roomName={secureRoomName}
                 configOverwrite={configOverwrite}
                 interfaceConfigOverwrite={interfaceConfigOverwrite}
+                lang="ar" // إجبار اللغة العربية
                 userInfo={{ 
                     displayName: user?.displayName || "Operative",
                     email: user?.email 
@@ -197,7 +212,7 @@ export default function GlobalLiveManager() {
             />
         </div>
 
-        {/* 3. واجهة التحكم الكاملة (HUD) - تظهر فقط في الوضع الكامل */}
+        {/* 3. واجهة التحكم الكاملة (تظهر فقط في وضع ملء الشاشة) */}
         {!liveState.isMinimized && (
             <div className="absolute top-0 left-0 w-full p-6 flex justify-between items-start pointer-events-none z-20" dir={dir}>
                 
@@ -223,12 +238,12 @@ export default function GlobalLiveManager() {
                     </div>
                 </div>
 
-                {/* أزرار التحكم */}
+                {/* أزرار التحكم العلوية */}
                 <div className="flex items-center gap-3 pointer-events-auto">
                     <button 
                       onClick={() => { toggleMinimize(true); setCurrentView('home'); }} 
                       className="p-4 bg-black/60 backdrop-blur-xl border border-white/10 hover:bg-white/10 text-white rounded-2xl transition-all active:scale-95 shadow-xl group"
-                      title="Minimize (PIP)"
+                      title="تصغير (PIP)"
                     >
                       <IconMinimize size={20} className="group-hover:scale-110 transition-transform"/>
                     </button>
@@ -237,7 +252,8 @@ export default function GlobalLiveManager() {
                       onClick={handleTerminateLink} 
                       className="px-8 py-4 bg-red-600 hover:bg-red-500 text-white rounded-2xl shadow-2xl shadow-red-900/40 transition-all active:scale-95 flex items-center gap-3 uppercase text-[10px] font-black tracking-[0.2em] border border-red-400/20 group"
                     >
-                      <IconX size={18} className="group-hover:rotate-90 transition-transform"/> TERMINATE
+                      <IconX size={18} className="group-hover:rotate-90 transition-transform"/> 
+                      {dir === 'rtl' ? 'إنهاء البث' : 'TERMINATE'}
                     </button>
                 </div>
             </div>
