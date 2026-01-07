@@ -4,11 +4,11 @@ import { db } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, limit, where } from 'firebase/firestore';
 import { 
   IconShieldCheck, IconCrown, IconUser, IconMedal, 
-  IconUsers, IconActivity, IconTrophy, IconSchool 
+  IconUsers, IconActivity, IconTrophy, IconSchool, IconWorld 
 } from '@tabler/icons-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
 
 export default function MemberList() {
   const [members, setMembers] = useState([]);

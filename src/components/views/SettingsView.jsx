@@ -10,9 +10,8 @@ import { db } from '@/lib/firebase';
 import { 
   IconMoon, IconSun, IconDeviceDesktop, 
   IconLogout, IconCheck, IconCamera, IconUser, IconDeviceFloppy,
-  IconWorld, IconVocabulary, IconPalette, IconSettings
+  IconWorld, IconPalette, IconSettings, IconSchool, IconMessage
 } from '@tabler/icons-react';
-import { motion } from "framer-motion";
 
 // قائمة الأفاتارات الافتراضية
 const AVATARS = [
@@ -33,13 +32,17 @@ const SYSTEM_LANGUAGES = [
 
 export default function SettingsView() {
   // استدعاء الهوكس الأساسية
-  const { user, logout, userData } = useAuth();
+  const { user, logout, userData, isTeacher } = useAuth();
   const { settings, updateSettings, isDark } = useSettings();
   const { t, dir, lang } = useLanguage(); 
   
   // الحالة المحلية (Local States)
   const [displayName, setDisplayName] = useState("");
   const [photoURL, setPhotoURL] = useState("");
+  // حقول خاصة للأستاذ
+  const [subject, setSubject] = useState("");
+  const [contactInfo, setContactInfo] = useState("");
+
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -48,16 +51,37 @@ export default function SettingsView() {
     if (user || userData) {
       setDisplayName(userData?.displayName || user?.displayName || "");
       setPhotoURL(userData?.photoURL || user?.photoURL || "/avatars/avatar1.png");
+      
+      // تحميل بيانات الأستاذ
+      if (isTeacher) {
+          setSubject(userData?.subject || "");
+          setContactInfo(userData?.contactInfo || "");
+      }
     }
-  }, [user, userData]);
+  }, [user, userData, isTeacher]);
 
   // --- 1. حفظ الملف الشخصي ---
   const handleSaveProfile = async () => {
     if (!user) return;
     setLoading(true);
     try {
+        // تحديث البيانات الأساسية في Auth
         await updateProfile(user, { displayName, photoURL });
-        await updateDoc(doc(db, "users", user.uid), { displayName, photoURL });
+        
+        // تجهيز البيانات للتحديث في Firestore
+        const updateData = { 
+            displayName, 
+            photoURL,
+            updatedAt: new Date().toISOString()
+        };
+
+        // إضافة بيانات الأستاذ إذا كان المستخدم أستاذاً
+        if (isTeacher) {
+            updateData.subject = subject;
+            updateData.contactInfo = contactInfo;
+        }
+
+        await updateDoc(doc(db, "users", user.uid), updateData);
         alert(t('alert_saved'));
     } catch (error) {
         console.error(error);
@@ -167,6 +191,36 @@ export default function SettingsView() {
                       />
                   </div>
 
+                  {/* === حقول خاصة بالأستاذ فقط === */}
+                  {isTeacher && (
+                      <div className="space-y-6 p-6 bg-cyan-500/5 border border-cyan-500/10 rounded-3xl animate-in slide-in-from-top-2">
+                          <div className="flex items-center gap-2 mb-2 text-cyan-500">
+                              <IconSchool size={18}/>
+                              <span className="text-xs font-black uppercase tracking-widest">Teacher Profile</span>
+                          </div>
+                          
+                          <div>
+                              <label className="text-[9px] font-black uppercase tracking-widest mb-2 block opacity-60">Subject / Course</label>
+                              <input 
+                                value={subject} 
+                                onChange={(e) => setSubject(e.target.value)}
+                                className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-white text-sm outline-none focus:border-cyan-500 transition-all"
+                                placeholder="e.g. Russian Language Level 1"
+                              />
+                          </div>
+
+                          <div>
+                              <label className="text-[9px] font-black uppercase tracking-widest mb-2 block opacity-60">Contact Info / Bio</label>
+                              <textarea 
+                                value={contactInfo} 
+                                onChange={(e) => setContactInfo(e.target.value)}
+                                className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-white text-sm outline-none focus:border-cyan-500 transition-all h-24 resize-none"
+                                placeholder="Contact details or short bio for students..."
+                              />
+                          </div>
+                      </div>
+                  )}
+
                   {/* اختيار من الأفاتارات الجاهزة */}
                   <div>
                       <label className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 block opacity-40">{t('identity_avatar_label')}</label>
@@ -196,7 +250,7 @@ export default function SettingsView() {
           {/* === القسم الثاني: النظام (System) === */}
           <div className="space-y-8">
               
-              {/* إعدادات اللغة (Localization) - هذا ما سيحل مشكلة "الروسية تظل عربية" */}
+              {/* إعدادات اللغة */}
               <section className={`rounded-[2.5rem] border p-8 backdrop-blur-2xl ${isDark ? 'bg-white/[0.02] border-white/10' : 'bg-black/[0.02] border-black/10'}`}>
                   <div className="flex items-center gap-3 mb-8">
                       <IconWorld className="text-emerald-500" size={24} />
@@ -215,16 +269,9 @@ export default function SettingsView() {
                           />
                       ))}
                   </div>
-                  
-                  <div className="mt-8 p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl">
-                      <p className="text-[10px] text-emerald-500/60 font-mono leading-relaxed uppercase tracking-tighter">
-                          &gt; {t('lang_system_label')}: {SYSTEM_LANGUAGES.find(l => l.code === lang)?.label} <br/>
-                          &gt; {t('lang_target_label')}: Russian [LOCKED]
-                      </p>
-                  </div>
               </section>
 
-              {/* إعدادات المظهر (Appearance) */}
+              {/* إعدادات المظهر */}
               <section className={`rounded-[2.5rem] border p-8 backdrop-blur-2xl ${isDark ? 'bg-white/[0.02] border-white/10' : 'bg-black/[0.02] border-black/10'}`}>
                   <div className="flex items-center gap-3 mb-8">
                       <IconPalette className="text-purple-500" size={24} />
@@ -252,7 +299,7 @@ export default function SettingsView() {
                   </div>
               </section>
 
-              {/* زر الخروج المترجم */}
+              {/* زر الخروج */}
               <button 
                 onClick={logout} 
                 className="w-full py-5 bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-600 hover:text-white font-black rounded-2xl transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs group"

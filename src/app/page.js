@@ -25,7 +25,6 @@ import IntroSequence from '@/components/ui/IntroSequence';
 import CyberLayout from '@/components/layout/CyberLayout';
 import SupportModal from '@/components/features/support/SupportModal';
 import { AuthScreen } from '@/components/features/auth/AuthScreen';
-import DailyReward from '@/components/ui/DailyReward';
 
 // استيراد الألعاب المنبثقة
 import TimeTraveler from '@/components/features/games/TimeTraveler';
@@ -42,7 +41,6 @@ const LoadingFallback = () => (
 
 export default function Page() {
   // 1. استدعاء كافة الهوكس اللازمة
-  // نستخدم المتغيرات الجديدة من AuthContext
   const { user, loading, isAdmin, isTeacher, isStudent, isUser, isBanned } = useAuth();
   const { 
     currentView, setCurrentView, 
@@ -54,7 +52,6 @@ export default function Page() {
   const { speak, playSFX } = useAudio();
   
   // 2. إدارة حالة نظام الدراسة
-  // سيتم تعديل useStudySystem لاحقاً ليدعم جلب البيانات حسب الرتبة
   const { 
     cards, currentCard, stats, handleSwipe, 
     resetProgress, addCard, deleteCard, updateCard, 
@@ -65,7 +62,6 @@ export default function Page() {
   const [showIntro, setShowIntro] = useState(true);
   const [broadcast, setBroadcast] = useState(null);
   const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0 });
-  const [showDaily, setShowDaily] = useState(true);
 
   // 4. مراقبة رسائل البث الإدارية (Global Broadcast)
   useEffect(() => {
@@ -173,7 +169,7 @@ export default function Page() {
         {/* المكونات العائمة العالمية */}
         <NotificationCenter />
         
-        {showDaily && <DailyReward user={user} onClose={() => setShowDaily(false)} />}
+        {/* تمت إزالة مكون DailyReward بالكامل من هنا */}
         
         <AnimatePresence>
             {showSupport && <SupportModal user={user} onClose={() => setShowSupport(false)} />}

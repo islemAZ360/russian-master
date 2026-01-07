@@ -5,9 +5,10 @@ import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion'; 
+// FIX: استبدال IconShieldAlert بـ IconShield لتجنب ReferenceError
 import { 
   IconBell, IconX, IconUserPlus, IconAward, 
-  IconMessageCircle, IconShieldAlert, IconCheck, IconLoader2 
+  IconMessageCircle, IconShield, IconCheck, IconLoader2, IconInfoCircle 
 } from '@tabler/icons-react';
 import { useLanguage } from '@/hooks/useLanguage';
 
@@ -18,7 +19,7 @@ export default function NotificationCenter() {
   const [processingId, setProcessingId] = useState(null);
   const { t, dir } = useLanguage();
 
-  // FIX: التأكد من أن الإشعارات مصفوفة دائماً
+  // FIX: التأكد من أن الإشعارات مصفوفة دائماً لتجنب الأخطاء عند التحميل
   const safeNotifications = Array.isArray(notifications) ? notifications : [];
 
   const handleAcceptInvite = async (notification) => {
@@ -51,7 +52,7 @@ export default function NotificationCenter() {
         // 3. حذف الدعوة
         await removeNotification(notification.id);
 
-        // 4. إعادة تحميل الصفحة
+        // 4. إعادة تحميل الصفحة لتطبيق الصلاحيات الجديدة
         window.location.reload();
 
     } catch (error) {
@@ -87,7 +88,6 @@ export default function NotificationCenter() {
     return map[type] || "SYSTEM ALERT";
   };
 
-  // FIX: دالة آمنة لتنسيق الوقت لمنع الانهيار
   const formatTime = (timestamp) => {
       if (!timestamp) return "Processing..."; 
       if (timestamp?.toDate) {
@@ -96,6 +96,17 @@ export default function NotificationCenter() {
           } catch (e) { return "Now"; }
       }
       return "Now";
+  };
+
+  // دالة مساعدة لاختيار الأيقونة بأمان (لتجنب تعطل التطبيق)
+  const getIcon = (type) => {
+    switch (type) {
+        case 'invite': return <IconUserPlus size={20} />;
+        case 'rank': return <IconAward size={20} />;
+        case 'support_reply': return <IconMessageCircle size={20} />;
+        case 'admin_alert': return <IconShield size={20} />; // تم الإصلاح هنا
+        default: return <IconInfoCircle size={20} />;
+    }
   };
 
   return (
@@ -152,11 +163,7 @@ export default function NotificationCenter() {
                                 className={`p-5 border-b border-white/5 flex gap-4 items-start group transition-all relative overflow-hidden ${n.type !== 'invite' ? 'cursor-pointer hover:bg-white/5' : ''}`}
                             >
                                 <div className="mt-1 shrink-0 p-2.5 rounded-xl bg-white/5 border border-white/10 text-cyan-400">
-                                    {n.type === 'invite' ? <IconUserPlus size={20}/> :
-                                     n.type === 'rank' ? <IconAward size={20}/> :
-                                     n.type === 'support_reply' ? <IconMessageCircle size={20}/> :
-                                     n.type === 'admin_alert' ? <IconShieldAlert size={20}/> :
-                                     <IconBell size={20}/>}
+                                    {getIcon(n.type)}
                                 </div>
 
                                 <div className="flex-1 min-w-0">
