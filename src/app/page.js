@@ -62,6 +62,18 @@ export default function Page() {
   const [showIntro, setShowIntro] = useState(true);
   const [broadcast, setBroadcast] = useState(null);
   const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0 });
+  
+  // FIX: إضافة حالة لفرض العرض إذا تأخر التحميل
+  const [forceLoad, setForceLoad] = useState(false);
+
+  // مراقبة وقت التحميل لتجنب التعليق اللانهائي
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // إذا استمر التحميل أكثر من 4 ثواني، افرض الدخول
+      setForceLoad(true);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // 4. مراقبة رسائل البث الإدارية (Global Broadcast)
   useEffect(() => {
@@ -86,44 +98,28 @@ export default function Page() {
     // --- واجهة الأستاذ (Teacher Interface) ---
     if (isTeacher) {
       links = [
-        // صفحة إنشاء قاعدة البيانات
         { title: t('nav_create_db') || "Database", icon: <IconPencil className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('teacher_db') },
-        // صفحة إدارة الطلاب
         { title: t('nav_students') || "Students", icon: <IconUsers className={`${iconClass} text-cyan-400`} />, onClick: () => setCurrentView('teacher_students') },
-        // صفحة اختبار البطاقات (تجربة ما أنشأه)
         { title: t('nav_test_cards') || "Test", icon: <IconCpu className={`${iconClass} text-purple-400`} />, onClick: () => setCurrentView('category') },
-        // صفحة الدردشة (مع الطلاب)
         { title: t('nav_chat') || "Chat", icon: <IconMessageCircle className={`${iconClass} text-blue-400`} />, onClick: () => setCurrentView('chat') },
-        // صفحة البث المباشر
         { title: t('nav_live') || "Live", icon: <IconBroadcast className={`${iconClass} text-red-500`} />, onClick: () => setCurrentView('live') },
-        // صفحة متابعة التقدم
         { title: t('nav_progress') || "Progress", icon: <IconChartBar className={`${iconClass} text-yellow-400`} />, onClick: () => setCurrentView('teacher_progress') },
-        // صفحة الدعم (للتواصل مع الأدمن)
         { title: t('nav_support') || "Support", icon: <IconLifebuoy className={`${iconClass} text-orange-500`} />, onClick: () => setShowSupport(true) },
       ];
     } 
-    
     // --- واجهة الطالب (Student Interface) ---
     else if (isStudent) {
       links = [
-        // صفحة البطاقات (للدراسة)
         { title: t('nav_study') || "Study", icon: <IconCpu className={`${iconClass} text-purple-400`} />, onClick: () => setCurrentView('category') },
-        // صفحة البيانات (للاطلاع فقط)
         { title: t('nav_data') || "Data", icon: <IconDatabase className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('data') },
-        // صفحة الدردشة (مع الأستاذ)
         { title: t('nav_chat') || "Class", icon: <IconMessageCircle className={`${iconClass} text-cyan-400`} />, onClick: () => setCurrentView('chat') },
-        // صفحة الجوائز
         { title: t('nav_rewards') || "Rewards", icon: <IconTrophy className={`${iconClass} text-yellow-400`} />, onClick: () => setCurrentView('leaderboard') },
-        // صفحة الإعدادات
         { title: t('nav_settings') || "Settings", icon: <IconSettings className={`${iconClass} text-zinc-400`} />, onClick: () => setCurrentView('settings') },
-        // صفحة الدعم
         { title: t('nav_support') || "Support", icon: <IconLifebuoy className={`${iconClass} text-orange-500`} />, onClick: () => setShowSupport(true) },
       ];
     }
-
-    // --- واجهة المستخدم العادي / الأدمن (Default Interface) ---
+    // --- واجهة المستخدم العادي / الأدمن ---
     else {
-      // (User Or Admin)
       links = [
         { title: t('nav_home'), icon: <IconHome className={`${iconClass} text-white/70`} />, onClick: () => setCurrentView('home') },
         { title: t('nav_games'), icon: <IconDeviceGamepad className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('games') },
@@ -135,11 +131,9 @@ export default function Page() {
         { title: t('nav_settings'), icon: <IconSettings className={`${iconClass} text-zinc-400`} />, onClick: () => setCurrentView('settings') },
       ];
 
-      // إضافة زر الأدمن إذا كان يملك الصلاحية
       if (isAdmin) {
         links.push({ title: t('nav_admin'), icon: <IconShield className={`${iconClass} text-red-600`} />, onClick: () => setCurrentView('admin_panel') });
       } else {
-        // إضافة زر الدعم لليوزر العادي
         links.push({ title: t('nav_support'), icon: <IconLifebuoy className={`${iconClass} text-orange-500`} />, onClick: () => setShowSupport(true) });
       }
     }
@@ -147,9 +141,12 @@ export default function Page() {
     return links;
   }, [isTeacher, isStudent, isAdmin, setCurrentView, setShowSupport, t]);
 
-  // 7. معالجة حالات التحميل والأمن
+  // 7. معالجة حالات التحميل والأمن (تم التعديل لإضافة forceLoad)
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
-  if (loading || !isLoaded) return <LoadingFallback />;
+  
+  // FIX: إذا طال الانتظار (forceLoad = true)، نتجاوز شاشة التحميل حتى لو كانت loading = true
+  if ((loading || !isLoaded) && !forceLoad) return <LoadingFallback />;
+  
   if (isBanned || studyBanned) {
       return (
         <div className="h-screen flex items-center justify-center bg-black text-red-600 font-black font-mono tracking-[0.5em] text-2xl uppercase">
@@ -157,25 +154,22 @@ export default function Page() {
         </div>
       );
   }
+  
+  // إذا لم يكن هناك مستخدم وتم تجاوز التحميل، اعرض شاشة الدخول
   if (!user) return <AuthScreen onLoginSuccess={() => {}} />;
 
   const isAdminMode = isAdmin && currentView === 'admin_panel';
 
   return (
     <CyberLayout>
-      {/* تطبيق اتجاه اللغة ودعم RTL/LTR */}
       <div className="relative h-full w-full" dir={dir}>
         
-        {/* المكونات العائمة العالمية */}
         <NotificationCenter />
-        
-        {/* تمت إزالة مكون DailyReward بالكامل من هنا */}
         
         <AnimatePresence>
             {showSupport && <SupportModal user={user} onClose={() => setShowSupport(false)} />}
         </AnimatePresence>
 
-        {/* طبقة الألعاب المنبثقة (Pop-up Overlays) - متاحة للجميع ما عدا وضع الأدمن */}
         {!isAdminMode && (
             <AnimatePresence>
               {activeOverlayGame === 'time_traveler' && <TimeTraveler onClose={() => setActiveOverlayGame(null)} />}
@@ -185,7 +179,6 @@ export default function Page() {
             </AnimatePresence>
         )}
         
-        {/* شريط البث العاجل من الإدارة */}
         <AnimatePresence>
           {broadcast && (
               <motion.div 
@@ -199,7 +192,6 @@ export default function Page() {
           )}
         </AnimatePresence>
 
-        {/* مدير العرض المركزي (Main Operations Window) */}
         <div className="relative z-10 flex flex-col items-center justify-start h-full w-full pt-4 md:pt-0">
              <ViewManager 
                   cards={cards} 
@@ -218,7 +210,6 @@ export default function Page() {
              />
         </div>
 
-        {/* شريط التنقل السفلي المترجم والديناميكي */}
         {!isAdminMode && (
             <div className="fixed bottom-8 left-0 w-full z-[60] flex justify-center pointer-events-none">
                 <motion.div 
