@@ -77,19 +77,13 @@ export default function CommunicationHub() {
         updateLocalChats();
     }));
 
-    // الاستعلام 4: للطالب - مجموعات أستاذه
+    // الاستعلام 4: للطالب - مجموعات أستاذه (للانضمام التلقائي أو الرؤية)
     if (isStudent && userData?.teacherId) {
         const qTeacher = query(collection(db, "chats"), where("createdBy", "==", userData.teacherId));
         unsubscribers.push(onSnapshot(qTeacher, (snap) => {
             snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
             updateLocalChats();
         }));
-    }
-
-    // إذا كان أدمن، نجلب كل شيء (اختياري، يمكن الاكتفاء بما سبق لتقليل الحمل)
-    if (isAdmin) {
-        // الأدمن يرى كل شيء عبر الاستعلامات السابقة + العامة، 
-        // أو يمكن إضافة استعلام شامل إذا كانت القواعد تسمح بذلك للأدمن حصراً
     }
 
     return () => {
@@ -101,7 +95,7 @@ export default function CommunicationHub() {
   useEffect(() => {
     if (!selectedChat) return;
     
-    // الانضمام التلقائي للطالب لغرف أستاذه
+    // الانضمام التلقائي للطالب لغرف أستاذه إذا لم يكن عضواً
     if (isStudent && userData?.teacherId === selectedChat.createdBy && !selectedChat.members?.includes(user.uid)) {
         updateDoc(doc(db, "chats", selectedChat.id), {
             members: arrayUnion(user.uid)
@@ -122,7 +116,7 @@ export default function CommunicationHub() {
     return () => unsub();
   }, [selectedChat, isStudent, user, userData]);
 
-  // 3. جلب طلاب الأستاذ للدعوة
+  // 3. جلب طلاب الأستاذ للدعوة (عند فتح المودال)
   useEffect(() => {
       if (showInviteModal && isTeacher) {
           const q = query(collection(db, "users"), where("teacherId", "==", user.uid));
@@ -159,6 +153,7 @@ export default function CommunicationHub() {
   const handleCreateGroup = async () => {
     if (!newGroup.name.trim()) return;
     
+    // الأستاذ ينشئ مجموعات خاصة افتراضياً (للفصل)
     const finalType = isTeacher ? 'private' : newGroup.type;
 
     try {
@@ -173,11 +168,10 @@ export default function CommunicationHub() {
         
         setShowCreateModal(false);
         setNewGroup({ name: "", type: "public" });
-        // تحديد الشات الجديد مباشرة
+        
+        // الانتقال للمحادثة الجديدة فوراً
         const newChatData = { id: docRef.id, name: newGroup.name, type: finalType, createdBy: user.uid, members: [user.uid] };
         setSelectedChat(newChatData);
-        
-        // إضافته يدوياً للقائمة فوراً لتجنب انتظار السيرفر
         setChats(prev => [newChatData, ...prev]);
         
     } catch (e) { console.error(e); }
@@ -189,6 +183,7 @@ export default function CommunicationHub() {
           await updateDoc(doc(db, "chats", selectedChat.id), {
               members: arrayUnion(studentId)
           });
+          // Feedback بصري سريع
           alert("Operative added to channel.");
       } catch (e) { console.error(e); }
   };
@@ -203,14 +198,15 @@ export default function CommunicationHub() {
       } catch(e) { console.error(e); }
   };
 
-  const canCreate = !isStudent; 
+  // الصلاحيات
+  const canCreate = !isStudent; // الطلاب لا ينشئون مجموعات (حالياً)
   const canInvite = selectedChat && (selectedChat.createdBy === user.uid || isAdmin);
   const canDelete = selectedChat && (selectedChat.createdBy === user.uid || isAdmin);
 
   return (
     <div className="flex-1 w-full flex flex-col md:flex-row bg-[#080808]/60 border border-white/10 rounded-[2.5rem] overflow-hidden backdrop-blur-xl shadow-2xl mb-10 h-[calc(100vh-180px)]" dir={dir}>
       
-      {/* Sidebar */}
+      {/* Sidebar List */}
       <aside className={`w-full md:w-80 border-r border-white/5 flex flex-col bg-black/40 shrink-0 ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
           <div className="flex items-center gap-3">
@@ -340,7 +336,7 @@ export default function CommunicationHub() {
         )}
       </main>
 
-      {/* Invite Modal */}
+      {/* Invite Modal (خاص للأستاذ) */}
       <AnimatePresence>
         {showInviteModal && (
           <div className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
@@ -364,7 +360,7 @@ export default function CommunicationHub() {
                                 }
                             </div>
                         ))
-                    ) : <div className="text-center py-10 text-white/20 text-xs font-mono">No students assigned.</div>
+                    ) : <div className="text-center py-10 text-white/20 text-xs font-mono">No students assigned. Recruit first.</div>
                 ) : (
                     <div className="text-center py-10 text-white/20 text-xs font-mono">Restricted to command.</div>
                 )}

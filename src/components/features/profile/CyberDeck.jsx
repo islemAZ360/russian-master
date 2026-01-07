@@ -1,13 +1,15 @@
 "use client";
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   IconUser, IconTrophy, IconFlame, IconTarget, 
   IconActivity, IconLock, IconMedal, IconCrown, 
   IconDna, IconChartRadar, IconSchool, IconShieldCheck, 
-  IconBook, IconMessage // تم إضافة أيقونات جديدة للمادة والتواصل
+  IconBook, IconMessage, IconId
 } from "@tabler/icons-react";
 import { useLanguage } from "@/hooks/useLanguage";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 // --- تكوين الرتب ---
 const RANKS_CONFIG = [
@@ -68,6 +70,24 @@ const SkillRadar = ({ stats, color }) => {
 
 export default function CyberDeck({ user, stats, cards = [] }) {
   const { t, dir } = useLanguage();
+  const [commanderName, setCommanderName] = useState(null);
+
+  // جلب اسم المعلم (القائد) إذا كان المستخدم طالباً
+  useEffect(() => {
+      if (user?.role === 'student' && user?.teacherId) {
+          const fetchCommander = async () => {
+              try {
+                  const docSnap = await getDoc(doc(db, "users", user.teacherId));
+                  if (docSnap.exists()) {
+                      setCommanderName(docSnap.data().displayName);
+                  }
+              } catch (err) {
+                  console.error("Failed to load commander data", err);
+              }
+          };
+          fetchCommander();
+      }
+  }, [user]);
 
   const analytics = useMemo(() => {
     const xp = stats?.xp || 0;
@@ -121,6 +141,7 @@ export default function CyberDeck({ user, stats, cards = [] }) {
     : '#06b6d4';
 
   const isTeacher = user?.role === 'teacher';
+  const isStudent = user?.role === 'student';
 
   return (
     <div className="w-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20" dir={dir}>
@@ -158,7 +179,7 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                             {user?.displayName || "OPERATIVE"}
                         </h1>
 
-                        {/* --- الجديد: عرض معلومات الأستاذ --- */}
+                        {/* --- معلومات الأستاذ --- */}
                         {isTeacher && (
                             <div className="flex flex-col gap-2 mb-4 items-center md:items-start">
                                 {user?.subject && (
@@ -173,6 +194,17 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                                         <span className="text-xs font-mono">{user.contactInfo}</span>
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {/* --- معلومات الطالب (القائد) --- */}
+                        {isStudent && commanderName && (
+                            <div className="mb-4 inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                                <IconId size={16} className="text-purple-400" />
+                                <div className="flex flex-col text-left">
+                                    <span className="text-[8px] text-purple-400/60 font-black uppercase tracking-widest leading-none mb-0.5">SQUAD COMMANDER</span>
+                                    <span className="text-xs text-purple-100 font-bold uppercase">{commanderName}</span>
+                                </div>
                             </div>
                         )}
 

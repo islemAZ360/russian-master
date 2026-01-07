@@ -1,115 +1,129 @@
 "use client";
 import React, { useState } from 'react';
-import { useUI } from '../../context/UIContext';
+import { useUI } from '@/context/UIContext';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, addDoc, collection, deleteDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion'; 
 import { 
   IconBell, IconX, IconUserPlus, IconAward, 
   IconMessageCircle, IconShield, IconCheck, IconLoader2, 
-  IconInfoCircle, IconBroadcast 
+  IconInfoCircle, IconBroadcast, IconSchool
 } from '@tabler/icons-react';
 import { useLanguage } from '@/hooks/useLanguage';
 
 export default function NotificationCenter() {
-  // إضافة startBroadcast للتعامل مع إشعارات البث
   const { notifications, removeNotification, setCurrentView, setShowSupport, startBroadcast } = useUI();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [processingId, setProcessingId] = useState(null);
   const { t, dir } = useLanguage();
 
+  // ضمان أن الإشعارات مصفوفة دائماً
   const safeNotifications = Array.isArray(notifications) ? notifications : [];
 
+  // --- 1. معالجة قبول الدعوة ---
   const handleAcceptInvite = async (notification) => {
     if (!user || !notification.actionPayload) return;
     
     setProcessingId(notification.id);
 
     try {
-        const { teacherId, newRole } = notification.actionPayload;
+        const { teacherId, teacherName, newRole } = notification.actionPayload;
 
-        // 1. تحديث بيانات المستخدم
+        // أ. تحديث بيانات الطالب (المستخدم الحالي)
         const userRef = doc(db, "users", user.uid);
         await updateDoc(userRef, {
-            role: newRole,
-            teacherId: teacherId,
+            role: newRole || 'student', // ترقية لرتبة طالب
+            teacherId: teacherId,       // ربطه بالأستاذ
             updatedAt: serverTimestamp()
         });
 
-        // 2. إشعار الأستاذ
+        // ب. إشعار الأستاذ بأن الطالب قبل الدعوة
         await addDoc(collection(db, "notifications"), {
-            userId: teacherId,
+            userId: teacherId, // معرف الأستاذ
             target: 'teacher',
             type: "info",
-            title: "RECRUITMENT SUCCESSFUL",
-            message: `${user.displayName || "Agent"} has joined your squad.`,
+            title: "✅ RECRUITMENT SUCCESS",
+            message: `Operative ${user.displayName || "Unknown"} has accepted your invite and joined the squad.`,
+            senderId: user.uid,
             createdAt: serverTimestamp(),
             read: false
         });
 
-        // 3. حذف الدعوة
-        await removeNotification(notification.id);
+        // ج. حذف إشعار الدعوة بعد القبول
+        await deleteDoc(doc(db, "notifications", notification.id));
 
-        // 4. إعادة التحميل
-        window.location.reload();
+        // د. تحديث الواجهة (إعادة تحميل لتطبيق الصلاحيات الجديدة)
+        // نستخدم setTimeout لإعطاء فرصة للمستخدم لرؤية التغيير البصري
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
 
     } catch (error) {
-        console.error("Invite Error:", error);
+        console.error("Invite Acceptance Error:", error);
+        alert("Failed to process acceptance. Connection error.");
         setProcessingId(null);
     }
   };
 
+  // --- 2. رفض أو حذف الإشعار ---
   const handleDismiss = async (e, id) => {
       e.stopPropagation();
       await removeNotification(id);
   };
 
-  // --- التوجيه الذكي عند الضغط على الإشعار ---
+  // --- 3. التوجيه عند النقر ---
   const handleNavigation = (n) => {
-    // دعوات الانضمام لها أزرار خاصة ولا يتم تفعيلها بالنقر العام
+    // الدعوات لا تفعل شيئاً عند النقر العام (يجب استخدام الأزرار)
     if (n.type === 'invite') return;
 
-    // 1. معالجة إشعار البث المباشر (الجديد)
+    // معالجة إشعار البث المباشر
     if (n.type === 'live_start' && n.roomId) {
-        startBroadcast(n.roomId); // دالة بدء البث من الـ Context
-    }
-    // 2. ردود الدعم الفني
-    else if (n.type === 'support_reply') {
-        setShowSupport(true);
-    }
-    // 3. الترقيات والجوائز
-    else if (n.type === 'rank') {
-        setCurrentView('leaderboard');
-    }
-    // 4. تنبيهات الأدمن
-    else if (n.type === 'admin_alert') {
-        // إذا كان المستخدم أدمن يذهب للوحة، وإلا يكتفي بالقراءة
-        // (يمكن توجيهه لصفحة خاصة إذا لزم الأمر)
+        startBroadcast(n.roomId);
+        setIsOpen(false);
+        return;
     }
     
+    // ردود الدعم
+    if (n.type === 'support_reply') {
+        setShowSupport(true);
+    }
+    
+    // الترقيات
+    if (n.type === 'rank') {
+        setCurrentView('leaderboard');
+    }
+
+    // إغلاق القائمة وحذف الإشعار (اختياري: يمكن تركه مقروءاً بدلاً من حذفه)
     setIsOpen(false);
     removeNotification(n.id);
   };
 
   const getNotifTitle = (type) => {
     const map = {
-      'invite': t('notif_type_invite') || "INVITATION",
+      'invite': t('notif_type_invite') || "SQUAD INVITE",
       'rank': t('notif_type_rank') || "PROMOTION",
       'support_reply': t('notif_type_support') || "SUPPORT",
       'admin_alert': t('notif_type_admin') || "ALERT",
-      'live_start': "🔴 LIVE STREAM", // عنوان إشعار البث
+      'live_start': "🔴 LIVE STREAM",
       'info': "SYSTEM INFO"
     };
-    return map[type] || "SYSTEM ALERT";
+    return map[type] || "SYSTEM MESSAGE";
   };
 
   const formatTime = (timestamp) => {
-      if (!timestamp) return "..."; 
+      if (!timestamp) return "Just now"; 
       if (timestamp?.toDate) {
           try {
-              return new Date(timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+              const date = timestamp.toDate();
+              const now = new Date();
+              const diff = (now - date) / 1000; // seconds
+              
+              if (diff < 60) return "Just now";
+              if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+              if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+              return date.toLocaleDateString();
           } catch (e) { return "Now"; }
       }
       return "Now";
@@ -117,29 +131,30 @@ export default function NotificationCenter() {
 
   const getIcon = (type) => {
     switch (type) {
-        case 'invite': return <IconUserPlus size={20} />;
-        case 'rank': return <IconAward size={20} />;
-        case 'support_reply': return <IconMessageCircle size={20} />;
-        case 'admin_alert': return <IconShield size={20} />;
-        case 'live_start': return <IconBroadcast size={20} className="animate-pulse text-red-500" />; // أيقونة البث
-        default: return <IconInfoCircle size={20} />;
+        case 'invite': return <IconSchool size={20} className="text-purple-400"/>;
+        case 'rank': return <IconAward size={20} className="text-yellow-400"/>;
+        case 'support_reply': return <IconMessageCircle size={20} className="text-blue-400"/>;
+        case 'admin_alert': return <IconShield size={20} className="text-red-500"/>;
+        case 'live_start': return <IconBroadcast size={20} className="animate-pulse text-red-500" />;
+        case 'info': return <IconCheck size={20} className="text-emerald-400"/>;
+        default: return <IconInfoCircle size={20} className="text-gray-400"/>;
     }
   };
 
   return (
-    <div className={`fixed top-6 ${dir === 'rtl' ? 'left-6' : 'right-6'} z-[9999]`} dir={dir}>
+    <div className={`fixed top-6 ${dir === 'rtl' ? 'left-6' : 'right-6'} z-[9999] font-sans`} dir={dir}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className={`p-3 rounded-2xl border transition-all duration-300 shadow-2xl group relative
           ${safeNotifications.length > 0 
-            ? 'bg-cyan-600 border-cyan-400 text-white animate-pulse' 
+            ? 'bg-cyan-600 border-cyan-400 text-white animate-pulse shadow-[0_0_20px_rgba(6,182,212,0.4)]' 
             : 'bg-[#0a0a0a]/80 border-white/10 text-white/40 hover:text-white hover:border-white/20'
           }`}
       >
-        <IconBell size={24} className="group-hover:rotate-12 transition-transform" />
+        <IconBell size={24} className={safeNotifications.length > 0 ? "animate-swing" : ""} />
         
         {safeNotifications.length > 0 && (
-          <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full text-[10px] flex items-center justify-center font-black text-white border-2 border-black shadow-lg">
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[10px] flex items-center justify-center font-black text-white border-2 border-[#0a0a0a]">
             {safeNotifications.length}
           </span>
         )}
@@ -148,69 +163,74 @@ export default function NotificationCenter() {
       <AnimatePresence>
         {isOpen && (
             <motion.div 
-                initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className={`absolute top-16 ${dir === 'rtl' ? 'left-0' : 'right-0'} w-85 bg-[#0d0d0d] border border-white/10 rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden backdrop-blur-2xl`}
-                style={{ width: '360px' }}
+                className={`absolute top-16 ${dir === 'rtl' ? 'left-0' : 'right-0'} w-[360px] bg-[#0d0d0d] border border-white/10 rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.9)] overflow-hidden backdrop-blur-3xl`}
             >
+                {/* Header */}
                 <div className="p-5 bg-white/5 border-b border-white/10 flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 bg-cyan-500 rounded-full"></span>
-                        <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">{t('notif_title') || "NOTIFICATIONS"}</span>
+                    <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></div>
+                        <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">
+                            {t('notif_title') || "NEURAL ALERTS"}
+                        </span>
                     </div>
-                    <button onClick={()=>setIsOpen(false)} className="p-1 hover:bg-white/10 rounded-lg text-white/20 hover:text-white transition-colors">
-                        <IconX size={18}/>
+                    <button onClick={()=>setIsOpen(false)} className="p-1.5 hover:bg-white/10 rounded-full text-white/20 hover:text-white transition-colors">
+                        <IconX size={16}/>
                     </button>
                 </div>
                 
-                <div className="max-h-[450px] overflow-y-auto custom-scrollbar">
+                {/* Body */}
+                <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
                     {safeNotifications.length === 0 ? (
-                        <div className="p-16 text-center">
-                            <IconBell size={48} className="mx-auto mb-4 text-white/5" />
-                            <p className="text-[10px] font-black text-white/20 uppercase tracking-widest leading-relaxed">
-                                {t('notif_empty') || "NO NEW SIGNALS"}
-                            </p>
+                        <div className="py-16 flex flex-col items-center justify-center text-center opacity-30">
+                            <IconBell size={48} className="mb-4" />
+                            <p className="text-[10px] font-black uppercase tracking-widest">No Active Signals</p>
                         </div>
                     ) : (
                         safeNotifications.map(n => (
                             <div 
                                 key={n.id} 
                                 onClick={() => handleNavigation(n)} 
-                                className={`p-5 border-b border-white/5 flex gap-4 items-start group transition-all relative overflow-hidden ${n.type !== 'invite' ? 'cursor-pointer hover:bg-white/5' : ''}`}
+                                className={`p-5 border-b border-white/5 flex gap-4 items-start relative group transition-all 
+                                ${n.type === 'invite' ? 'bg-purple-500/5' : 'hover:bg-white/5 cursor-pointer'}`}
                             >
-                                <div className="mt-1 shrink-0 p-2.5 rounded-xl bg-white/5 border border-white/10 text-cyan-400">
+                                {/* Icon */}
+                                <div className="mt-1 shrink-0 p-2.5 rounded-xl bg-[#1a1a1a] border border-white/10 shadow-lg">
                                     {getIcon(n.type)}
                                 </div>
 
+                                {/* Content */}
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex justify-between items-start mb-1">
-                                        <h4 className="text-xs font-black text-white uppercase tracking-tight truncate">
+                                    <div className="flex justify-between items-start mb-1.5">
+                                        <h4 className={`text-xs font-black uppercase tracking-tight truncate ${n.type === 'invite' ? 'text-purple-400' : 'text-white'}`}>
                                             {getNotifTitle(n.type)}
                                         </h4>
-                                        <span className="text-[8px] font-mono text-white/20 uppercase">
+                                        <span className="text-[9px] font-mono text-white/20 uppercase whitespace-nowrap ml-2">
                                             {formatTime(n.createdAt)}
                                         </span>
                                     </div>
                                     
-                                    <p className="text-[11px] text-white/50 leading-relaxed font-medium mb-3">
+                                    <p className="text-[11px] text-white/60 leading-relaxed font-medium mb-3">
                                         {n.message}
                                     </p>
                                     
+                                    {/* Invite Actions */}
                                     {n.type === 'invite' && (
-                                        <div className="flex gap-2 mt-2">
+                                        <div className="flex gap-2 mt-1">
                                             <button 
                                                 onClick={(e) => { e.stopPropagation(); handleAcceptInvite(n); }}
                                                 disabled={processingId === n.id}
-                                                className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg transition-all"
+                                                className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 disabled:opacity-50"
                                             >
                                                 {processingId === n.id ? <IconLoader2 className="animate-spin" size={12}/> : <IconCheck size={12}/>}
-                                                ACCEPT
+                                                CONFIRM
                                             </button>
                                             <button 
                                                 onClick={(e) => handleDismiss(e, n.id)}
                                                 disabled={processingId === n.id}
-                                                className="py-2 px-3 bg-white/5 hover:bg-red-500/20 text-white/40 hover:text-red-500 border border-white/10 hover:border-red-500/30 rounded-lg transition-all"
+                                                className="px-3 py-2 bg-white/5 hover:bg-red-500/20 text-white/40 hover:text-red-500 border border-white/10 hover:border-red-500/30 rounded-lg transition-all"
                                             >
                                                 <IconX size={14}/>
                                             </button>

@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { 
   IconHome, IconCpu, IconDatabase, IconTrophy, IconSettings, 
   IconShield, IconMessageCircle, IconDeviceGamepad, IconBroadcast, 
-  IconLifebuoy, IconUsers, IconChartBar, IconPencil
+  IconLifebuoy, IconUsers, IconChartBar, IconPencil, IconSchool
 } from '@tabler/icons-react';
 
 // استيراد الهوكس
@@ -41,17 +41,16 @@ const LoadingFallback = () => (
 
 export default function Page() {
   // 1. استدعاء كافة الهوكس اللازمة
-  const { user, loading, isAdmin, isTeacher, isStudent, isUser, isBanned } = useAuth();
+  const { user, loading, isAdmin, isTeacher, isStudent, isBanned } = useAuth();
   const { 
     currentView, setCurrentView, 
     showSupport, setShowSupport, 
     activeOverlayGame, setActiveOverlayGame 
   } = useUI();
-  const { settings } = useSettings();
   const { t, dir, isLoaded } = useLanguage();
   const { speak, playSFX } = useAudio();
   
-  // 2. إدارة حالة نظام الدراسة
+  // 2. إدارة حالة نظام الدراسة (مع الأخذ في الاعتبار أدوار المستخدم)
   const { 
     cards, currentCard, stats, handleSwipe, 
     resetProgress, addCard, deleteCard, updateCard, 
@@ -62,16 +61,11 @@ export default function Page() {
   const [showIntro, setShowIntro] = useState(true);
   const [broadcast, setBroadcast] = useState(null);
   const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0 });
-  
-  // FIX: إضافة حالة لفرض العرض إذا تأخر التحميل
   const [forceLoad, setForceLoad] = useState(false);
 
   // مراقبة وقت التحميل لتجنب التعليق اللانهائي
   useEffect(() => {
-    const timer = setTimeout(() => {
-      // إذا استمر التحميل أكثر من 4 ثواني، افرض الدخول
-      setForceLoad(true);
-    }, 4000);
+    const timer = setTimeout(() => setForceLoad(true), 4000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -98,24 +92,24 @@ export default function Page() {
     // --- واجهة الأستاذ (Teacher Interface) ---
     if (isTeacher) {
       links = [
-        { title: t('nav_create_db') || "Database", icon: <IconPencil className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('teacher_db') },
+        { title: t('nav_create_db') || "DB", icon: <IconPencil className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('teacher_db') },
         { title: t('nav_students') || "Students", icon: <IconUsers className={`${iconClass} text-cyan-400`} />, onClick: () => setCurrentView('teacher_students') },
         { title: t('nav_test_cards') || "Test", icon: <IconCpu className={`${iconClass} text-purple-400`} />, onClick: () => setCurrentView('category') },
         { title: t('nav_chat') || "Chat", icon: <IconMessageCircle className={`${iconClass} text-blue-400`} />, onClick: () => setCurrentView('chat') },
         { title: t('nav_live') || "Live", icon: <IconBroadcast className={`${iconClass} text-red-500`} />, onClick: () => setCurrentView('live') },
-        { title: t('nav_progress') || "Progress", icon: <IconChartBar className={`${iconClass} text-yellow-400`} />, onClick: () => setCurrentView('teacher_progress') },
-        { title: t('nav_support') || "Support", icon: <IconLifebuoy className={`${iconClass} text-orange-500`} />, onClick: () => setShowSupport(true) },
+        { title: t('nav_progress') || "Stats", icon: <IconChartBar className={`${iconClass} text-yellow-400`} />, onClick: () => setCurrentView('teacher_progress') },
+        { title: t('nav_settings') || "Config", icon: <IconSettings className={`${iconClass} text-zinc-400`} />, onClick: () => setCurrentView('settings') },
       ];
     } 
     // --- واجهة الطالب (Student Interface) ---
     else if (isStudent) {
       links = [
-        { title: t('nav_study') || "Study", icon: <IconCpu className={`${iconClass} text-purple-400`} />, onClick: () => setCurrentView('category') },
-        { title: t('nav_data') || "Data", icon: <IconDatabase className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('data') },
-        { title: t('nav_chat') || "Class", icon: <IconMessageCircle className={`${iconClass} text-cyan-400`} />, onClick: () => setCurrentView('chat') },
-        { title: t('nav_rewards') || "Rewards", icon: <IconTrophy className={`${iconClass} text-yellow-400`} />, onClick: () => setCurrentView('leaderboard') },
-        { title: t('nav_settings') || "Settings", icon: <IconSettings className={`${iconClass} text-zinc-400`} />, onClick: () => setCurrentView('settings') },
-        { title: t('nav_support') || "Support", icon: <IconLifebuoy className={`${iconClass} text-orange-500`} />, onClick: () => setShowSupport(true) },
+        { title: t('nav_study') || "Mission", icon: <IconCpu className={`${iconClass} text-purple-400`} />, onClick: () => setCurrentView('category') },
+        { title: t('nav_data') || "Intel", icon: <IconDatabase className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('data') },
+        { title: t('nav_chat') || "Squad", icon: <IconMessageCircle className={`${iconClass} text-cyan-400`} />, onClick: () => setCurrentView('chat') },
+        { title: t('nav_live') || "Live", icon: <IconSchool className={`${iconClass} text-red-500`} />, onClick: () => setCurrentView('live') },
+        { title: t('nav_rewards') || "Rank", icon: <IconTrophy className={`${iconClass} text-yellow-400`} />, onClick: () => setCurrentView('leaderboard') },
+        { title: t('nav_settings') || "Config", icon: <IconSettings className={`${iconClass} text-zinc-400`} />, onClick: () => setCurrentView('settings') },
       ];
     }
     // --- واجهة المستخدم العادي / الأدمن ---
@@ -141,12 +135,9 @@ export default function Page() {
     return links;
   }, [isTeacher, isStudent, isAdmin, setCurrentView, setShowSupport, t]);
 
-  // 7. معالجة حالات التحميل والأمن (تم التعديل لإضافة forceLoad)
+  // 7. معالجة حالات التحميل والأمن
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
-  
-  // FIX: إذا طال الانتظار (forceLoad = true)، نتجاوز شاشة التحميل حتى لو كانت loading = true
   if ((loading || !isLoaded) && !forceLoad) return <LoadingFallback />;
-  
   if (isBanned || studyBanned) {
       return (
         <div className="h-screen flex items-center justify-center bg-black text-red-600 font-black font-mono tracking-[0.5em] text-2xl uppercase">
@@ -155,7 +146,6 @@ export default function Page() {
       );
   }
   
-  // إذا لم يكن هناك مستخدم وتم تجاوز التحميل، اعرض شاشة الدخول
   if (!user) return <AuthScreen onLoginSuccess={() => {}} />;
 
   const isAdminMode = isAdmin && currentView === 'admin_panel';

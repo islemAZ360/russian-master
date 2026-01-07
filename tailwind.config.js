@@ -62,7 +62,10 @@ module.exports = {
   		},
   		animation: {
   			'pulse-slow': 'pulse 8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-  			'float': 'float 20s ease-in-out infinite'
+  			'float': 'float 20s ease-in-out infinite',
+            'shimmer': 'shimmer 2s linear infinite',
+            'swing': 'swing 2s ease-in-out infinite',
+            'border-beam': 'border-beam calc(var(--duration)*1s) infinite linear',
   		},
   		keyframes: {
   			float: {
@@ -72,7 +75,27 @@ module.exports = {
   				'50%': {
   					transform: 'translateY(-20px)'
   				}
-  			}
+  			},
+            shimmer: {
+                from: {
+                    backgroundPosition: "0 0"
+                },
+                to: {
+                    backgroundPosition: "-200% 0"
+                }
+            },
+            swing: {
+                '0%, 100%': { transform: 'rotate(0deg)' },
+                '20%': { transform: 'rotate(15deg)' },
+                '40%': { transform: 'rotate(-10deg)' },
+                '60%': { transform: 'rotate(5deg)' },
+                '80%': { transform: 'rotate(-5deg)' },
+            },
+            'border-beam': {
+                '100%': {
+                    'offset-distance': '100%'
+                }
+            }
   		},
   		borderRadius: {
   			lg: 'var(--radius)',

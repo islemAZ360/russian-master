@@ -5,12 +5,13 @@ import { useSettings } from '@/context/SettingsContext';
 import { useLanguage } from '@/hooks/useLanguage';
 import { updateProfile } from "firebase/auth";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, getDoc, deleteField, addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import { 
   IconMoon, IconSun, IconDeviceDesktop, 
   IconLogout, IconCheck, IconCamera, IconUser, IconDeviceFloppy,
-  IconWorld, IconPalette, IconSettings, IconSchool, IconMessage
+  IconWorld, IconPalette, IconSettings, IconSchool, IconMessage,
+  IconUnlink, IconShieldCheck, IconAlertTriangle
 } from '@tabler/icons-react';
 
 // قائمة الأفاتارات الافتراضية
@@ -31,51 +32,60 @@ const SYSTEM_LANGUAGES = [
 ];
 
 export default function SettingsView() {
-  // استدعاء الهوكس الأساسية
-  const { user, logout, userData, isTeacher } = useAuth();
+  const { user, logout, userData, isTeacher, isStudent } = useAuth();
   const { settings, updateSettings, isDark } = useSettings();
   const { t, dir, lang } = useLanguage(); 
   
-  // الحالة المحلية (Local States)
   const [displayName, setDisplayName] = useState("");
   const [photoURL, setPhotoURL] = useState("");
   // حقول خاصة للأستاذ
   const [subject, setSubject] = useState("");
   const [contactInfo, setContactInfo] = useState("");
+  // حقول خاصة للطالب
+  const [teacherName, setTeacherName] = useState("");
 
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // تحديث البيانات المحلية عند تحميل بيانات المستخدم
+  // تحديث البيانات المحلية
   useEffect(() => {
     if (user || userData) {
       setDisplayName(userData?.displayName || user?.displayName || "");
       setPhotoURL(userData?.photoURL || user?.photoURL || "/avatars/avatar1.png");
       
-      // تحميل بيانات الأستاذ
       if (isTeacher) {
           setSubject(userData?.subject || "");
           setContactInfo(userData?.contactInfo || "");
       }
+
+      // جلب اسم الأستاذ إذا كان المستخدم طالباً
+      if (isStudent && userData?.teacherId) {
+          const fetchTeacher = async () => {
+              try {
+                  const teacherSnap = await getDoc(doc(db, "users", userData.teacherId));
+                  if (teacherSnap.exists()) {
+                      setTeacherName(teacherSnap.data().displayName);
+                  }
+              } catch (e) { console.error("Error fetching teacher:", e); }
+          };
+          fetchTeacher();
+      }
     }
-  }, [user, userData, isTeacher]);
+  }, [user, userData, isTeacher, isStudent]);
 
   // --- 1. حفظ الملف الشخصي ---
   const handleSaveProfile = async () => {
     if (!user) return;
     setLoading(true);
     try {
-        // تحديث البيانات الأساسية في Auth
         await updateProfile(user, { displayName, photoURL });
         
-        // تجهيز البيانات للتحديث في Firestore
         const updateData = { 
             displayName, 
             photoURL,
             updatedAt: new Date().toISOString()
         };
 
-        // إضافة بيانات الأستاذ إذا كان المستخدم أستاذاً
         if (isTeacher) {
             updateData.subject = subject;
             updateData.contactInfo = contactInfo;
@@ -91,7 +101,7 @@ export default function SettingsView() {
     }
   };
 
-  // --- 2. رفع صورة مخصصة ---
+  // --- 2. رفع صورة ---
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file || !user) return;
@@ -109,7 +119,43 @@ export default function SettingsView() {
     }
   };
 
-  // --- مكونات واجهة المستخدم الفرعية ---
+  // --- 3. مغادرة الفصل (للطلاب) ---
+  const handleLeaveClass = async () => {
+      if (!confirm("WARNING: Are you sure you want to leave your current squad? You will lose access to teacher's content.")) return;
+      
+      setLoading(true);
+      try {
+          const oldTeacherId = userData.teacherId;
+
+          // تحديث مستند المستخدم (حذف التبعية)
+          await updateDoc(doc(db, "users", user.uid), {
+              role: 'user', // العودة لرتبة مستخدم عادي
+              teacherId: deleteField()
+          });
+
+          // إشعار الأستاذ
+          if (oldTeacherId) {
+              await addDoc(collection(db, "notifications"), {
+                  userId: oldTeacherId,
+                  target: 'teacher',
+                  type: "info",
+                  title: "OPERATIVE DEPARTURE",
+                  message: `${user.displayName || "Student"} has left your squad.`,
+                  createdAt: serverTimestamp(),
+                  read: false
+              });
+          }
+
+          alert("You have left the squad.");
+          window.location.reload();
+
+      } catch (error) {
+          console.error(error);
+          alert("Operation Failed.");
+      } finally {
+          setLoading(false);
+      }
+  };
 
   const OptionButton = ({ isActive, onClick, icon: Icon, label }) => (
     <button
@@ -143,7 +189,7 @@ export default function SettingsView() {
   return (
     <div className="w-full max-w-6xl mx-auto p-4 md:p-10 font-sans pb-40 animate-in fade-in duration-700" dir={dir}>
       
-      {/* عنوان الصفحة الرئيسي */}
+      {/* Header */}
       <div className="mb-12">
           <div className="flex items-center gap-3 mb-2">
               <IconSettings className="text-cyan-500" size={32} />
@@ -158,14 +204,14 @@ export default function SettingsView() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           
-          {/* === القسم الأول: الهوية (Identity) === */}
+          {/* === Column 1: Identity & Role === */}
           <section className={`rounded-[2.5rem] border p-8 backdrop-blur-2xl ${isDark ? 'bg-white/[0.02] border-white/10' : 'bg-black/[0.02] border-black/10'}`}>
               <div className="flex items-center gap-3 mb-10">
                   <IconUser className="text-cyan-500" size={24} />
                   <h3 className="text-xl font-black uppercase tracking-tighter">{t('identity_title')}</h3>
               </div>
 
-              {/* إدارة الصورة الشخصية */}
+              {/* Avatar Upload */}
               <div className="flex flex-col items-center mb-10">
                   <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                       <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-cyan-500/20 shadow-2xl relative z-10 transition-transform group-hover:scale-105">
@@ -180,7 +226,7 @@ export default function SettingsView() {
               </div>
 
               <div className="space-y-8">
-                  {/* إدخال الاسم الرمزي */}
+                  {/* Name Input */}
                   <div>
                       <label className="text-[10px] font-black uppercase tracking-[0.2em] mb-3 block opacity-40">{t('identity_name_label')}</label>
                       <input 
@@ -191,37 +237,46 @@ export default function SettingsView() {
                       />
                   </div>
 
-                  {/* === حقول خاصة بالأستاذ فقط === */}
+                  {/* --- Teacher Fields --- */}
                   {isTeacher && (
                       <div className="space-y-6 p-6 bg-cyan-500/5 border border-cyan-500/10 rounded-3xl animate-in slide-in-from-top-2">
                           <div className="flex items-center gap-2 mb-2 text-cyan-500">
                               <IconSchool size={18}/>
                               <span className="text-xs font-black uppercase tracking-widest">Teacher Profile</span>
                           </div>
-                          
                           <div>
                               <label className="text-[9px] font-black uppercase tracking-widest mb-2 block opacity-60">Subject / Course</label>
-                              <input 
-                                value={subject} 
-                                onChange={(e) => setSubject(e.target.value)}
-                                className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-white text-sm outline-none focus:border-cyan-500 transition-all"
-                                placeholder="e.g. Russian Language Level 1"
-                              />
+                              <input value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-white text-sm outline-none focus:border-cyan-500 transition-all" placeholder="e.g. Russian Language Level 1" />
                           </div>
-
                           <div>
-                              <label className="text-[9px] font-black uppercase tracking-widest mb-2 block opacity-60">Contact Info / Bio</label>
-                              <textarea 
-                                value={contactInfo} 
-                                onChange={(e) => setContactInfo(e.target.value)}
-                                className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-white text-sm outline-none focus:border-cyan-500 transition-all h-24 resize-none"
-                                placeholder="Contact details or short bio for students..."
-                              />
+                              <label className="text-[9px] font-black uppercase tracking-widest mb-2 block opacity-60">Contact Info</label>
+                              <textarea value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-white text-sm outline-none focus:border-cyan-500 transition-all h-24 resize-none" placeholder="Contact details..." />
                           </div>
                       </div>
                   )}
 
-                  {/* اختيار من الأفاتارات الجاهزة */}
+                  {/* --- Student Fields (Leaving Squad) --- */}
+                  {isStudent && (
+                      <div className="space-y-6 p-6 bg-purple-500/5 border border-purple-500/10 rounded-3xl animate-in slide-in-from-top-2">
+                          <div className="flex justify-between items-start">
+                              <div>
+                                  <div className="flex items-center gap-2 mb-1 text-purple-400">
+                                      <IconShieldCheck size={18}/>
+                                      <span className="text-xs font-black uppercase tracking-widest">Active Squad</span>
+                                  </div>
+                                  <p className="text-[10px] text-white/40 font-mono">Commander: <span className="text-white font-bold">{teacherName || "Loading..."}</span></p>
+                              </div>
+                              <button 
+                                onClick={handleLeaveClass}
+                                className="px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                              >
+                                  <IconUnlink size={14}/> Leave
+                              </button>
+                          </div>
+                      </div>
+                  )}
+
+                  {/* Avatar Preset Grid */}
                   <div>
                       <label className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 block opacity-40">{t('identity_avatar_label')}</label>
                       <div className="grid grid-cols-6 gap-3">
@@ -247,10 +302,10 @@ export default function SettingsView() {
               </div>
           </section>
 
-          {/* === القسم الثاني: النظام (System) === */}
+          {/* === Column 2: System Settings === */}
           <div className="space-y-8">
               
-              {/* إعدادات اللغة */}
+              {/* Language */}
               <section className={`rounded-[2.5rem] border p-8 backdrop-blur-2xl ${isDark ? 'bg-white/[0.02] border-white/10' : 'bg-black/[0.02] border-black/10'}`}>
                   <div className="flex items-center gap-3 mb-8">
                       <IconWorld className="text-emerald-500" size={24} />
@@ -271,7 +326,7 @@ export default function SettingsView() {
                   </div>
               </section>
 
-              {/* إعدادات المظهر */}
+              {/* Theme */}
               <section className={`rounded-[2.5rem] border p-8 backdrop-blur-2xl ${isDark ? 'bg-white/[0.02] border-white/10' : 'bg-black/[0.02] border-black/10'}`}>
                   <div className="flex items-center gap-3 mb-8">
                       <IconPalette className="text-purple-500" size={24} />
@@ -299,7 +354,7 @@ export default function SettingsView() {
                   </div>
               </section>
 
-              {/* زر الخروج */}
+              {/* Logout */}
               <button 
                 onClick={logout} 
                 className="w-full py-5 bg-red-900/10 border border-red-500/20 text-red-500 hover:bg-red-600 hover:text-white font-black rounded-2xl transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-xs group"

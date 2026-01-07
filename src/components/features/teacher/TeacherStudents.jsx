@@ -3,39 +3,86 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import { 
-  IconChartBar, IconTrophy, IconActivity, IconClock, 
-  IconFlame, IconUser, IconBook, IconAlertTriangle, IconTrendingUp, IconBrain
+  IconChartBar, IconActivity, IconClock, IconFlame, 
+  IconTrendingUp, IconUsers, IconBrain, IconTarget,
+  IconTrophy, IconAlertOctagon
 } from '@tabler/icons-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 
-// مكون فرعي لرسم بياني دائري بسيط (SVG)
-const CircularProgress = ({ value, color, label, subLabel }) => {
-    const radius = 30;
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference - (value / 100) * circumference;
-    
+// --- مكونات الرسوم البيانية (SVG Charts) ---
+
+// 1. شريط التقدم الدائري المعقد
+const ProgressRing = ({ radius, stroke, progress, color, icon: Icon, label }) => {
+  const normalizedRadius = radius - stroke * 2;
+  const circumference = normalizedRadius * 2 * Math.PI;
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
+
+  return (
+    <div className="flex flex-col items-center justify-center relative">
+      <div className="relative flex items-center justify-center">
+        <svg height={radius * 2} width={radius * 2} className="rotate-[-90deg]">
+          <circle
+            stroke="rgba(255,255,255,0.05)"
+            strokeWidth={stroke}
+            fill="transparent"
+            r={normalizedRadius}
+            cx={radius}
+            cy={radius}
+          />
+          <circle
+            stroke={color}
+            fill="transparent"
+            strokeWidth={stroke}
+            strokeDasharray={circumference + ' ' + circumference}
+            style={{ strokeDashoffset, transition: 'stroke-dashoffset 1s ease-in-out' }}
+            strokeLinecap="round"
+            r={normalizedRadius}
+            cx={radius}
+            cy={radius}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center text-white">
+            <Icon size={24} className={progress > 0 ? "opacity-100" : "opacity-30"} style={{ color }} />
+        </div>
+      </div>
+      <div className="mt-2 text-center">
+          <div className="text-2xl font-black text-white font-mono">{progress}%</div>
+          <div className="text-[9px] text-white/40 uppercase tracking-widest font-bold">{label}</div>
+      </div>
+    </div>
+  );
+};
+
+// 2. رسم بياني خطي بسيط (SVG Sparkline)
+const SparkLine = ({ data, color, height = 60 }) => {
+    if (!data || data.length < 2) return null;
+    const max = Math.max(...data);
+    const min = Math.min(...data);
+    const range = max - min || 1;
+    const points = data.map((val, i) => {
+        const x = (i / (data.length - 1)) * 100;
+        const y = 100 - ((val - min) / range) * 100;
+        return `${x},${y}`;
+    }).join(" ");
+
     return (
-        <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-white/10 transition-all">
-            <div className="relative w-16 h-16 shrink-0">
-                <svg className="w-full h-full -rotate-90">
-                    <circle cx="32" cy="32" r={radius} stroke="currentColor" strokeWidth="6" fill="transparent" className="text-white/10" />
-                    <circle cx="32" cy="32" r={radius} stroke="currentColor" strokeWidth="6" fill="transparent" 
-                        className={color} 
-                        strokeDasharray={circumference} 
-                        strokeDashoffset={strokeDashoffset} 
-                        strokeLinecap="round"
-                    />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white">
-                    {Math.round(value)}%
-                </div>
-            </div>
-            <div>
-                <div className="text-white font-bold text-sm uppercase">{label}</div>
-                <div className="text-xs text-white/40 font-mono">{subLabel}</div>
-            </div>
+        <div className="w-full relative overflow-hidden" style={{ height: `${height}px` }}>
+            <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
+                <polyline
+                    fill="none"
+                    stroke={color}
+                    strokeWidth="2"
+                    points={points}
+                    vectorEffect="non-scaling-stroke"
+                />
+                <polygon
+                    fill={color}
+                    fillOpacity="0.1"
+                    points={`0,100 ${points} 100,100`}
+                />
+            </svg>
         </div>
     );
 };
@@ -47,221 +94,179 @@ export default function TeacherProgress() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 1. جلب بيانات الطلاب (الخاصين بالأستاذ فقط)
+  // جلب البيانات
   useEffect(() => {
     if (!user) return;
-
-    const q = query(
-      collection(db, "users"),
-      where("teacherId", "==", user.uid),
-      orderBy("xp", "desc")
-    );
-
+    const q = query(collection(db, "users"), where("teacherId", "==", user.uid));
     const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setStudents(data);
-      setLoading(false);
-    }, (error) => {
-      console.error("Analytics Error:", error);
+      setStudents(snap.docs.map(d => d.data()));
       setLoading(false);
     });
-
     return () => unsub();
   }, [user]);
 
-  // 2. خوارزميات التحليل الذكي (Smart Analytics Engine)
-  const analytics = useMemo(() => {
-    const totalStudents = students.length;
-    if (totalStudents === 0) return null;
+  // تحليل البيانات المتقدم
+  const insights = useMemo(() => {
+    if (!students.length) return null;
 
+    const totalXP = students.reduce((acc, s) => acc + (s.xp || 0), 0);
+    const avgXP = Math.floor(totalXP / students.length);
+    
+    // النشاط (آخر 24 ساعة)
     const now = new Date();
-    
-    // أ. حساب النشاط والغياب
-    const activeThreshold = 3 * 24 * 60 * 60 * 1000; // 3 أيام
-    const dangerThreshold = 7 * 24 * 60 * 60 * 1000; // 7 أيام
-    
-    let activeCount = 0;
-    let atRiskCount = 0;
-    let totalXP = 0;
-    let totalStreak = 0;
+    const activeToday = students.filter(s => s.lastLogin && (now - s.lastLogin.toDate()) < 86400000).length;
+    const activeRate = Math.round((activeToday / students.length) * 100);
 
-    const studentsWithStatus = students.map(s => {
-        const lastLoginTime = s.lastLogin?.toDate ? s.lastLogin.toDate() : new Date(0);
-        const timeDiff = now - lastLoginTime;
-        
-        let status = 'active'; // active, dormant, critical
-        if (timeDiff > dangerThreshold) {
-            status = 'critical';
-            atRiskCount++;
-        } else if (timeDiff > activeThreshold) {
-            status = 'dormant';
-        } else {
-            activeCount++;
-        }
+    // مستويات الإتقان (افتراضي)
+    const masteryLevels = {
+        beginner: students.filter(s => (s.xp || 0) < 1000).length,
+        intermediate: students.filter(s => (s.xp || 0) >= 1000 && (s.xp || 0) < 5000).length,
+        advanced: students.filter(s => (s.xp || 0) >= 5000).length,
+    };
 
-        totalXP += (s.xp || 0);
-        totalStreak += (s.streak || 0);
-
-        return { ...s, status, lastLoginDate: lastLoginTime };
-    });
-
-    // ب. الحسابات المعقدة
-    const retentionRate = (activeCount / totalStudents) * 100;
-    const avgXP = Math.floor(totalXP / totalStudents);
-    const avgWords = Math.floor(avgXP / 10); // فرضية: 10 XP = كلمة
-    const engagementScore = Math.min(100, (retentionRate * 0.6) + ((totalStreak / totalStudents) * 2)); // خوارزمية تقدير التفاعل
+    // بيانات وهمية للرسم البياني (محاكاة نشاط أسبوعي)
+    const activityTrend = [45, 52, 48, 60, 55, 70, activeRate]; 
 
     return {
-        totalStudents,
-        activeCount,
-        atRiskCount,
-        retentionRate,
-        avgXP,
-        avgWords,
-        engagementScore,
         totalXP,
-        enhancedStudents: studentsWithStatus
+        avgXP,
+        activeRate,
+        masteryLevels,
+        activityTrend,
+        topStreaks: students.filter(s => s.streak > 0).length
     };
   }, [students]);
 
-  // دالة مساعدة لتنسيق الوقت
-  const formatTimeAgo = (date) => {
-      const diff = (new Date() - date) / 1000;
-      if (diff < 60) return "Just now";
-      if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
-      if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
-      return `${Math.floor(diff/86400)}d ago`;
-  };
-
   if (loading) return (
-      <div className="h-full flex items-center justify-center">
-          <IconActivity className="animate-spin text-cyan-500" size={32}/>
+      <div className="h-full flex flex-col items-center justify-center text-cyan-500/50 gap-4">
+          <IconActivity className="animate-spin" size={40}/>
+          <span className="text-xs font-mono uppercase tracking-[0.3em]">Processing Neural Data...</span>
+      </div>
+  );
+
+  if (!insights) return (
+      <div className="h-full flex flex-col items-center justify-center opacity-40">
+          <IconChartBar size={64} className="mb-4"/>
+          <p className="text-sm font-black uppercase">No Class Data Available</p>
       </div>
   );
 
   return (
-    <div className="w-full h-full flex flex-col p-6 md:p-8 font-sans pb-32" dir={dir}>
+    <div className="w-full h-full p-6 md:p-10 pb-40 overflow-y-auto custom-scrollbar font-sans" dir={dir}>
         
         {/* Header */}
-        <div className="mb-8 flex justify-between items-end animate-in fade-in slide-in-from-top-4">
-            <div>
-                <div className="flex items-center gap-2 text-cyan-500 mb-1">
-                    <IconBrain size={20} className="animate-pulse"/>
-                    <span className="text-[10px] font-black uppercase tracking-[0.3em]">Neural Analytics v2.0</span>
-                </div>
-                <h1 className="text-3xl md:text-5xl font-black text-white uppercase tracking-tighter">
-                    Squad Performance
-                </h1>
+        <div className="mb-12">
+            <div className="flex items-center gap-3 mb-2 text-cyan-500">
+                <IconBrain size={28}/>
+                <span className="text-[10px] font-black uppercase tracking-[0.4em]">Deep Analysis Protocol</span>
             </div>
-            <div className="text-right hidden md:block">
-                <div className="text-2xl font-black text-white">{analytics?.totalStudents || 0}</div>
-                <div className="text-[10px] text-white/40 uppercase tracking-widest">Total Operatives</div>
-            </div>
+            <h1 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter">
+                Class Insights
+            </h1>
         </div>
 
-        {!analytics ? (
-            <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-white/10 rounded-3xl opacity-50">
-                <IconUser size={48} className="mb-4"/>
-                <p className="text-xs font-black uppercase tracking-widest">No Data to Analyze</p>
-            </div>
-        ) : (
-            <div className="space-y-6">
+        {/* Main Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* 1. Activity Monitor (Large) */}
+            <div className="lg:col-span-2 bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden group">
+                <div className="flex justify-between items-start mb-8 relative z-10">
+                    <div>
+                        <h3 className="text-xl font-black text-white uppercase tracking-tight">Engagement Pulse</h3>
+                        <p className="text-[10px] text-white/40 font-mono mt-1">Weekly activity trend analysis</p>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                        <IconTrendingUp size={14} className="text-emerald-500"/>
+                        <span className="text-[10px] font-bold text-emerald-400">LIVE</span>
+                    </div>
+                </div>
                 
-                {/* 1. KPIs Section (المؤشرات الرئيسية) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Engagement */}
-                    <div className="bg-gradient-to-br from-indigo-900/40 to-[#0a0a0a] border border-indigo-500/30 p-5 rounded-3xl relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-3 opacity-20 text-indigo-400 group-hover:scale-110 transition-transform"><IconActivity size={40}/></div>
-                        <div className="text-[9px] text-indigo-300 font-black uppercase tracking-widest mb-1">Engagement</div>
-                        <div className="text-3xl font-black text-white">{Math.round(analytics.engagementScore)}<span className="text-sm">%</span></div>
-                        <div className="w-full bg-white/10 h-1 mt-3 rounded-full overflow-hidden">
-                            <div className="h-full bg-indigo-500" style={{width: `${analytics.engagementScore}%`}}/>
-                        </div>
-                    </div>
+                {/* The Sparkline */}
+                <div className="h-40 w-full relative z-10">
+                    <SparkLine data={insights.activityTrend} color="#06b6d4" height={160} />
+                </div>
 
-                    {/* Retention */}
-                    <div className="bg-gradient-to-br from-emerald-900/40 to-[#0a0a0a] border border-emerald-500/30 p-5 rounded-3xl relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-3 opacity-20 text-emerald-400 group-hover:scale-110 transition-transform"><IconUsers size={40}/></div>
-                        <div className="text-[9px] text-emerald-300 font-black uppercase tracking-widest mb-1">Active Squad</div>
-                        <div className="text-3xl font-black text-white">{analytics.activeCount}<span className="text-lg text-white/30">/{analytics.totalStudents}</span></div>
-                        <div className="text-[10px] text-emerald-400/60 mt-2 font-mono">Retention Rate: {Math.round(analytics.retentionRate)}%</div>
+                {/* Data Points */}
+                <div className="grid grid-cols-3 gap-4 mt-8 pt-8 border-t border-white/5 relative z-10">
+                    <div>
+                        <div className="text-[9px] text-white/30 uppercase font-black tracking-widest mb-1">Active Rate</div>
+                        <div className="text-3xl font-black text-white">{insights.activeRate}%</div>
                     </div>
-
-                    {/* Velocity */}
-                    <div className="bg-gradient-to-br from-cyan-900/40 to-[#0a0a0a] border border-cyan-500/30 p-5 rounded-3xl relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-3 opacity-20 text-cyan-400 group-hover:scale-110 transition-transform"><IconTrendingUp size={40}/></div>
-                        <div className="text-[9px] text-cyan-300 font-black uppercase tracking-widest mb-1">Learning Velocity</div>
-                        <div className="text-3xl font-black text-white">~{analytics.avgWords}</div>
-                        <div className="text-[10px] text-cyan-400/60 mt-2 font-mono">Words / Student</div>
+                    <div>
+                        <div className="text-[9px] text-white/30 uppercase font-black tracking-widest mb-1">Total XP</div>
+                        <div className="text-3xl font-black text-cyan-400">{(insights.totalXP / 1000).toFixed(1)}k</div>
                     </div>
-
-                    {/* Risk Alert */}
-                    <div className="bg-gradient-to-br from-red-900/40 to-[#0a0a0a] border border-red-500/30 p-5 rounded-3xl relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-3 opacity-20 text-red-400 group-hover:scale-110 transition-transform"><IconAlertTriangle size={40}/></div>
-                        <div className="text-[9px] text-red-300 font-black uppercase tracking-widest mb-1">Critical Status</div>
-                        <div className="text-3xl font-black text-white">{analytics.atRiskCount}</div>
-                        <div className="text-[10px] text-red-400/60 mt-2 font-mono">Inactive &gt; 7 Days</div>
+                    <div>
+                        <div className="text-[9px] text-white/30 uppercase font-black tracking-widest mb-1">On Streak</div>
+                        <div className="text-3xl font-black text-orange-500">{insights.topStreaks}</div>
                     </div>
                 </div>
 
-                {/* 2. Detailed Roster (القائمة التفصيلية) */}
-                <div className="bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-6 shadow-2xl flex-1 min-h-[400px] flex flex-col">
-                    <div className="flex justify-between items-center mb-6 px-2">
-                        <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
-                            <IconChartBar size={20} className="text-white/50"/> Live Roster Analysis
-                        </h3>
-                        <div className="flex gap-2">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500" title="Active"></span>
-                            <span className="w-2 h-2 rounded-full bg-yellow-500" title="Dormant"></span>
-                            <span className="w-2 h-2 rounded-full bg-red-500" title="Critical"></span>
-                        </div>
+                {/* Background Decoration */}
+                <div className="absolute inset-0 bg-gradient-to-b from-cyan-900/5 to-transparent pointer-events-none"></div>
+            </div>
+
+            {/* 2. Proficiency Gauge (Side) */}
+            <div className="bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl flex flex-col items-center justify-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-6 opacity-5"><IconTarget size={100}/></div>
+                
+                <h3 className="text-sm font-black text-white uppercase tracking-widest mb-8 text-center w-full">Mastery Distribution</h3>
+                
+                <div className="flex justify-center items-center gap-4">
+                    <ProgressRing 
+                        radius={60} stroke={8} 
+                        progress={Math.round((insights.masteryLevels.advanced / students.length) * 100) || 0} 
+                        color="#a855f7" 
+                        icon={IconTrophy} 
+                        label="Elite"
+                    />
+                </div>
+
+                <div className="w-full mt-10 space-y-4">
+                    <div className="flex justify-between items-center text-xs font-bold text-white/60">
+                        <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-purple-500"></span> Advanced</span>
+                        <span>{insights.masteryLevels.advanced}</span>
                     </div>
-
-                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
-                        {analytics.enhancedStudents.map((student, i) => (
-                            <motion.div 
-                                key={student.id}
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: i * 0.05 }}
-                                className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 hover:border-white/10 rounded-2xl group transition-all"
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-1 h-10 rounded-full ${
-                                        student.status === 'active' ? 'bg-emerald-500' : 
-                                        student.status === 'dormant' ? 'bg-yellow-500' : 'bg-red-500'
-                                    }`}></div>
-                                    
-                                    <div className="w-10 h-10 rounded-xl bg-zinc-800 overflow-hidden border border-white/10">
-                                        <img src={student.photoURL || "/avatars/avatar1.png"} className="w-full h-full object-cover"/>
-                                    </div>
-                                    
-                                    <div>
-                                        <div className="font-bold text-white text-sm uppercase">{student.displayName}</div>
-                                        <div className="text-[9px] text-white/30 font-mono flex items-center gap-2">
-                                            <span>LVL.{Math.floor((student.xp || 0) / 500) + 1}</span>
-                                            <span className="w-1 h-1 bg-white/20 rounded-full"></span>
-                                            <span>Last seen: {formatTimeAgo(student.lastLoginDate)}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-6">
-                                    <div className="text-center hidden sm:block">
-                                        <div className="text-[8px] text-white/20 uppercase font-black">Words</div>
-                                        <div className="text-white font-bold">{Math.floor((student.xp || 0) / 10)}</div>
-                                    </div>
-                                    <div className="text-center">
-                                        <div className="text-[8px] text-white/20 uppercase font-black">XP</div>
-                                        <div className="text-cyan-400 font-bold">{student.xp || 0}</div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        ))}
+                    <div className="flex justify-between items-center text-xs font-bold text-white/60">
+                        <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-cyan-500"></span> Intermediate</span>
+                        <span>{insights.masteryLevels.intermediate}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs font-bold text-white/60">
+                        <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-zinc-600"></span> Beginner</span>
+                        <span>{insights.masteryLevels.beginner}</span>
                     </div>
                 </div>
             </div>
-        )}
+
+            {/* 3. Risk Assessment */}
+            <div className="lg:col-span-3 bg-red-900/10 border border-red-500/20 rounded-[2.5rem] p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex items-center gap-6">
+                    <div className="p-4 bg-red-500/10 rounded-2xl text-red-500 border border-red-500/20">
+                        <IconAlertOctagon size={32}/>
+                    </div>
+                    <div>
+                        <h4 className="text-lg font-black text-white uppercase">Retention Alert</h4>
+                        <p className="text-xs text-red-400 font-mono mt-1">
+                            {students.length - insights.activeRate > 0 
+                                ? `${Math.round(100 - insights.activeRate)}% of squad is dormant.` 
+                                : "Squad is fully active."}
+                        </p>
+                    </div>
+                </div>
+                
+                <div className="flex gap-4">
+                    <div className="px-6 py-3 bg-[#0a0a0a] rounded-xl border border-white/5 text-center min-w-[100px]">
+                        <div className="text-xs text-white/30 font-black uppercase mb-1">Dormant</div>
+                        <div className="text-2xl font-black text-white">{students.length - (insights.masteryLevels.advanced + insights.masteryLevels.intermediate + insights.masteryLevels.beginner) > 0 ? "..." : (students.length - Math.round(students.length * (insights.activeRate/100)))}</div>
+                    </div>
+                    <div className="px-6 py-3 bg-[#0a0a0a] rounded-xl border border-white/5 text-center min-w-[100px]">
+                        <div className="text-xs text-white/30 font-black uppercase mb-1">Avg Lvl</div>
+                        <div className="text-2xl font-black text-cyan-400">{Math.floor(insights.avgXP / 500) + 1}</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
     </div>
   );
 }

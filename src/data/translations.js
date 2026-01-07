@@ -22,6 +22,31 @@ export const translations = {
     nav_data: "بنك المعلومات",
     nav_rewards: "الجوائز والأوسمة",
 
+    // --- نظام التوظيف وإدارة الطلاب (Recruitment & Squad) ---
+    recruit_protocol: "بروتوكول التجنيد",
+    recruit_title: "البحث عن عملاء",
+    recruit_search_ph: "بحث بالاسم أو البريد...",
+    recruit_no_results: "لم يتم العثور على عملاء",
+    recruit_invite_btn: "إرسال دعوة",
+    recruit_sent: "تم الإرسال",
+    recruit_assigned: "مسجل مسبقاً",
+    recruit_success_msg: "تم إرسال إشارة التجنيد بنجاح",
+    
+    squad_title: "أداء الكتيبة",
+    squad_analytics: "التحليل العصبي V2.0",
+    squad_total_ops: "إجمالي العملاء",
+    squad_active: "نشط",
+    squad_dormant: "خامل",
+    squad_critical: "حرج",
+    squad_engagement: "معدل التفاعل",
+    squad_retention: "الاحتفاظ",
+    squad_velocity: "سرعة التعلم",
+    squad_risk: "حالة الخطر",
+    squad_no_data: "لا توجد بيانات للتحليل",
+    squad_btn_recruit: "تجنيد طلاب جدد",
+    squad_last_seen: "آخر ظهور",
+    squad_words_count: "كلمات",
+
     // --- واجهة الدخول والتسجيل (Auth System) ---
     auth_welcome: "مرحباً بك في الواجهة",
     auth_step_name: "تحديد الهوية",
@@ -59,7 +84,7 @@ export const translations = {
     game_scale_title: "ميزان الكلمات",
     game_scale_desc: "حقق التوازن اللغوي عبر تصنيف الكلمات حسب وزنها المرجعي.",
 
-    // --- وحدات الدراسة (Data Modules & Category Select) ---
+    // --- وحدات الدراسة (Data Modules) ---
     modules_system_ready: "النظام جاهز",
     modules_available: "وحدة متاحة",
     modules_title_1: "أرشيف",
@@ -85,7 +110,7 @@ export const translations = {
     cat_general: "عام",
     cat_uncategorized: "غير مصنف",
 
-    // --- أرشيف البيانات (Archive & Data Manager) ---
+    // --- أرشيف البيانات (Archive) ---
     archive_header: "الأرشيف العصبي المركز",
     archive_items: "سجل",
     archive_search_placeholder: "البحث في قاعدة البيانات...",
@@ -120,10 +145,12 @@ export const translations = {
     notif_title: "مركز التنبيهات",
     notif_empty: "لا توجد إشارات جديدة",
     notif_now: "الآن",
-    notif_type_invite: "دعوة انضمام للفصل",
+    notif_type_invite: "دعوة تجنيد",
     notif_type_rank: "ترقية عسكرية",
     notif_type_support: "رد من الدعم",
     notif_type_admin: "تنبيه إداري",
+    notif_live_start: "بث مباشر",
+    notif_recruit_success: "نجاح التجنيد",
 
     // --- الرتب والإنجازات (Ranks) ---
     rank_recruit: "مجند",
@@ -227,13 +254,36 @@ export const translations = {
     nav_admin: "Control",
     nav_support: "Support",
     
-    // New Role Links
     nav_create_db: "Content DB",
     nav_students: "Students",
     nav_test_cards: "Test Mode",
     nav_progress: "Progress",
     nav_data: "Knowledge Base",
     nav_rewards: "Achievements",
+
+    recruit_protocol: "Recruitment Protocol",
+    recruit_title: "Find Operatives",
+    recruit_search_ph: "Search users by name or email...",
+    recruit_no_results: "No Operatives Found",
+    recruit_invite_btn: "Invite",
+    recruit_sent: "Sent",
+    recruit_assigned: "Assigned",
+    recruit_success_msg: "Recruitment signal broadcasted successfully",
+
+    squad_title: "Squad Performance",
+    squad_analytics: "Neural Analytics V2.0",
+    squad_total_ops: "Total Operatives",
+    squad_active: "Active",
+    squad_dormant: "Dormant",
+    squad_critical: "Critical",
+    squad_engagement: "Engagement",
+    squad_retention: "Retention",
+    squad_velocity: "Learning Velocity",
+    squad_risk: "Risk Status",
+    squad_no_data: "No Data to Analyze",
+    squad_btn_recruit: "Recruit Students",
+    squad_last_seen: "Last Seen",
+    squad_words_count: "Words",
 
     auth_welcome: "Welcome to Interface",
     auth_step_name: "Identification",
@@ -325,10 +375,12 @@ export const translations = {
     notif_title: "NOTIFICATION CENTER",
     notif_empty: "NO NEW SIGNALS",
     notif_now: "NOW",
-    notif_type_invite: "CLASS INVITATION",
+    notif_type_invite: "SQUAD INVITE",
     notif_type_rank: "RANK PROMOTION",
     notif_type_support: "SUPPORT REPLY",
     notif_type_admin: "ADMIN ALERT",
+    notif_live_start: "LIVE STREAM",
+    notif_recruit_success: "RECRUITMENT SUCCESS",
 
     rank_recruit: "RECRUIT",
     rank_soldier: "SOLDIER",
@@ -426,13 +478,36 @@ export const translations = {
     nav_admin: "Контроль",
     nav_support: "Помощь",
     
-    // New Role Links
     nav_create_db: "Контент",
     nav_students: "Студенты",
     nav_test_cards: "Тест",
     nav_progress: "Прогресс",
     nav_data: "База Знаний",
     nav_rewards: "Награды",
+
+    recruit_protocol: "Протокол Вербовки",
+    recruit_title: "Поиск Агентов",
+    recruit_search_ph: "Поиск по имени или email...",
+    recruit_no_results: "Агенты не найдены",
+    recruit_invite_btn: "Пригласить",
+    recruit_sent: "Отправлено",
+    recruit_assigned: "Назначен",
+    recruit_success_msg: "Сигнал вербовки отправлен",
+
+    squad_title: "Эффективность Отряда",
+    squad_analytics: "Нейро Аналитика V2.0",
+    squad_total_ops: "Всего Агентов",
+    squad_active: "Активен",
+    squad_dormant: "Спящий",
+    squad_critical: "Критический",
+    squad_engagement: "Вовлеченность",
+    squad_retention: "Удержание",
+    squad_velocity: "Скорость Обучения",
+    squad_risk: "Риск",
+    squad_no_data: "Нет данных для анализа",
+    squad_btn_recruit: "Нанять Студентов",
+    squad_last_seen: "Был в сети",
+    squad_words_count: "Слов",
 
     auth_welcome: "Добро пожаловать",
     auth_step_name: "Личность",
@@ -524,10 +599,12 @@ export const translations = {
     notif_title: "УВЕДОМЛЕНИЯ",
     notif_empty: "НЕТ СИГНАЛОВ",
     notif_now: "СЕЙЧАС",
-    notif_type_invite: "ПРИГЛАШЕНИЕ",
+    notif_type_invite: "ВЕРБОВКА",
     notif_type_rank: "ПОВЫШЕНИЕ",
     notif_type_support: "ОТВЕТ ПОДДЕРЖКИ",
     notif_type_admin: "ТРЕВОГА",
+    notif_live_start: "ПРЯМОЙ ЭФИР",
+    notif_recruit_success: "ВЕРБОВКА УСПЕШНА",
 
     rank_recruit: "НОВОБРАНЕЦ",
     rank_soldier: "СОЛДАТ",
