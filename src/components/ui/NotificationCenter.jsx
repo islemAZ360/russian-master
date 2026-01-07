@@ -1,9 +1,9 @@
 "use client";
 import React, { useState } from 'react';
 import { useUI } from '../../context/UIContext';
-import { useAuth } from '@/context/AuthContext'; // نحتاج هذا لنعرف من هو المستخدم الحالي لتحديث بياناته
+import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, deleteDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion'; 
 import { 
   IconBell, IconX, IconUserPlus, IconAward, 
@@ -13,36 +13,46 @@ import { useLanguage } from '@/hooks/useLanguage';
 
 export default function NotificationCenter() {
   const { notifications, removeNotification, setCurrentView, setShowSupport } = useUI();
-  const { user } = useAuth(); // المستخدم الحالي
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
-  const [processingId, setProcessingId] = useState(null); // لتتبع الإشعار الذي يتم معالجته حالياً
+  const [processingId, setProcessingId] = useState(null);
   const { t, dir } = useLanguage();
 
+  // === FIX 1: حماية ضد البيانات غير المعرفة ===
+  // نضمن أن المتغير دائماً مصفوفة حتى لو كانت البيانات لم تحمل بعد
   const safeNotifications = Array.isArray(notifications) ? notifications : [];
 
-  /**
-   * معالجة قبول الدعوة (Accept Invite)
-   * هذه الدالة هي التي تحول المستخدم العادي إلى طالب
-   */
+  // === FIX 2: دالة آمنة لتنسيق الوقت ===
+  // هذه الدالة تمنع الانهيار إذا كان التاريخ null (يحدث لحظة الإنشاء)
+  const formatTime = (timestamp) => {
+      if (!timestamp) return "Processing..."; 
+      if (timestamp.toDate) {
+          try {
+              return new Date(timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+          } catch (e) { return "Now"; }
+      }
+      return "Now";
+  };
+
   const handleAcceptInvite = async (notification) => {
     if (!user || !notification.actionPayload) return;
     
-    setProcessingId(notification.id);
+    setProcessingId(notification.id); // تفعيل مؤشر التحميل
 
     try {
         const { teacherId, newRole } = notification.actionPayload;
 
-        // 1. تحديث مستند المستخدم الحالي
+        // 1. تحديث بيانات المستخدم ليصبح طالباً
         const userRef = doc(db, "users", user.uid);
         await updateDoc(userRef, {
-            role: newRole,      // تحويله إلى 'student'
-            teacherId: teacherId, // ربطه بالأستاذ
+            role: newRole,      // student
+            teacherId: teacherId,
             updatedAt: serverTimestamp()
         });
 
-        // 2. إشعار الأستاذ بأن الطالب قبل الدعوة
+        // 2. إرسال إشعار للأستاذ
         await addDoc(collection(db, "notifications"), {
-            userId: teacherId,
+            userId: teacherId, // إشعار موجه للأستاذ
             type: "info",
             title: "RECRUITMENT SUCCESSFUL",
             message: `${user.displayName || "Agent"} has joined your squad.`,
@@ -50,40 +60,33 @@ export default function NotificationCenter() {
             read: false
         });
 
-        // 3. حذف إشعار الدعوة
+        // 3. حذف الدعوة
         await removeNotification(notification.id);
 
-        // 4. إعادة تحميل الصفحة لتطبيق الصلاحيات الجديدة (الواجهة ستتغير بالكامل)
+        // 4. إعادة تحميل الصفحة لتطبيق الواجهة الجديدة
         window.location.reload();
 
     } catch (error) {
-        console.error("Failed to accept invite:", error);
+        console.error("Invite Error:", error);
         alert("System Error: Could not process uplink.");
         setProcessingId(null);
     }
   };
 
-  /**
-   * معالجة الرفض أو الحذف العادي
-   */
   const handleDismiss = async (e, id) => {
       e.stopPropagation();
       await removeNotification(id);
   };
 
-  /**
-   * معالجة الضغط على الإشعارات الأخرى (التوجيه)
-   */
   const handleNavigation = (n) => {
-    if (n.type === 'invite') return; // الدعوات لا تقوم بالتوجيه، بل تتطلب إجراء
+    // الدعوات لا تقوم بالتوجيه، بل تتطلب ضغط زر القبول/الرفض
+    if (n.type === 'invite') return;
 
     if (n.type === 'support_reply') setShowSupport(true);
     else if (n.type === 'rank') setCurrentView('leaderboard');
     else if (n.type === 'admin_alert') setCurrentView('admin_panel');
     
-    // إغلاق القائمة بعد التوجيه
     setIsOpen(false);
-    // يمكننا حذف الإشعار أو تركه، سنحذفه ليبقى المركز نظيفاً
     removeNotification(n.id);
   };
 
@@ -99,7 +102,7 @@ export default function NotificationCenter() {
 
   return (
     <div className={`fixed top-6 ${dir === 'rtl' ? 'left-6' : 'right-6'} z-[9999]`} dir={dir}>
-      {/* زر الجرس العائم */}
+      {/* زر الجرس */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className={`p-3 rounded-2xl border transition-all duration-300 shadow-2xl group relative
@@ -117,7 +120,7 @@ export default function NotificationCenter() {
         )}
       </button>
 
-      {/* قائمة الإشعارات */}
+      {/* القائمة المنسدلة */}
       <AnimatePresence>
         {isOpen && (
             <motion.div 
@@ -127,7 +130,6 @@ export default function NotificationCenter() {
                 className={`absolute top-16 ${dir === 'rtl' ? 'left-0' : 'right-0'} w-85 bg-[#0d0d0d] border border-white/10 rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden backdrop-blur-2xl`}
                 style={{ width: '360px' }}
             >
-                {/* Header */}
                 <div className="p-5 bg-white/5 border-b border-white/10 flex justify-between items-center">
                     <div className="flex items-center gap-2">
                         <span className="w-2 h-2 bg-cyan-500 rounded-full"></span>
@@ -138,7 +140,6 @@ export default function NotificationCenter() {
                     </button>
                 </div>
                 
-                {/* Content */}
                 <div className="max-h-[450px] overflow-y-auto custom-scrollbar">
                     {safeNotifications.length === 0 ? (
                         <div className="p-16 text-center">
@@ -151,10 +152,9 @@ export default function NotificationCenter() {
                         safeNotifications.map(n => (
                             <div 
                                 key={n.id} 
-                                onClick={() => handleNavigation(n)}
+                                onClick={() => handleNavigation(n)} 
                                 className={`p-5 border-b border-white/5 flex gap-4 items-start group transition-all relative overflow-hidden ${n.type !== 'invite' ? 'cursor-pointer hover:bg-white/5' : ''}`}
                             >
-                                {/* Icon */}
                                 <div className="mt-1 shrink-0 p-2.5 rounded-xl bg-white/5 border border-white/10 text-cyan-400">
                                     {n.type === 'invite' && <IconUserPlus size={20}/>}
                                     {n.type === 'rank' && <IconAward size={20}/>}
@@ -167,8 +167,9 @@ export default function NotificationCenter() {
                                         <h4 className="text-xs font-black text-white uppercase tracking-tight truncate">
                                             {getNotifTitle(n.type)}
                                         </h4>
+                                        {/* استخدام الدالة الآمنة للوقت */}
                                         <span className="text-[8px] font-mono text-white/20 uppercase">
-                                            {n.createdAt?.toDate ? new Date(n.createdAt.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "NOW"}
+                                            {formatTime(n.createdAt)}
                                         </span>
                                     </div>
                                     
@@ -176,7 +177,7 @@ export default function NotificationCenter() {
                                         {n.message}
                                     </p>
                                     
-                                    {/* Invite Actions - أزرار القبول والرفض للدعوات فقط */}
+                                    {/* أزرار الدعوة الخاصة */}
                                     {n.type === 'invite' && (
                                         <div className="flex gap-2 mt-2">
                                             <button 
@@ -201,15 +202,6 @@ export default function NotificationCenter() {
                         ))
                     )}
                 </div>
-                
-                {/* Footer */}
-                {safeNotifications.length > 0 && (
-                    <div className="p-3 bg-black/40 border-t border-white/5 text-center">
-                        <span className="text-[8px] font-mono text-gray-600 uppercase tracking-widest">
-                            Secure Uplink v4.2
-                        </span>
-                    </div>
-                )}
             </motion.div>
         )}
       </AnimatePresence>
