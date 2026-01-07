@@ -4,13 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { BALANCE_DATA } from '@/data/games/balanceData';
 import { 
   IconArrowLeft, IconScan, IconAtom, IconScale, 
-  IconCircleCheck, IconAlertCircle, IconWeight, IconGripVertical 
+  IconCircleCheck, IconWeight, IconGripVertical, IconChevronDown 
 } from '@tabler/icons-react';
 import { useLanguage } from '@/hooks/useLanguage';
 
 /**
- * لعبة ميزان الكلمات (Word Scale) - الإصدار الفاخر المطور
- * تم إصلاح مشكلة اختفاء العناصر وضبط التوازن الفيزيائي بالكامل
+ * لعبة ميزان الكلمات (Word Scale) - النسخة الفاخرة المضغوطة
+ * تم إصلاح مشكلة الحجم واختفاء الكلمات لضمان تجربة لعب انسيابية
  */
 export default function WordScale({ onClose }) {
   const { t, dir, isRTL } = useLanguage();
@@ -26,185 +26,154 @@ export default function WordScale({ onClose }) {
 
   const currentLevelData = BALANCE_DATA[level % BALANCE_DATA.length];
 
-  // 1. تهيئة البيانات وضمان ظهورها (Visibility Lock)
+  // 1. تهيئة البيانات مع ضمان الظهور الفوري
   useEffect(() => {
       const words = [currentLevelData.mainWord, ...currentLevelData.subWords].map((w, i) => ({
-          id: `w-${level}-${i}-${w.text}`,
+          id: `node-${level}-${i}-${w.text.substring(0,3)}`,
           text: w.text,
           trans: w.trans,
-          weight: w.weight || 20,
-          location: 'bank' // bank, left, right
+          weight: w.weight || 25,
+          location: 'bank' 
       }));
       setItems(words);
       setShowResult(false);
       setIsError(false);
   }, [level, currentLevelData]);
 
-  // 2. محرك حسابات التوازن (Equilibrium Engine)
+  // 2. محرك حسابات الميلان الفيزيائي
   const leftTotal = items.filter(i => i.location === 'left').reduce((acc, w) => acc + w.weight, 0);
   const rightTotal = items.filter(i => i.location === 'right').reduce((acc, w) => acc + w.weight, 0);
-  
-  // حساب زاوية الميل (Degrees)
-  const tilt = Math.max(-25, Math.min(25, (rightTotal - leftTotal) / 3));
+  const tilt = Math.max(-20, Math.min(20, (rightTotal - leftTotal) / 4));
 
-  // 3. معالجة السحب والإفلات (Advanced Drag Logic)
+  // 3. منطق السحب والإسقاط الذكي
   const handleDragEnd = (event, info, wordId) => {
       const { x, y } = info.point;
       const leftRect = leftPanRef.current?.getBoundingClientRect();
       const rightRect = rightPanRef.current?.getBoundingClientRect();
       
       let targetLoc = 'bank';
-      const SENSITIVITY = 50; // مساحة إضافية حول الكفة
+      const TOLERANCE = 40; // زيادة حساسية الكفة
 
-      if (leftRect && x >= leftRect.left - SENSITIVITY && x <= leftRect.right + SENSITIVITY && y >= leftRect.top - SENSITIVITY && y <= leftRect.bottom + SENSITIVITY) {
+      if (leftRect && x >= leftRect.left - TOLERANCE && x <= leftRect.right + TOLERANCE && y >= leftRect.top - TOLERANCE && y <= leftRect.bottom + TOLERANCE) {
           targetLoc = 'left';
-      } else if (rightRect && x >= rightRect.left - SENSITIVITY && x <= rightRect.right + SENSITIVITY && y >= rightRect.top - SENSITIVITY && y <= rightRect.bottom + SENSITIVITY) {
+      } else if (rightRect && x >= rightRect.left - TOLERANCE && x <= rightRect.right + TOLERANCE && y >= rightRect.top - TOLERANCE && y <= rightRect.bottom + TOLERANCE) {
           targetLoc = 'right';
       }
 
       setItems(prev => prev.map(item => item.id === wordId ? { ...item, location: targetLoc } : item));
   };
 
-  // 4. التحقق من التوازن المنطقي
+  // 4. التحقق من التوازن
   const validateBalance = () => {
       const left = items.filter(i => i.location === 'left');
       const right = items.filter(i => i.location === 'right');
-      
       if (left.length === 0 || right.length === 0) return;
 
-      const mainWordText = currentLevelData.mainWord.text;
-      const subWordsTexts = currentLevelData.subWords.map(s => s.text);
+      const mainWord = currentLevelData.mainWord.text;
+      const subWords = currentLevelData.subWords.map(s => s.text);
 
-      const scenarioA = left.some(w => w.text === mainWordText) && left.length === 1 && right.every(w => subWordsTexts.includes(w.text)) && right.length === subWordsTexts.length;
-      const scenarioB = right.some(w => w.text === mainWordText) && right.length === 1 && left.every(w => subWordsTexts.includes(w.text)) && left.length === subWordsTexts.length;
+      const winA = left.some(w => w.text === mainWord) && left.length === 1 && right.length === subWords.length;
+      const winB = right.some(w => w.text === mainWord) && right.length === 1 && left.length === subWords.length;
 
-      if (scenarioA || scenarioB) {
+      if (winA || winB) {
           setShowResult(true);
       } else {
           setIsError(true);
-          setTimeout(() => setIsError(false), 800);
+          setTimeout(() => setIsError(false), 600);
       }
   };
 
   return (
-    <div 
-      ref={containerRef}
-      className="fixed inset-0 z-[30000] bg-[#050505] text-[#cfb53b] font-sans flex flex-col overflow-hidden"
-      dir={dir}
-    >
-        {/* خلفية سينمائية نويز */}
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(207,181,59,0.05),transparent_80%)] pointer-events-none" />
+    <div ref={containerRef} className="fixed inset-0 z-[30000] bg-black text-[#cfb53b] font-sans flex flex-col overflow-hidden" dir={dir}>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(207,181,59,0.04),transparent_80%)] pointer-events-none" />
 
-        {/* هيدر التحكم */}
-        <header className="w-full p-8 md:p-12 flex justify-between items-center z-50 relative">
-             <button 
-                onClick={onClose} 
-                className="flex items-center gap-3 text-white/20 hover:text-white border border-white/10 px-8 py-3 rounded-2xl bg-white/5 uppercase text-[10px] font-black tracking-widest transition-all"
-             >
-                <IconArrowLeft size={20}/> {t('chat_cancel')}
+        {/* هيدر مصغر */}
+        <header className="w-full p-6 md:p-8 flex justify-between items-center z-50 shrink-0">
+             <button onClick={onClose} className="flex items-center gap-2 text-white/20 hover:text-white border border-white/10 px-5 py-2 rounded-xl bg-white/5 text-[10px] font-black uppercase transition-all">
+                <IconArrowLeft size={16}/> {t('chat_cancel')}
              </button>
              <div className="text-right">
-                <h1 className="text-4xl font-black tracking-tighter text-[#cfb53b] uppercase italic leading-none">
-                    {t('game_scale_title')}
-                </h1>
-                <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.5em] mt-2">Quantum_Equilibrium_v4.2</p>
+                <h1 className="text-xl md:text-2xl font-black tracking-tighter text-[#cfb53b] uppercase italic leading-none">{t('game_scale_title')}</h1>
+                <p className="text-[7px] font-bold text-white/20 uppercase tracking-[0.4em] mt-1">Equilibrium_v4.2</p>
              </div>
         </header>
 
-        {/* جسم الميزان الميكانيكي */}
-        <div className="flex-1 flex flex-col items-center justify-center relative">
-            
-            <div className={`relative w-full max-w-5xl h-[400px] flex justify-center items-start transition-all ${isError ? 'animate-shake' : ''}`}>
+        {/* منطقة الميزان - تم ضغط الارتفاع هنا */}
+        <div className="flex-1 flex flex-col items-center justify-start relative pt-4 md:pt-10">
+            <div className={`relative w-full max-w-3xl h-[320px] md:h-[380px] flex justify-center items-start transition-all ${isError ? 'animate-shake' : ''}`}>
                 
-                {/* العمود الرأسي */}
-                <div className="absolute bottom-[-100px] left-1/2 -translate-x-1/2 w-48 h-12 bg-[#111] rounded-t-[3rem] border-t-2 border-white/5"></div>
-                <div className="absolute bottom-[-88px] left-1/2 -translate-x-1/2 w-8 h-[380px] bg-gradient-to-b from-[#1a1a1a] to-black border-x border-white/5 shadow-2xl"></div>
+                {/* العمود الرأسي المصغر */}
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-32 h-8 bg-[#111] rounded-t-3xl border-t border-white/5"></div>
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-4 h-48 md:h-64 bg-gradient-to-b from-[#1a1a1a] to-black border-x border-white/5 shadow-xl"></div>
                 
-                {/* المحور المركزي الذهب */}
-                <div className="absolute top-[35px] left-1/2 -translate-x-1/2 w-24 h-24 bg-[#0c0c0c] rounded-full border-[8px] border-[#cfb53b]/40 shadow-[0_0_60px_rgba(207,181,59,0.2)] z-30 flex items-center justify-center">
-                    <IconAtom size={44} className="text-[#cfb53b] animate-spin-slow" />
+                {/* المحور الذهبي */}
+                <div className="absolute top-[30px] left-1/2 -translate-x-1/2 w-16 h-16 bg-[#0c0c0c] rounded-full border-[5px] border-[#cfb53b]/40 shadow-2xl z-30 flex items-center justify-center">
+                    <IconAtom size={28} className="text-[#cfb53b] animate-spin-slow" />
                 </div>
 
-                {/* العارضة الأفقية (The Beam) */}
+                {/* العارضة الأفقية المضغوطة */}
                 <motion.div 
-                    className="absolute top-[75px] left-1/2 w-full max-w-[90%] h-5 bg-gradient-to-r from-[#1a1a1a] via-[#333] to-[#1a1a1a] rounded-full origin-center z-20 border border-white/5 shadow-2xl"
+                    className="absolute top-[60px] left-1/2 w-[85%] h-3 bg-gradient-to-r from-[#111] via-[#333] to-[#111] rounded-full origin-center z-20 border border-white/5 shadow-xl"
                     animate={{ rotate: tilt }}
-                    transition={{ type: "spring", stiffness: 45, damping: 15 }}
+                    transition={{ type: "spring", stiffness: 50, damping: 15 }}
                     style={{ x: "-50%" }}
                 >
                     {/* الكفة اليسرى */}
-                    <motion.div 
-                        ref={leftPanRef}
-                        className="absolute left-6 top-6 w-[2px] h-40 bg-gradient-to-b from-[#cfb53b]/40 to-transparent origin-top flex flex-col items-center"
-                        animate={{ rotate: -tilt }}
-                    >
-                        <div className="absolute bottom-0 w-72 h-20 bg-zinc-900/40 rounded-[3rem] border-2 border-white/5 backdrop-blur-xl shadow-2xl flex flex-wrap items-center justify-center p-4 gap-2 border-dashed">
+                    <motion.div ref={leftPanRef} className="absolute left-4 top-4 w-[1px] h-28 md:h-36 bg-gradient-to-b from-[#cfb53b]/30 to-transparent origin-top flex flex-col items-center" animate={{ rotate: -tilt }}>
+                        <div className="absolute bottom-0 w-48 md:w-56 h-16 bg-zinc-900/60 rounded-[2rem] border border-white/10 backdrop-blur-xl shadow-2xl flex flex-wrap items-center justify-center p-2 gap-1 border-dashed">
                             <AnimatePresence>
-                                {items.filter(i => i.location === 'left').map(word => (
-                                    <DraggableNode key={word.id} word={word} onDragEnd={handleDragEnd} />
-                                ))}
+                                {items.filter(i => i.location === 'left').map(word => <DraggableWord key={word.id} word={word} onDragEnd={handleDragEnd} />)}
                             </AnimatePresence>
-                            {items.filter(i => i.location === 'left').length === 0 && <IconWeight size={32} className="opacity-5"/>}
                         </div>
                     </motion.div>
 
                     {/* الكفة اليمنى */}
-                    <motion.div 
-                        ref={rightPanRef}
-                        className="absolute right-6 top-6 w-[2px] h-40 bg-gradient-to-b from-[#cfb53b]/40 to-transparent origin-top flex flex-col items-center"
-                        animate={{ rotate: -tilt }}
-                    >
-                        <div className="absolute bottom-0 w-72 h-20 bg-zinc-900/40 rounded-[3rem] border-2 border-white/5 backdrop-blur-xl shadow-2xl flex flex-wrap items-center justify-center p-4 gap-2 border-dashed">
+                    <motion.div ref={rightPanRef} className="absolute right-4 top-4 w-[1px] h-28 md:h-36 bg-gradient-to-b from-[#cfb53b]/30 to-transparent origin-top flex flex-col items-center" animate={{ rotate: -tilt }}>
+                        <div className="absolute bottom-0 w-48 md:w-56 h-16 bg-zinc-900/60 rounded-[2rem] border border-white/10 backdrop-blur-xl shadow-2xl flex flex-wrap items-center justify-center p-2 gap-1 border-dashed">
                              <AnimatePresence>
-                                {items.filter(i => i.location === 'right').map(word => (
-                                    <DraggableNode key={word.id} word={word} onDragEnd={handleDragEnd} />
-                                ))}
+                                {items.filter(i => i.location === 'right').map(word => <DraggableWord key={word.id} word={word} onDragEnd={handleDragEnd} />)}
                             </AnimatePresence>
-                            {items.filter(i => i.location === 'right').length === 0 && <IconWeight size={32} className="opacity-5"/>}
                         </div>
                     </motion.div>
                 </motion.div>
             </div>
 
-            {/* بنك الكلمات (The Vault) - تأمين الرؤية بنسبة 100% */}
-            <div className="mt-40 w-full max-w-5xl px-10 flex flex-col items-center z-[100]">
-                 <div className="w-full min-h-[160px] bg-[#080808] border border-white/5 rounded-[3.5rem] p-10 backdrop-blur-xl shadow-inner flex flex-wrap items-center justify-center gap-4 relative">
-                     <div className="absolute top-4 left-1/2 -translate-x-1/2 text-[8px] font-black text-white/5 uppercase tracking-[1em]">Word_Deposit_Vault</div>
+            {/* مخزن الكلمات - تأمين الظهور في أسفل الشاشة */}
+            <div className="w-full max-w-4xl px-6 mt-10 z-50">
+                 <div className="w-full min-h-[120px] bg-[#080808] border border-white/5 rounded-[2.5rem] p-6 backdrop-blur-xl shadow-inner flex flex-wrap items-center justify-center gap-3 relative border-dashed">
+                     <div className="absolute top-2 left-1/2 -translate-x-1/2 flex flex-col items-center opacity-20">
+                        <span className="text-[7px] font-black uppercase tracking-[0.5em]">Vault_Storage</span>
+                        <IconChevronDown size={10} className="animate-bounce" />
+                     </div>
                      <AnimatePresence>
                          {items.filter(i => i.location === 'bank').map(word => (
-                            <DraggableNode key={word.id} word={word} onDragEnd={handleDragEnd} />
+                            <DraggableWord key={word.id} word={word} onDragEnd={handleDragEnd} />
                          ))}
                      </AnimatePresence>
                  </div>
 
-                 {/* زر التحليل الضخم */}
-                 <button 
-                    onClick={validateBalance} 
-                    className="group relative mt-12 px-20 py-7 bg-[#cfb53b] text-black font-black rounded-[2rem] hover:bg-white transition-all shadow-[0_20px_80px_rgba(207,181,59,0.3)] active:scale-95 flex items-center gap-5 uppercase text-sm tracking-[0.3em]"
-                 >
-                    <IconScan size={28} className="group-hover:rotate-90 transition-transform duration-700" /> 
-                    {t('admin_overview')}
+                 {/* زر التحليل المترجم */}
+                 <button onClick={validateBalance} className="group w-full max-w-xs mx-auto mt-8 py-5 bg-[#cfb53b] text-black font-black rounded-2xl hover:bg-white transition-all shadow-[0_15px_40px_rgba(207,181,59,0.2)] active:scale-95 flex items-center justify-center gap-4 uppercase text-[10px] tracking-[0.2em]">
+                    <IconScan size={20} className="group-hover:rotate-90 transition-transform duration-500" /> {t('admin_overview')}
                  </button>
             </div>
 
-            {/* واجهة الفوز (Victory Overlay) */}
+            {/* واجهة النتيجة */}
             <AnimatePresence>
                 {showResult && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 bg-black/98 z-[40000] flex flex-col items-center justify-center p-8 backdrop-blur-3xl">
-                        <motion.div initial={{ scale: 0.9, y: 50 }} animate={{ scale: 1, y: 0 }} className="bg-[#0c0c0c] border-2 border-[#cfb53b]/30 p-16 rounded-[4rem] w-full max-w-2xl shadow-2xl text-center relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-full h-1 bg-[#cfb53b] shadow-[0_0_30px_#cfb53b]"></div>
-                            <IconCircleCheck size={100} className="text-emerald-500 mx-auto mb-10" stroke={1} />
-                            <h2 className="text-5xl font-black text-white mb-12 tracking-tighter uppercase italic">Mission_Accomplished</h2>
-                            <div className="grid grid-cols-2 gap-4 mb-12 max-h-[300px] overflow-y-auto custom-scrollbar p-2">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 bg-black/95 z-[40000] flex flex-col items-center justify-center p-6 backdrop-blur-2xl">
+                        <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-[#0c0c0c] border border-[#cfb53b]/30 p-10 md:p-14 rounded-[3.5rem] w-full max-w-lg shadow-2xl text-center relative overflow-hidden">
+                            <IconCircleCheck size={80} className="text-emerald-500 mx-auto mb-6" />
+                            <h2 className="text-3xl font-black text-white mb-8 tracking-tighter uppercase italic">Balance_Restored</h2>
+                            <div className="grid grid-cols-2 gap-3 mb-10 max-h-[200px] overflow-y-auto custom-scrollbar p-1">
                                 {items.map(word => (
-                                    <div key={word.id} className="flex flex-col items-center p-5 bg-white/5 rounded-3xl border border-white/5">
-                                        <span className="text-[#cfb53b] font-black text-lg uppercase">{word.text}</span>
-                                        <span className="text-white/20 text-[10px] mt-1 font-bold">{word.trans}</span>
+                                    <div key={word.id} className="flex flex-col items-center p-4 bg-white/5 rounded-2xl border border-white/5">
+                                        <span className="text-[#cfb53b] font-black text-sm uppercase">{word.text}</span>
+                                        <span className="text-white/20 text-[9px] mt-1 font-bold">{word.trans}</span>
                                     </div>
                                 ))}
                             </div>
-                            <button onClick={() => setLevel(l => l + 1)} className="w-full py-6 bg-white text-black font-black rounded-3xl shadow-2xl transition-all uppercase tracking-widest text-xs hover:bg-[#cfb53b]">
+                            <button onClick={() => setLevel(l => l + 1)} className="w-full py-5 bg-white text-black font-black rounded-2xl transition-all uppercase tracking-widest text-[10px] hover:bg-[#cfb53b]">
                                 {t('archive_load_more')}
                             </button>
                         </motion.div>
@@ -213,32 +182,18 @@ export default function WordScale({ onClose }) {
             </AnimatePresence>
         </div>
 
-        {/* توقيع المبرمج في الركن */}
-        <div className="absolute bottom-10 left-12 opacity-10 flex flex-col pointer-events-none">
-            <span className="text-[10px] font-black tracking-[0.5em] text-white">ENGINEERED BY</span>
-            <span className="text-2xl font-serif font-black tracking-widest text-[#cfb53b]">ИСЛАМ АЗАЙЗИЯ</span>
+        <div className="absolute bottom-6 left-10 opacity-5 flex flex-col pointer-events-none">
+            <span className="text-xl font-serif font-black tracking-widest text-[#cfb53b]">ИСЛАМ АЗАЙЗИЯ</span>
         </div>
     </div>
   );
 }
 
-/**
- * مكون الكلمة القابل للسحب (المعزول) لضمان الأداء
- */
-function DraggableNode({ word, onDragEnd }) {
+function DraggableWord({ word, onDragEnd }) {
     return (
-        <motion.div
-            layout
-            drag
-            dragMomentum={false}
-            onDragEnd={(e, i) => onDragEnd(e, i, word.id)}
-            whileDrag={{ scale: 1.15, zIndex: 1000 }}
-            whileHover={{ y: -3, scale: 1.05 }}
-            className="cursor-grab active:cursor-grabbing"
-        >
-            <div className="px-6 py-3 bg-gradient-to-br from-[#cfb53b] to-[#a38b24] text-black text-[11px] font-black rounded-2xl border-2 border-white/20 shadow-2xl flex items-center gap-2 uppercase tracking-tighter">
-                <IconGripVertical size={14} className="opacity-30"/>
-                {word.text}
+        <motion.div layout drag dragMomentum={false} onDragEnd={(e, i) => onDragEnd(e, i, word.id)} whileDrag={{ scale: 1.1, zIndex: 1000 }} className="cursor-grab active:cursor-grabbing">
+            <div className="px-4 py-2 bg-gradient-to-br from-[#cfb53b] to-[#a38b24] text-black text-[10px] font-black rounded-xl border border-white/20 shadow-xl flex items-center gap-2 uppercase">
+                <IconGripVertical size={12} className="opacity-30"/> {word.text}
             </div>
         </motion.div>
     );

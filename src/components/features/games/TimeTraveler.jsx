@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { IconX, IconAward, IconPlayerPlay } from "@tabler/icons-react";
+import { IconX, IconAward } from "@tabler/icons-react";
 import confetti from "canvas-confetti";
 import { useLanguage } from "@/hooks/useLanguage";
 import { motion, AnimatePresence } from "framer-motion";
@@ -22,15 +22,15 @@ export default function TimeTraveler({ onClose }) {
   const tMins = useRef(720);
   const isDragging = useRef(false);
 
-  // --- 1. منطق اللغة الروسية (Nom/Gen Cases) ---
+  // --- 1. منطق اللغة الروسية ---
   const hNom = ['двенадцать', 'час', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять', 'десять', 'одиннадцать'];
   const hGen = ['двенадцатого', 'первого', 'второго', 'третьего', 'четвёртого', 'пятого', 'шестого', 'седьмого', 'восьмого', 'девятого', 'десятого', 'одиннадцатого'];
 
   const getMText = (m, kase) => {
     const u = ['','одна','две','три','четыре','пять','шесть','семь','восемь','девять','десять','одиннадцать','двенадцать','тринадцать','четырнадцать','пятнадцать','шестнадцать','семнадцать','восемнадцать','девятнадцати'];
-    const uGen = ['','одной','двух','трёх','четырёх','пяти','шести','семи','восьми','девяти','десяти','одиннадцати','двенадцати','тринадцати','четырнадцать','пятнадцати','шестнадцать','семнадцать','восемнадцать','девятнадцати'];
+    const uGen = ['','одной','двух','трёх','четырёх','пяти','шести','семи','восьми','девяти','десяти','одиннадцати','двенадцати','тринадцати','четырнадцать','пятнадцать','шестнадцать','семнадцать','восемнадцать','девятнадцати'];
     const tens = ['','','двадцать','тридцать','сорок','пятьдесят'];
-    const tensGen = ['','','двадцати','триدцати','сорока','пятидесяти'];
+    const tensGen = ['','','двадцати','тридцати','сорока','пятидесяти'];
 
     if(m === 15) return kase === 'gen' ? 'четверти' : 'четверть';
     if(m === 30) return 'половина';
@@ -58,7 +58,7 @@ export default function TimeTraveler({ onClose }) {
     else return `Без ${getMText(60 - m, 'gen')} ${hNom[nH]}`;
   }, []);
 
-  // --- 2. تحديث العقارب (إصلاح فيزيائي كامل) ---
+  // --- 2. تحديث العقارب بدقة مركزية ---
   const updateClock = (mins, animate = true) => {
     let m = mins % 720; if(m < 0) m += 720;
     let hV = Math.floor(m/60);
@@ -68,7 +68,7 @@ export default function TimeTraveler({ onClose }) {
         const hDeg = (hV * 30) + (mV * 0.5);
         const mDeg = mV * 6;
         
-        const transition = animate ? 'transform 0.6s cubic-bezier(0.17, 0.67, 0.83, 0.67)' : 'none';
+        const transition = animate ? 'transform 0.6s cubic-bezier(0.23, 1, 0.32, 1)' : 'none';
         hHandRef.current.style.transition = transition;
         mHandRef.current.style.transition = transition;
 
@@ -103,7 +103,7 @@ export default function TimeTraveler({ onClose }) {
 
   const handleOptionClick = (selected, e) => {
     if(selected === correctOption) {
-        confetti({ particleCount: 150, spread: 70, origin: { y: 0.8 }, colors: ['#cfb53b', '#ffffff'] });
+        confetti({ particleCount: 100, spread: 60, origin: { y: 0.7 } });
         setTimeout(generateQuestion, 1500);
     } else {
         e.target.classList.add('animate-shake');
@@ -111,7 +111,7 @@ export default function TimeTraveler({ onClose }) {
     }
   };
 
-  // --- 4. حركة الثواني الميكانيكية (Continuous Sweep) ---
+  // --- 4. حركة الثواني ---
   useEffect(() => {
     let raf;
     const loop = () => {
@@ -128,7 +128,7 @@ export default function TimeTraveler({ onClose }) {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  // --- 5. التعامل مع السحب (Drag) ---
+  // --- 5. السحب ---
   useEffect(() => {
     const handleMove = (e) => {
         if(!isDragging.current || isQuiz) return;
@@ -139,7 +139,6 @@ export default function TimeTraveler({ onClose }) {
         const ey = e.touches ? e.touches[0].clientY : e.clientY;
         let angle = Math.atan2(ey - cy, ex - cx) * 180 / Math.PI + 90;
         if(angle < 0) angle += 360;
-        
         const totalMins = Math.round((angle * 2) / 5) * 5;
         tMins.current = totalMins;
         updateClock(totalMins, false);
@@ -161,38 +160,36 @@ export default function TimeTraveler({ onClose }) {
 
   return (
     <div className="fixed inset-0 z-[30000] bg-black flex flex-col items-center justify-center p-4 overflow-hidden" dir="ltr">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(207,181,59,0.05),transparent_80%)]" />
       
-      {/* إضاءة سينمائية */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(207,181,59,0.1),transparent_80%)]" />
-      
-      <button onClick={onClose} className="absolute top-10 right-10 text-white/20 hover:text-red-500 transition-colors z-[30002]">
-          <IconX size={40} stroke={1.5} />
+      <button onClick={onClose} className="absolute top-6 right-6 text-white/20 hover:text-red-500 transition-colors z-[30002]">
+          <IconX size={32} stroke={1.5} />
       </button>
 
-      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="relative z-[30001] flex flex-col items-center w-full max-w-lg">
+      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="relative z-[30001] flex flex-col items-center w-full max-w-sm">
         
-        {/* جسم الساعة (Watch Body) */}
+        {/* جسم الساعة - الحجم المصغر الملموم */}
         <div 
           ref={dialRef}
-          className="relative w-[300px] h-[300px] md:w-[420px] md:h-[420px] rounded-full bg-[#0c0c0c] border-[10px] border-[#1a1a1a] shadow-[0_50px_100px_rgba(0,0,0,0.9),inset_0_0_40px_#000]"
+          className="relative w-[280px] h-[280px] md:w-[360px] md:h-[360px] rounded-full bg-[#0c0c0c] border-[8px] border-[#1a1a1a] shadow-[0_30px_60px_rgba(0,0,0,0.8),inset_0_0_30px_#000]"
         >
-            {/* العلامات الذهبية */}
+            {/* العلامات */}
             {[...Array(60)].map((_, i) => (
-                <div key={i} className="absolute left-1/2 top-0 w-[2px] origin-bottom" 
+                <div key={i} className="absolute left-1/2 top-0 w-[1.5px] origin-bottom" 
                      style={{ 
-                         height: i % 5 === 0 ? '15px' : '7px', 
-                         backgroundColor: i % 5 === 0 ? '#cfb53b' : '#333',
+                         height: i % 5 === 0 ? '12px' : '5px', 
+                         backgroundColor: i % 5 === 0 ? '#cfb53b' : '#222',
                          transform: `translateX(-50%) rotate(${i * 6}deg)`,
-                         transformOrigin: `50% ${window.innerWidth < 768 ? '140px' : '200px'}` 
+                         transformOrigin: `50% ${window.innerWidth < 768 ? '132px' : '172px'}` 
                      }} />
             ))}
 
-            {/* الأرقام الرومانية */}
+            {/* الأرقام */}
             {['XII', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'].map((r, i) => {
                 const ang = (i * 30 - 90) * Math.PI / 180;
-                const radius = window.innerWidth < 768 ? 110 : 160;
+                const radius = window.innerWidth < 768 ? 100 : 135;
                 return (
-                    <div key={i} className="absolute font-serif text-[#cfb53b] text-xl md:text-3xl font-black drop-shadow-lg" 
+                    <div key={i} className="absolute font-serif text-[#cfb53b] text-lg md:text-2xl font-black opacity-80" 
                          style={{ 
                              left: `calc(50% + ${Math.cos(ang) * radius}px - 15px)`, 
                              top: `calc(50% + ${Math.sin(ang) * radius}px - 15px)`,
@@ -201,30 +198,17 @@ export default function TimeTraveler({ onClose }) {
                 );
             })}
 
-            {/* المينا الداخلية */}
-            <div className="absolute top-[30%] left-1/2 -translate-x-1/2 text-center opacity-30">
-                <div className="text-[#cfb53b] text-[8px] font-black tracking-[0.5em] uppercase">Chronometer</div>
-                <div className="w-12 h-px bg-[#cfb53b] mx-auto mt-1" />
-            </div>
-
-            {/* العقارب (Fixed Core Logic) */}
+            {/* العقارب المحسنة */}
             <div className="absolute inset-0 pointer-events-none">
-                {/* عقرب الساعات */}
-                <div ref={hHandRef} className="absolute left-1/2 top-1/2 w-2.5 h-24 md:h-32 bg-[#cfb53b] rounded-full shadow-xl" 
-                     style={{ transformOrigin: '50% 100%', transform: 'translate(-50%, -100%) rotate(0deg)' }}>
-                    <div className="w-full h-1/3 bg-white/20 rounded-full" />
-                </div>
-                {/* عقرب الدقائق */}
-                <div ref={mHandRef} className="absolute left-1/2 top-1/2 w-1.5 h-36 md:h-48 bg-zinc-300 rounded-full shadow-xl"
+                <div ref={hHandRef} className="absolute left-1/2 top-1/2 w-2 h-20 md:h-28 bg-[#cfb53b] rounded-full shadow-lg" 
                      style={{ transformOrigin: '50% 100%', transform: 'translate(-50%, -100%) rotate(0deg)' }} />
-                {/* عقرب الثواني */}
-                <div ref={sHandRef} className="absolute left-1/2 top-1/2 w-0.5 h-40 md:h-52 bg-red-600 rounded-full"
+                <div ref={mHandRef} className="absolute left-1/2 top-1/2 w-1.5 h-30 md:h-40 bg-zinc-400 rounded-full shadow-lg"
+                     style={{ transformOrigin: '50% 100%', transform: 'translate(-50%, -100%) rotate(0deg)' }} />
+                <div ref={sHandRef} className="absolute left-1/2 top-1/2 w-0.5 h-32 md:h-44 bg-red-600 rounded-full"
                      style={{ transformOrigin: '50% 85%', transform: 'translate(-50%, -85%) rotate(0deg)' }} />
-                {/* المسمار المركزي */}
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 bg-[#111] border-4 border-[#cfb53b] rounded-full z-40" />
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-[#111] border-2 border-[#cfb53b] rounded-full z-40" />
             </div>
 
-            {/* طبقة التفاعل */}
             {!isQuiz && (
                 <div 
                     onMouseDown={() => isDragging.current = true}
@@ -234,20 +218,20 @@ export default function TimeTraveler({ onClose }) {
             )}
         </div>
 
-        {/* لوحة العرض (Display Panel) */}
-        <div className="mt-10 w-full max-w-sm bg-[#0c0c0c] border border-white/5 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-[#cfb53b]/20" />
+        {/* لوحة العرض المصغرة */}
+        <div className="mt-6 w-full bg-[#0c0c0c] border border-white/5 rounded-[2rem] p-6 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-0.5 bg-[#cfb53b]/10" />
             <AnimatePresence mode="wait">
                 {!isQuiz ? (
-                    <motion.div key="time" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
-                        <div className="text-[9px] font-black text-white/20 uppercase tracking-[0.4em] mb-4">Neural_Time_Protocol</div>
-                        <div className="text-6xl md:text-7xl font-black text-white tracking-tighter mb-4">{displayTime}</div>
-                        <p className="text-xl text-[#cfb53b] font-bold italic drop-shadow-md min-h-[60px]">{russianText}</p>
+                    <motion.div key="t" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center">
+                        <div className="text-[8px] font-black text-white/20 uppercase tracking-[0.4em] mb-2">Neural_Time</div>
+                        <div className="text-5xl md:text-6xl font-black text-white tracking-tighter mb-2">{displayTime}</div>
+                        <p className="text-lg text-[#cfb53b] font-bold italic min-h-[50px] leading-tight">{russianText}</p>
                     </motion.div>
                 ) : (
-                    <motion.div key="quiz" initial={{ y: 20, opacity: 0 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+                    <motion.div key="q" initial={{ y: 10, opacity: 0 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
                         {quizOptions.map((opt, i) => (
-                            <button key={i} onClick={(e) => handleOptionClick(opt, e)} className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-zinc-300 font-bold hover:bg-[#cfb53b] hover:text-black transition-all">
+                            <button key={i} onClick={(e) => handleOptionClick(opt, e)} className="w-full p-3 rounded-xl bg-white/5 border border-white/10 text-zinc-300 font-bold hover:bg-[#cfb53b] hover:text-black transition-all text-xs">
                                 {opt}
                             </button>
                         ))}
@@ -257,15 +241,10 @@ export default function TimeTraveler({ onClose }) {
 
             <button 
                 onClick={() => { if(isQuiz) setIsQuiz(false); else { setIsQuiz(true); generateQuestion(); } }}
-                className={`mt-8 w-full py-5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all ${isQuiz ? 'bg-red-900/20 text-red-500' : 'bg-[#cfb53b] text-black'}`}
+                className={`mt-6 w-full py-4 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all ${isQuiz ? 'bg-red-900/20 text-red-500' : 'bg-[#cfb53b] text-black'}`}
             >
                 {isQuiz ? "Abort" : t('btn_start')}
             </button>
-        </div>
-
-        <div className="mt-8 flex flex-col items-center opacity-20">
-            <span className="text-[14px] font-serif font-black tracking-[0.5em] text-[#cfb53b]">ИСЛАМ АЗАЙЗИЯ</span>
-            <span className="text-[8px] font-black uppercase tracking-[0.3em] text-white">Supreme Developer</span>
         </div>
       </motion.div>
     </div>
