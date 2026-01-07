@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { 
   IconBroadcast, IconLoader, IconDeviceTv, 
-  IconShieldCheck, IconWifi, IconSchool, IconChalkboard, IconUsers 
+  IconShieldCheck, IconWifi, IconSchool, IconChalkboard, IconUsers, IconLock 
 } from "@tabler/icons-react";
 import { useUI } from "@/context/UIContext";
 import { useAuth } from "@/context/AuthContext";
@@ -23,18 +23,18 @@ export default function RealLiveStream() {
   // سجلات النظام (Log Console)
   const addLog = (msg) => setLogs(prev => [...prev.slice(-3), `> ${msg}`]);
 
-  // --- 1. بدء البث للأستاذ (مع إرسال الإشعارات للكتيبة) ---
+  // --- 1. بدء البث للأستاذ (Command Center) ---
   const handleStartClass = async () => {
       setStatus("scanning");
       addLog("INITIALIZING CLASSROOM PROTOCOL...");
       
-      // اسم الغرفة الثابت للأستاذ (يضمن أن الطلاب يدخلون دائماً لنفس القناة)
+      // اسم الغرفة الثابت للأستاذ
       const classRoomId = `CLASS_${user.uid}`;
       
       try {
           addLog("SCANNING SQUAD ROSTER...");
           
-          // 1. جلب جميع الطلاب المرتبطين بهذا الأستاذ
+          // جلب الطلاب لإرسال إشعار لهم
           const q = query(collection(db, "users"), where("teacherId", "==", user.uid));
           const snapshot = await getDocs(q);
           
@@ -42,16 +42,15 @@ export default function RealLiveStream() {
               setStatus("notifying");
               addLog(`FOUND ${snapshot.size} OPERATIVES. SENDING SIGNAL...`);
               
-              // 2. إرسال إشعار لكل طالب
-              // نستخدم Promise.all لضمان السرعة
+              // إرسال الإشعارات
               const notificationsPromises = snapshot.docs.map(studentDoc => {
                   return addDoc(collection(db, "notifications"), {
                       userId: studentDoc.id,
                       target: 'student',
-                      type: 'live_start', // هذا النوع يتم التقاطه في NotificationCenter
+                      type: 'live_start', // عند الضغط عليه في مركز الإشعارات سيتم توجيه الطالب للغرفة
                       title: "🔴 LIVE CLASS STARTED",
-                      message: `Commander ${user.displayName || "Teacher"} is live now. Tap to join squad!`,
-                      roomId: classRoomId, // نمرر معرف الغرفة ليدخل الطالب مباشرة
+                      message: `Commander ${user.displayName || "Teacher"} is live. Tap to join immediately!`,
+                      roomId: classRoomId, 
                       senderId: user.uid,
                       createdAt: serverTimestamp(),
                       read: false
@@ -68,7 +67,6 @@ export default function RealLiveStream() {
           addLog("WARNING: SIGNAL RELAY FAILED. CHECK NETWORK.");
       }
       
-      // تأخير بسيط للمحاكاة قبل الدخول الفعلي
       setTimeout(() => {
           setStatus("connected");
           addLog("SECURE CHANNEL ESTABLISHED.");
@@ -76,7 +74,8 @@ export default function RealLiveStream() {
       }, 1500);
   };
 
-  // --- 2. انضمام الطالب لصف أستاذه ---
+  // --- 2. انضمام الطالب (Receiver Mode) ---
+  // الطالب لا ينشئ غرفة، بل ينضم حصرياً لغرفة أستاذه
   const handleJoinClass = () => {
       if (!userData?.teacherId) {
           addLog("ERROR: NO COMMANDER ASSIGNED.");
@@ -84,18 +83,19 @@ export default function RealLiveStream() {
       }
 
       setStatus("scanning");
-      addLog("SEARCHING FOR COMMANDER SIGNAL...");
+      addLog("SYNCING WITH COMMANDER FREQUENCY...");
       
+      // معرف الغرفة يجب أن يطابق معرف غرفة الأستاذ
       const targetRoomId = `CLASS_${userData.teacherId}`;
       
       setTimeout(() => {
           setStatus("connected");
           addLog("UPLINK SUCCESSFUL.");
-          setTimeout(() => startBroadcast(targetRoomId), 800); 
-      }, 1000);
+          startBroadcast(targetRoomId); 
+      }, 1500);
   };
 
-  // --- 3. انضمام يدوي (للمستخدمين العاديين) ---
+  // --- 3. انضمام يدوي (للمستخدمين العاديين فقط) ---
   const handleManualJoin = () => {
     if (!roomName.trim()) return;
     setStatus("scanning");
@@ -108,7 +108,7 @@ export default function RealLiveStream() {
     }, 1500);
   };
 
-  // --- حالة: البث نشط حالياً (Screen Active) ---
+  // --- العرض: في حالة البث النشط ---
   if (liveState.isActive) {
       return (
         <div className="flex flex-col items-center justify-center h-full w-full text-center" dir={dir}>
@@ -141,7 +141,7 @@ export default function RealLiveStream() {
             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.05] pointer-events-none"></div>
             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 blur-[50px] rounded-full pointer-events-none"></div>
 
-            {/* Header Icon */}
+            {/* الأيقونة العلوية حسب الدور */}
             <div className="text-center mb-10 relative z-10">
                 <div className={`w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6 border shadow-[0_0_40px_rgba(0,0,0,0.3)] transition-all duration-500
                     ${isTeacher 
@@ -158,14 +158,14 @@ export default function RealLiveStream() {
                     {isTeacher ? "Command Center" : isStudent ? "Academy Uplink" : "Neural Link"}
                 </h2>
                 <div className="flex items-center justify-center gap-2 text-[9px] font-mono text-white/30 uppercase tracking-[0.3em]">
-                    {isTeacher ? "Broadcast V.4.0" : isStudent ? "Receiver V.4.0" : "Secure Gateway V.4.0"}
+                    {isTeacher ? "Broadcast V.4.0" : isStudent ? "Receiver Mode" : "Secure Gateway"}
                 </div>
             </div>
 
-            {/* Actions Area */}
+            {/* منطقة الإجراءات (Actions) */}
             <div className="space-y-6 relative z-10">
                 
-                {/* --- واجهة الأستاذ (Teacher Interface) --- */}
+                {/* --- واجهة الأستاذ (البادئ) --- */}
                 {isTeacher && (
                     <div className="space-y-4">
                         <button 
@@ -175,39 +175,55 @@ export default function RealLiveStream() {
                         >
                             {status === "idle" ? <IconBroadcast size={24} className="group-hover/btn:animate-pulse"/> : <IconLoader className="animate-spin" size={24} />}
                             <span className="tracking-widest text-xs uppercase">
-                                {status === "idle" ? "INITIATE CLASS SESSION" : status === "scanning" ? "SCANNING ROSTER..." : "BROADCASTING..."}
+                                {status === "idle" ? "START CLASS SESSION" : "NOTIFYING SQUAD..."}
                             </span>
                         </button>
                         <div className="text-center text-[10px] text-emerald-500/50 font-mono flex items-center justify-center gap-2">
                             <IconUsers size={12}/>
-                            <span>Auto-notifies all squad members</span>
+                            <span>Sending wake-up signal to {userData?.studentCount || "all"} students</span>
                         </div>
                     </div>
                 )}
 
-                {/* --- واجهة الطالب (Student Interface) --- */}
+                {/* --- واجهة الطالب (المستقبل) --- */}
                 {isStudent && (
                     <div className="space-y-4">
-                        <button 
-                            onClick={handleJoinClass}
-                            disabled={status !== "idle" || !userData?.teacherId}
-                            className={`w-full py-5 font-black rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed
-                            ${!userData?.teacherId ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/20'}`}
-                        >
-                            {status === "idle" ? <IconSchool size={24} /> : <IconLoader className="animate-spin" size={24} />}
-                            <span className="tracking-widest text-xs uppercase">
-                                {userData?.teacherId ? "JOIN COMMANDER'S ROOM" : "NO ASSIGNED TEACHER"}
-                            </span>
-                        </button>
-                        {userData?.teacherId && (
-                            <div className="text-center text-[10px] text-indigo-500/50 font-mono">
-                                Status: Ready to receive
+                        {userData?.teacherId ? (
+                            <>
+                                {/* زر الانضمام اليدوي (احتياطي) */}
+                                <button 
+                                    onClick={handleJoinClass}
+                                    disabled={status !== "idle"}
+                                    className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-lg shadow-indigo-900/20 disabled:opacity-50"
+                                >
+                                    {status === "idle" ? <IconSchool size={24} /> : <IconLoader className="animate-spin" size={24} />}
+                                    <span className="tracking-widest text-xs uppercase">
+                                        CONNECT TO LIVE FEED
+                                    </span>
+                                </button>
+                                
+                                {/* رسالة توضيحية */}
+                                <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-center">
+                                    <div className="flex justify-center mb-2 text-indigo-400"><IconLock size={16}/></div>
+                                    <p className="text-[10px] text-indigo-200/70 font-bold uppercase tracking-wide leading-relaxed">
+                                        Waiting for Commander's Signal...
+                                    </p>
+                                    <p className="text-[9px] text-white/20 mt-1 font-mono">
+                                        You will receive a notification when the class starts.
+                                    </p>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="text-center py-6 text-white/30 border border-dashed border-white/10 rounded-2xl">
+                                <IconSchool size={32} className="mx-auto mb-2 opacity-50"/>
+                                <p className="text-xs font-black uppercase">No Squad Assigned</p>
+                                <p className="text-[9px] font-mono mt-1">Wait for an invite from a teacher.</p>
                             </div>
                         )}
                     </div>
                 )}
 
-                {/* --- واجهة المستخدم العادي (Manual Entry) --- */}
+                {/* --- واجهة المستخدم العادي (يدوي) --- */}
                 {(!isTeacher && !isStudent) && (
                     <div className="space-y-4">
                         <div className="relative group/input">
@@ -234,7 +250,7 @@ export default function RealLiveStream() {
                 
                 {/* Console Logs */}
                 <div className="bg-black/40 rounded-xl p-4 h-24 overflow-hidden font-mono text-[9px] text-green-500/70 border border-white/5 flex flex-col justify-end text-left shadow-inner" dir="ltr">
-                    {logs.length === 0 && <span className="opacity-30">Waiting for command...</span>}
+                    {logs.length === 0 && <span className="opacity-30">System idle. Waiting for protocol...</span>}
                     {logs.map((l, i) => <div key={i}>{l}</div>)}
                 </div>
             </div>

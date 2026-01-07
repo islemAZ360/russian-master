@@ -19,55 +19,52 @@ export default function NotificationCenter() {
   const [processingId, setProcessingId] = useState(null);
   const { t, dir } = useLanguage();
 
-  // ضمان أن الإشعارات مصفوفة دائماً
   const safeNotifications = Array.isArray(notifications) ? notifications : [];
 
-  // --- 1. معالجة قبول الدعوة ---
+  // --- 1. معالجة قبول دعوة الانضمام للفريق ---
   const handleAcceptInvite = async (notification) => {
     if (!user || !notification.actionPayload) return;
     
     setProcessingId(notification.id);
 
     try {
-        const { teacherId, teacherName, newRole } = notification.actionPayload;
+        const { teacherId, teacherName } = notification.actionPayload;
 
-        // أ. تحديث بيانات الطالب (المستخدم الحالي)
+        // أ. تحديث بيانات المستخدم الحالي (الطالب)
         const userRef = doc(db, "users", user.uid);
         await updateDoc(userRef, {
-            role: newRole || 'student', // ترقية لرتبة طالب
-            teacherId: teacherId,       // ربطه بالأستاذ
+            role: 'student',        // الترقية لرتبة طالب
+            teacherId: teacherId,   // الربط بالأستاذ
             updatedAt: serverTimestamp()
         });
 
-        // ب. إشعار الأستاذ بأن الطالب قبل الدعوة
+        // ب. إرسال إشعار للأستاذ بأن الدعوة قُبلت
         await addDoc(collection(db, "notifications"), {
-            userId: teacherId, // معرف الأستاذ
+            userId: teacherId, // إرسال للأستاذ
             target: 'teacher',
-            type: "info",
+            type: "recruit_success", // نوع خاص لتمييز النجاح
             title: "✅ RECRUITMENT SUCCESS",
-            message: `Operative ${user.displayName || "Unknown"} has accepted your invite and joined the squad.`,
+            message: `Operative ${user.displayName || "Agent"} joined your squad.`,
             senderId: user.uid,
             createdAt: serverTimestamp(),
             read: false
         });
 
-        // ج. حذف إشعار الدعوة بعد القبول
+        // ج. حذف إشعار الدعوة
         await deleteDoc(doc(db, "notifications", notification.id));
 
-        // د. تحديث الواجهة (إعادة تحميل لتطبيق الصلاحيات الجديدة)
-        // نستخدم setTimeout لإعطاء فرصة للمستخدم لرؤية التغيير البصري
-        setTimeout(() => {
-            window.location.reload();
-        }, 1000);
+        // د. تحديث الصفحة لتطبيق الصلاحيات الجديدة
+        alert(`You have joined ${teacherName}'s squad! Reloading systems...`);
+        window.location.reload();
 
     } catch (error) {
-        console.error("Invite Acceptance Error:", error);
-        alert("Failed to process acceptance. Connection error.");
+        console.error("Acceptance Error:", error);
+        alert("Failed to join squad. Communication error.");
         setProcessingId(null);
     }
   };
 
-  // --- 2. رفض أو حذف الإشعار ---
+  // --- 2. حذف الإشعار ---
   const handleDismiss = async (e, id) => {
       e.stopPropagation();
       await removeNotification(id);
@@ -75,27 +72,29 @@ export default function NotificationCenter() {
 
   // --- 3. التوجيه عند النقر ---
   const handleNavigation = (n) => {
-    // الدعوات لا تفعل شيئاً عند النقر العام (يجب استخدام الأزرار)
+    // الدعوات تتطلب ضغط زر القبول، النقر العام لا يفعل شيئاً
     if (n.type === 'invite') return;
 
-    // معالجة إشعار البث المباشر
+    // أ. البث المباشر: الانضمام للغرفة
     if (n.type === 'live_start' && n.roomId) {
-        startBroadcast(n.roomId);
         setIsOpen(false);
+        // توجيه المستخدم لصفحة البث وبدء الفيديو
+        setCurrentView('live');
+        setTimeout(() => startBroadcast(n.roomId), 500);
         return;
     }
     
-    // ردود الدعم
+    // ب. رد الدعم الفني
     if (n.type === 'support_reply') {
         setShowSupport(true);
     }
     
-    // الترقيات
-    if (n.type === 'rank') {
-        setCurrentView('leaderboard');
+    // ج. الترقية
+    if (n.type === 'rank' || n.type === 'recruit_success') {
+        setCurrentView('leaderboard'); // أو teacher_students للأستاذ
     }
 
-    // إغلاق القائمة وحذف الإشعار (اختياري: يمكن تركه مقروءاً بدلاً من حذفه)
+    // إغلاق القائمة وحذف الإشعار (تمت قراءته)
     setIsOpen(false);
     removeNotification(n.id);
   };
@@ -107,6 +106,7 @@ export default function NotificationCenter() {
       'support_reply': t('notif_type_support') || "SUPPORT",
       'admin_alert': t('notif_type_admin') || "ALERT",
       'live_start': "🔴 LIVE STREAM",
+      'recruit_success': "SQUAD UPDATE",
       'info': "SYSTEM INFO"
     };
     return map[type] || "SYSTEM MESSAGE";
@@ -114,19 +114,15 @@ export default function NotificationCenter() {
 
   const formatTime = (timestamp) => {
       if (!timestamp) return "Just now"; 
-      if (timestamp?.toDate) {
-          try {
-              const date = timestamp.toDate();
-              const now = new Date();
-              const diff = (now - date) / 1000; // seconds
-              
-              if (diff < 60) return "Just now";
-              if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
-              if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
-              return date.toLocaleDateString();
-          } catch (e) { return "Now"; }
-      }
-      return "Now";
+      try {
+          const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+          const now = new Date();
+          const diff = (now - date) / 1000;
+          if (diff < 60) return "Just now";
+          if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+          if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+          return date.toLocaleDateString();
+      } catch (e) { return "Now"; }
   };
 
   const getIcon = (type) => {
@@ -136,7 +132,7 @@ export default function NotificationCenter() {
         case 'support_reply': return <IconMessageCircle size={20} className="text-blue-400"/>;
         case 'admin_alert': return <IconShield size={20} className="text-red-500"/>;
         case 'live_start': return <IconBroadcast size={20} className="animate-pulse text-red-500" />;
-        case 'info': return <IconCheck size={20} className="text-emerald-400"/>;
+        case 'recruit_success': return <IconUserPlus size={20} className="text-emerald-400"/>;
         default: return <IconInfoCircle size={20} className="text-gray-400"/>;
     }
   };
@@ -194,7 +190,8 @@ export default function NotificationCenter() {
                                 key={n.id} 
                                 onClick={() => handleNavigation(n)} 
                                 className={`p-5 border-b border-white/5 flex gap-4 items-start relative group transition-all 
-                                ${n.type === 'invite' ? 'bg-purple-500/5' : 'hover:bg-white/5 cursor-pointer'}`}
+                                ${n.type === 'invite' ? 'bg-purple-500/5' : 'hover:bg-white/5 cursor-pointer'}
+                                ${n.type === 'live_start' ? 'bg-red-900/10 border-l-2 border-l-red-500' : ''}`}
                             >
                                 {/* Icon */}
                                 <div className="mt-1 shrink-0 p-2.5 rounded-xl bg-[#1a1a1a] border border-white/10 shadow-lg">
@@ -216,7 +213,7 @@ export default function NotificationCenter() {
                                         {n.message}
                                     </p>
                                     
-                                    {/* Invite Actions */}
+                                    {/* Invite Actions (Only for Invite type) */}
                                     {n.type === 'invite' && (
                                         <div className="flex gap-2 mt-1">
                                             <button 
@@ -225,7 +222,7 @@ export default function NotificationCenter() {
                                                 className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 disabled:opacity-50"
                                             >
                                                 {processingId === n.id ? <IconLoader2 className="animate-spin" size={12}/> : <IconCheck size={12}/>}
-                                                CONFIRM
+                                                ACCEPT
                                             </button>
                                             <button 
                                                 onClick={(e) => handleDismiss(e, n.id)}

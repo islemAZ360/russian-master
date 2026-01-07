@@ -1,299 +1,262 @@
 "use client";
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, orderBy, limit } from "firebase/firestore";
 import { 
-  IconChartBar, IconActivity, IconClock, IconFlame, 
-  IconTrendingUp, IconUsers, IconBrain, IconTarget,
-  IconTrophy, IconAlertOctagon, IconLoader2
+  IconUserPlus, IconSearch, IconUsers, IconUser, 
+  IconCheck, IconLoader2, IconSchool, IconShield,
+  IconSend, IconMailForward
 } from '@tabler/icons-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
-
-// --- مكونات الرسوم البيانية (SVG Charts) ---
-
-// 1. شريط التقدم الدائري
-const ProgressRing = ({ radius, stroke, progress, color, icon: Icon, label }) => {
-  const normalizedRadius = radius - stroke * 2;
-  const circumference = normalizedRadius * 2 * Math.PI;
-  const strokeDashoffset = circumference - (progress / 100) * circumference;
-
-  return (
-    <div className="flex flex-col items-center justify-center relative">
-      <div className="relative flex items-center justify-center">
-        <svg height={radius * 2} width={radius * 2} className="rotate-[-90deg]">
-          <circle
-            stroke="rgba(255,255,255,0.05)"
-            strokeWidth={stroke}
-            fill="transparent"
-            r={normalizedRadius}
-            cx={radius}
-            cy={radius}
-          />
-          <circle
-            stroke={color}
-            fill="transparent"
-            strokeWidth={stroke}
-            strokeDasharray={circumference + ' ' + circumference}
-            style={{ strokeDashoffset, transition: 'stroke-dashoffset 1s ease-in-out' }}
-            strokeLinecap="round"
-            r={normalizedRadius}
-            cx={radius}
-            cy={radius}
-          />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center text-white">
-            <Icon size={24} className={progress > 0 ? "opacity-100" : "opacity-30"} style={{ color }} />
-        </div>
-      </div>
-      <div className="mt-2 text-center">
-          <div className="text-2xl font-black text-white font-mono">{progress}%</div>
-          <div className="text-[9px] text-white/40 uppercase tracking-widest font-bold">{label}</div>
-      </div>
-    </div>
-  );
-};
-
-// 2. رسم بياني خطي بسيط (Sparkline)
-const SparkLine = ({ data, color, height = 60 }) => {
-    if (!data || data.length < 2) return null;
-    const max = Math.max(...data);
-    const min = Math.min(...data);
-    const range = max - min || 1;
-    const points = data.map((val, i) => {
-        const x = (i / (data.length - 1)) * 100;
-        const y = 100 - ((val - min) / range) * 100;
-        return `${x},${y}`;
-    }).join(" ");
-
-    return (
-        <div className="w-full relative overflow-hidden" style={{ height: `${height}px` }}>
-            <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
-                <polyline
-                    fill="none"
-                    stroke={color}
-                    strokeWidth="2"
-                    points={points}
-                    vectorEffect="non-scaling-stroke"
-                />
-                <polygon
-                    fill={color}
-                    fillOpacity="0.1"
-                    points={`0,100 ${points} 100,100`}
-                />
-            </svg>
-        </div>
-    );
-};
 
 export default function TeacherStudents() {
   const { user } = useAuth();
   const { t, dir } = useLanguage();
   
-  const [students, setStudents] = useState([]);
+  // --- الحالات (States) ---
+  const [activeTab, setActiveTab] = useState('my_squad'); // 'my_squad' or 'recruit'
+  const [myStudents, setMyStudents] = useState([]);
+  const [allUsers, setAllUsers] = useState([]); // المستخدمون المحتملون للتجنيد
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [invitedUsers, setInvitedUsers] = useState([]); // لتتبع من تم إرسال الدعوة لهم في هذه الجلسة
 
-  // جلب البيانات (بدون ترتيب معقد لتجنب مشاكل الفهرسة)
+  // 1. جلب طلابي الحاليين (My Squad)
   useEffect(() => {
     if (!user) return;
     
-    // FIX: إزالة orderBy لتجنب تعليق التحميل
     const q = query(
       collection(db, "users"), 
       where("teacherId", "==", user.uid)
     );
     
     const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(d => d.data());
-      setStudents(data);
+      setMyStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    }, (err) => {
-        console.error("TeacherAnalytics Error:", err);
-        setLoading(false);
     });
     
     return () => unsub();
   }, [user]);
 
-  // تحليل البيانات المتقدم
-  const insights = useMemo(() => {
-    if (!students.length) return null;
+  // 2. جلب المستخدمين للتجنيد (Recruitment Pool)
+  // نجلب المستخدمين الذين ليسوا أساتذة ولا أدمن، وليسوا طلابي بالفعل
+  useEffect(() => {
+    if (activeTab === 'recruit') {
+        const fetchPotentialRecruits = async () => {
+            setLoading(true);
+            try {
+                // جلب آخر 100 مستخدم (أو الكل حسب حجم الداتا)
+                // يفضل هنا استخدام دالة سحابية للبحث الحقيقي، لكن هذا سيعمل للنسخ الأولية
+                const q = query(
+                    collection(db, "users"),
+                    where("role", "==", "user"), // فقط المستخدمين العاديين
+                    limit(100)
+                );
+                
+                const snap = await getDocs(q);
+                const users = snap.docs
+                    .map(d => ({ id: d.id, ...d.data() }))
+                    .filter(u => u.teacherId !== user.uid); // استبعاد طلابي الحاليين
+                
+                setAllUsers(users);
+            } catch (e) {
+                console.error("Error fetching recruits:", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchPotentialRecruits();
+    }
+  }, [activeTab, user]);
 
-    const totalXP = students.reduce((acc, s) => acc + (s.xp || 0), 0);
-    const avgXP = Math.floor(totalXP / students.length);
-    
-    // النشاط (آخر 24 ساعة)
-    const now = new Date();
-    const activeToday = students.filter(s => {
-        if (!s.lastLogin) return false;
-        // دعم التوقيت سواء كان Timestamp أو Date
-        const last = s.lastLogin.toDate ? s.lastLogin.toDate() : new Date(s.lastLogin);
-        return (now - last) < 86400000;
-    }).length;
-    
-    const activeRate = Math.round((activeToday / students.length) * 100);
+  // --- وظيفة إرسال الدعوة ---
+  const sendInvite = async (targetUser) => {
+      if (!user) return;
+      
+      try {
+          // إضافة إشعار للمستخدم المستهدف
+          await addDoc(collection(db, "notifications"), {
+              userId: targetUser.id,      // المستلم
+              target: 'student',          // نوع الهدف
+              type: 'invite',             // نوع الإشعار (مهم جداً ليظهر زر القبول)
+              title: "🎓 SQUAD INVITATION",
+              message: `Commander ${user.displayName || "Teacher"} invited you to join their squad.`,
+              
+              // بيانات ضرورية لعملية القبول
+              actionPayload: {
+                  teacherId: user.uid,
+                  teacherName: user.displayName || "Teacher",
+                  newRole: 'student'
+              },
+              
+              senderId: user.uid,
+              createdAt: serverTimestamp(),
+              read: false
+          });
 
-    // مستويات الإتقان (افتراضي)
-    const masteryLevels = {
-        beginner: students.filter(s => (s.xp || 0) < 1000).length,
-        intermediate: students.filter(s => (s.xp || 0) >= 1000 && (s.xp || 0) < 5000).length,
-        advanced: students.filter(s => (s.xp || 0) >= 5000).length,
-    };
+          // تحديث الحالة المحلية لإظهار علامة الصح
+          setInvitedUsers(prev => [...prev, targetUser.id]);
+          
+      } catch (error) {
+          console.error("Invite Failed:", error);
+          alert("Failed to send invite signal.");
+      }
+  };
 
-    // بيانات وهمية للرسم البياني (محاكاة نشاط أسبوعي بناءً على المعدل الحالي)
-    // في الوضع الحقيقي، يجب جلب هذه البيانات من مجموعة `daily_stats`
-    const activityTrend = [
-        activeRate - 10 > 0 ? activeRate - 10 : 0, 
-        activeRate + 5, 
-        activeRate - 5, 
-        activeRate + 10, 
-        activeRate, 
-        activeRate + 15, 
-        activeRate
-    ]; 
-
-    return {
-        totalXP,
-        avgXP,
-        activeRate,
-        masteryLevels,
-        activityTrend,
-        topStreaks: students.filter(s => s.streak > 3).length // أكثر من 3 أيام يعتبر سلسلة جيدة
-    };
-  }, [students]);
-
-  if (loading) return (
-      <div className="h-full flex flex-col items-center justify-center text-cyan-500/50 gap-4">
-          <IconLoader2 className="animate-spin" size={40}/>
-          <span className="text-xs font-mono uppercase tracking-[0.3em]">Processing Neural Data...</span>
-      </div>
-  );
-
-  if (!insights) return (
-      <div className="h-full flex flex-col items-center justify-center opacity-40 border-2 border-dashed border-white/5 rounded-3xl m-6">
-          <IconChartBar size={64} className="mb-4"/>
-          <p className="text-sm font-black uppercase tracking-widest">No Class Data Available</p>
-          <p className="text-[10px] font-mono mt-2">Recruit students to view analytics.</p>
-      </div>
+  // تصفية المستخدمين في البحث
+  const filteredRecruits = allUsers.filter(u => 
+      u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      u.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="w-full h-full p-6 md:p-10 pb-40 overflow-y-auto custom-scrollbar font-sans" dir={dir}>
+    <div className="w-full h-full flex flex-col p-6 md:p-10 font-sans pb-32" dir={dir}>
         
         {/* Header */}
-        <div className="mb-12">
-            <div className="flex items-center gap-3 mb-2 text-cyan-500">
-                <IconBrain size={28}/>
-                <span className="text-[10px] font-black uppercase tracking-[0.4em]">Deep Analysis Protocol</span>
+        <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-6">
+            <div>
+                <div className="flex items-center gap-3 mb-2 text-cyan-500">
+                    <IconShield size={32}/>
+                    <span className="text-[10px] font-black uppercase tracking-[0.4em]">Squad_Command</span>
+                </div>
+                <h1 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter">
+                    {activeTab === 'recruit' ? t('recruit_title') || "Recruitment" : t('nav_students') || "My Squad"}
+                </h1>
             </div>
-            <h1 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter">
-                Class Insights
-            </h1>
+
+            {/* Tabs */}
+            <div className="flex bg-[#0a0a0a] border border-white/10 p-1 rounded-2xl">
+                <button 
+                    onClick={() => setActiveTab('my_squad')}
+                    className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2
+                    ${activeTab === 'my_squad' ? 'bg-cyan-600 text-white shadow-lg' : 'text-white/40 hover:text-white'}`}
+                >
+                    <IconUsers size={16}/> {t('squad_active') || "Active Agents"}
+                </button>
+                <button 
+                    onClick={() => setActiveTab('recruit')}
+                    className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2
+                    ${activeTab === 'recruit' ? 'bg-purple-600 text-white shadow-lg' : 'text-white/40 hover:text-white'}`}
+                >
+                    <IconUserPlus size={16}/> {t('recruit_invite_btn') || "Recruit"}
+                </button>
+            </div>
         </div>
 
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Content Area */}
+        <div className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-6 shadow-2xl relative overflow-hidden flex flex-col">
             
-            {/* 1. Activity Monitor (Large) */}
-            <div className="lg:col-span-2 bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden group">
-                <div className="flex justify-between items-start mb-8 relative z-10">
-                    <div>
-                        <h3 className="text-xl font-black text-white uppercase tracking-tight">Engagement Pulse</h3>
-                        <p className="text-[10px] text-white/40 font-mono mt-1">Real-time activity trend analysis</p>
-                    </div>
-                    <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
-                        <IconTrendingUp size={14} className="text-emerald-500"/>
-                        <span className="text-[10px] font-bold text-emerald-400">LIVE</span>
-                    </div>
-                </div>
-                
-                {/* The Sparkline */}
-                <div className="h-40 w-full relative z-10">
-                    <SparkLine data={insights.activityTrend} color="#06b6d4" height={160} />
-                </div>
-
-                {/* Data Points */}
-                <div className="grid grid-cols-3 gap-4 mt-8 pt-8 border-t border-white/5 relative z-10">
-                    <div>
-                        <div className="text-[9px] text-white/30 uppercase font-black tracking-widest mb-1">Active Rate</div>
-                        <div className="text-3xl font-black text-white">{insights.activeRate}%</div>
-                    </div>
-                    <div>
-                        <div className="text-[9px] text-white/30 uppercase font-black tracking-widest mb-1">Total XP</div>
-                        <div className="text-3xl font-black text-cyan-400">{(insights.totalXP / 1000).toFixed(1)}k</div>
-                    </div>
-                    <div>
-                        <div className="text-[9px] text-white/30 uppercase font-black tracking-widest mb-1">Top Streaks</div>
-                        <div className="text-3xl font-black text-orange-500">{insights.topStreaks}</div>
-                    </div>
-                </div>
-
-                {/* Background Decoration */}
-                <div className="absolute inset-0 bg-gradient-to-b from-cyan-900/5 to-transparent pointer-events-none"></div>
-            </div>
-
-            {/* 2. Proficiency Gauge (Side) */}
-            <div className="bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl flex flex-col items-center justify-center relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-6 opacity-5"><IconTarget size={100}/></div>
-                
-                <h3 className="text-sm font-black text-white uppercase tracking-widest mb-8 text-center w-full">Mastery Distribution</h3>
-                
-                <div className="flex justify-center items-center gap-4">
-                    <ProgressRing 
-                        radius={60} stroke={8} 
-                        progress={students.length > 0 ? Math.round((insights.masteryLevels.advanced / students.length) * 100) : 0} 
-                        color="#a855f7" 
-                        icon={IconTrophy} 
-                        label="Elite"
-                    />
-                </div>
-
-                <div className="w-full mt-10 space-y-4">
-                    <div className="flex justify-between items-center text-xs font-bold text-white/60">
-                        <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-purple-500"></span> Advanced</span>
-                        <span>{insights.masteryLevels.advanced}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs font-bold text-white/60">
-                        <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-cyan-500"></span> Intermediate</span>
-                        <span>{insights.masteryLevels.intermediate}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs font-bold text-white/60">
-                        <span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-zinc-600"></span> Beginner</span>
-                        <span>{insights.masteryLevels.beginner}</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* 3. Risk Assessment */}
-            <div className="lg:col-span-3 bg-red-900/10 border border-red-500/20 rounded-[2.5rem] p-6 flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-6">
-                    <div className="p-4 bg-red-500/10 rounded-2xl text-red-500 border border-red-500/20">
-                        <IconAlertOctagon size={32}/>
-                    </div>
-                    <div>
-                        <h4 className="text-lg font-black text-white uppercase">Retention Alert</h4>
-                        <p className="text-xs text-red-400 font-mono mt-1">
-                            {students.length - insights.activeRate > 0 
-                                ? `${Math.max(0, 100 - insights.activeRate)}% of squad is dormant.` 
-                                : "Squad is fully active."}
-                        </p>
-                    </div>
-                </div>
-                
-                <div className="flex gap-4">
-                    <div className="px-6 py-3 bg-[#0a0a0a] rounded-xl border border-white/5 text-center min-w-[100px]">
-                        <div className="text-xs text-white/30 font-black uppercase mb-1">Dormant</div>
-                        <div className="text-2xl font-black text-white">
-                            {Math.max(0, students.length - Math.round(students.length * (insights.activeRate/100)))}
+            {/* === Tab 1: My Squad (الطلاب الحاليين) === */}
+            {activeTab === 'my_squad' && (
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    {myStudents.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center opacity-30 text-center">
+                            <IconSchool size={64} className="mb-4 text-cyan-500"/>
+                            <h3 className="text-lg font-black uppercase tracking-widest">Squad Empty</h3>
+                            <p className="text-xs font-mono mt-2">Go to "Recruit" tab to add students.</p>
                         </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {myStudents.map((student, i) => (
+                                <motion.div 
+                                    key={student.id}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: i * 0.05 }}
+                                    className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center gap-4 hover:border-cyan-500/30 transition-all group"
+                                >
+                                    <div className="w-12 h-12 rounded-xl bg-zinc-800 overflow-hidden border border-white/10 shrink-0">
+                                        <img src={student.photoURL || "/avatars/avatar1.png"} className="w-full h-full object-cover"/>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-white font-bold truncate uppercase">{student.displayName}</div>
+                                        <div className="text-[10px] text-emerald-500 font-mono flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                            OPERATIVE
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-cyan-400 font-black text-sm">{student.xp || 0}</div>
+                                        <div className="text-[8px] text-white/30 uppercase">XP</div>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* === Tab 2: Recruit (البحث والدعوة) === */}
+            {activeTab === 'recruit' && (
+                <div className="flex flex-col h-full">
+                    {/* شريط البحث */}
+                    <div className="relative mb-6">
+                        <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" size={20}/>
+                        <input 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder={t('recruit_search_ph') || "Search by codename or email..."}
+                            className="w-full bg-black/40 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white outline-none focus:border-purple-500 transition-all font-mono text-sm placeholder:text-white/20"
+                        />
                     </div>
-                    <div className="px-6 py-3 bg-[#0a0a0a] rounded-xl border border-white/5 text-center min-w-[100px]">
-                        <div className="text-xs text-white/30 font-black uppercase mb-1">Avg Lvl</div>
-                        <div className="text-2xl font-black text-cyan-400">{Math.floor(insights.avgXP / 500) + 1}</div>
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        {loading ? (
+                            <div className="h-full flex flex-col items-center justify-center gap-4 text-purple-500/50">
+                                <IconLoader2 className="animate-spin" size={32}/>
+                                <span className="text-xs font-black uppercase tracking-widest">Scanning Global Network...</span>
+                            </div>
+                        ) : filteredRecruits.length === 0 ? (
+                            <div className="text-center py-20 opacity-30">
+                                <p className="text-xs font-black uppercase tracking-widest">{t('recruit_no_results') || "No candidates found matching criteria"}</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {filteredRecruits.map((candidate, i) => {
+                                    const isInvited = invitedUsers.includes(candidate.id);
+                                    
+                                    return (
+                                        <motion.div 
+                                            key={candidate.id}
+                                            initial={{ opacity: 0, x: -10 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: i * 0.05 }}
+                                            className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-between hover:bg-white/[0.04] transition-all"
+                                        >
+                                            <div className="flex items-center gap-4 overflow-hidden">
+                                                <div className="w-10 h-10 rounded-xl bg-zinc-800 overflow-hidden border border-white/10 shrink-0">
+                                                    <img src={candidate.photoURL || "/avatars/avatar1.png"} className="w-full h-full object-cover"/>
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="text-white font-bold text-sm truncate uppercase">{candidate.displayName || "Unknown User"}</div>
+                                                    <div className="text-[10px] text-white/30 font-mono truncate">{candidate.email}</div>
+                                                </div>
+                                            </div>
+
+                                            <button 
+                                                onClick={() => !isInvited && sendInvite(candidate)}
+                                                disabled={isInvited}
+                                                className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2
+                                                ${isInvited 
+                                                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 cursor-default' 
+                                                    : 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg active:scale-95'}`}
+                                            >
+                                                {isInvited ? (
+                                                    <><IconCheck size={14}/> {t('recruit_sent') || "Sent"}</>
+                                                ) : (
+                                                    <><IconMailForward size={14}/> {t('recruit_invite_btn') || "Invite"}</>
+                                                )}
+                                            </button>
+                                        </motion.div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 </div>
-            </div>
+            )}
 
         </div>
     </div>
