@@ -5,7 +5,7 @@ import { IconLoader2, IconAlertTriangle, IconHome } from '@tabler/icons-react';
 
 // استيراد الهوكس الأساسية
 import { useUI } from '@/hooks/useUI';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/hooks/useLanguage';
 
 // استيراد العروض الأساسية (Views)
@@ -23,6 +23,7 @@ import CommunicationHub from '@/components/features/chat/CommunicationHub';
 import { CategorySelect } from '@/components/features/study/CategorySelect';
 
 // === استيراد صفحات الأستاذ (Recruitment & Analytics) ===
+// هذه هي المكونات التي قمنا بإصلاحها للتو
 import TeacherStudents from '@/components/features/teacher/TeacherStudents';
 import TeacherProgress from '@/components/features/teacher/TeacherProgress';
 
@@ -80,7 +81,7 @@ export default function ViewManager(props) {
         if (!isTeacher) return <AccessDenied />;
         return <TeacherStudents />; 
 
-      case 'teacher_progress': // صفحة التحليلات المتقدمة
+      case 'teacher_progress': // صفحة التحليلات المتقدمة (التي أصلحناها)
         if (!isTeacher) return <AccessDenied />;
         return <TeacherProgress />; 
 
@@ -113,7 +114,7 @@ export default function ViewManager(props) {
           />
         );
 
-      case 'data': // عرض الأرشيف (للطالب قراءة فقط، للآخرين حسب الصلاحية)
+      case 'data': // عرض الأرشيف
         // الطالب يرى المحتوى لكن لا يعدله (readOnly = true)
         // الأستاذ/الأدمن يمكنه التعديل
         const canEdit = isTeacher || isAdmin || isJunior;
@@ -163,9 +164,8 @@ export default function ViewManager(props) {
           </motion.div>
         </AnimatePresence>
         
-        {/* CSS Fixes for Layout */}
+        {/* إصلاحات CSS للتخطيط */}
         <style jsx global>{`
-            /* تحسين التمرير وتثبيت الهامش الجانبي */
             .view-container { 
                 scrollbar-gutter: stable; 
             }

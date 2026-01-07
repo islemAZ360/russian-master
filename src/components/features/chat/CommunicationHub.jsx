@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   IconMessage, IconPlus, IconLock, IconSend, IconUserPlus, 
   IconArrowLeft, IconX, IconHash, IconUsers, IconWorld, IconTrash,
-  IconShieldLock, IconSchool, IconLoader2
+  IconShieldLock, IconSchool, IconLoader2, IconRefresh
 } from "@tabler/icons-react";
 import { db } from "@/lib/firebase";
 import { 
@@ -48,6 +48,7 @@ export default function CommunicationHub() {
     const updateLocalChats = () => {
         const uniqueChats = Array.from(chatsMap.values())
             .sort((a, b) => {
+                // ترتيب حسب آخر نشاط
                 const timeA = a.lastActivity?.seconds || 0;
                 const timeB = b.lastActivity?.seconds || 0;
                 return timeB - timeA;
@@ -56,40 +57,46 @@ export default function CommunicationHub() {
         setLoadingChats(false);
     };
 
-    // الاستعلام 1: المجموعات العامة (Public)
-    const qPublic = query(collection(db, "chats"), where("type", "==", "public"));
-    unsubscribers.push(onSnapshot(qPublic, (snap) => {
-        snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-        updateLocalChats();
-    }));
-
-    // الاستعلام 2: المجموعات التي أنا عضو فيها
-    const qMember = query(collection(db, "chats"), where("members", "array-contains", user.uid));
-    unsubscribers.push(onSnapshot(qMember, (snap) => {
-        snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-        updateLocalChats();
-    }));
-
-    // الاستعلام 3: المجموعات التي أنشأتها أنا (هام للأستاذ ليرى مجموعاته الخاصة)
-    const qOwner = query(collection(db, "chats"), where("createdBy", "==", user.uid));
-    unsubscribers.push(onSnapshot(qOwner, (snap) => {
-        snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-        updateLocalChats();
-    }));
-
-    // الاستعلام 4: للطالب - مجموعات أستاذه (للانضمام التلقائي أو الرؤية)
-    if (isStudent && userData?.teacherId) {
-        const qTeacher = query(collection(db, "chats"), where("createdBy", "==", userData.teacherId));
-        unsubscribers.push(onSnapshot(qTeacher, (snap) => {
+    try {
+        // الاستعلام 1: المجموعات العامة (Public)
+        const qPublic = query(collection(db, "chats"), where("type", "==", "public"));
+        unsubscribers.push(onSnapshot(qPublic, (snap) => {
             snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
             updateLocalChats();
         }));
+
+        // الاستعلام 2: المجموعات التي أنا عضو فيها
+        const qMember = query(collection(db, "chats"), where("members", "array-contains", user.uid));
+        unsubscribers.push(onSnapshot(qMember, (snap) => {
+            snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
+            updateLocalChats();
+        }));
+
+        // الاستعلام 3: المجموعات التي أنشأتها أنا (هام للأستاذ ليرى مجموعاته الخاصة ويحذفها)
+        // هذا الاستعلام يضمن ظهور المجموعات التي أنشأها المعلم حتى لو لم يكن في قائمة الأعضاء لسبب ما
+        const qOwner = query(collection(db, "chats"), where("createdBy", "==", user.uid));
+        unsubscribers.push(onSnapshot(qOwner, (snap) => {
+            snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
+            updateLocalChats();
+        }));
+
+        // الاستعلام 4: للطالب - مجموعات أستاذه (للانضمام التلقائي أو الرؤية)
+        if (isStudent && userData?.teacherId) {
+            const qTeacher = query(collection(db, "chats"), where("createdBy", "==", userData.teacherId));
+            unsubscribers.push(onSnapshot(qTeacher, (snap) => {
+                snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
+                updateLocalChats();
+            }));
+        }
+    } catch (err) {
+        console.error("Chat Query Error:", err);
+        setLoadingChats(false);
     }
 
     return () => {
         unsubscribers.forEach(unsub => unsub());
     };
-  }, [user, isAdmin, isStudent, userData]);
+  }, [user, isAdmin, isStudent, userData, isTeacher]);
 
   // 2. جلب الرسائل
   useEffect(() => {
@@ -154,7 +161,8 @@ export default function CommunicationHub() {
     if (!newGroup.name.trim()) return;
     
     // الأستاذ ينشئ مجموعات خاصة افتراضياً (للفصل)
-    const finalType = isTeacher ? 'private' : newGroup.type;
+    // إذا كان المستخدم "user" عادي، ينشئ عامة. الأستاذ يمكنه اختيار النوع.
+    const finalType = isTeacher ? (newGroup.type || 'private') : newGroup.type;
 
     try {
         const docRef = await addDoc(collection(db, "chats"), {
@@ -172,7 +180,7 @@ export default function CommunicationHub() {
         // الانتقال للمحادثة الجديدة فوراً
         const newChatData = { id: docRef.id, name: newGroup.name, type: finalType, createdBy: user.uid, members: [user.uid] };
         setSelectedChat(newChatData);
-        setChats(prev => [newChatData, ...prev]);
+        // التحديث المحلي سيحدث تلقائياً عبر onSnapshot
         
     } catch (e) { console.error(e); }
   };
@@ -183,25 +191,41 @@ export default function CommunicationHub() {
           await updateDoc(doc(db, "chats", selectedChat.id), {
               members: arrayUnion(studentId)
           });
-          // Feedback بصري سريع
           alert("Operative added to channel.");
       } catch (e) { console.error(e); }
   };
 
+  // --- إصلاح حذف المحادثة ---
   const handleDeleteChat = async () => {
       if(!selectedChat) return;
-      if(!confirm("Are you sure you want to dismantle this squad?")) return;
+      
+      // رسالة تأكيد
+      if(!confirm(t('admin_confirm_delete') || "Are you sure you want to dismantle this squad?")) return;
       
       try {
+          // 1. حذف وثيقة المحادثة
           await deleteDoc(doc(db, "chats", selectedChat.id));
+          
+          // 2. تصفير المحادثة المختارة
           setSelectedChat(null);
-      } catch(e) { console.error(e); }
+          
+          // ملاحظة: الرسائل الفرعية (Subcollection) ستبقى في فايربيس كـ "Orphaned Documents"
+          // ولكنها لن تظهر في التطبيق لأن الأب حذف. لحذفها بالكامل يحتاج Cloud Function،
+          // ولكن هذا يكفي للواجهة الأمامية.
+      } catch(e) { 
+          console.error("Delete Error:", e);
+          alert("Failed to delete squad.");
+      }
   };
 
-  // الصلاحيات
-  const canCreate = !isStudent; // الطلاب لا ينشئون مجموعات (حالياً)
-  const canInvite = selectedChat && (selectedChat.createdBy === user.uid || isAdmin);
-  const canDelete = selectedChat && (selectedChat.createdBy === user.uid || isAdmin);
+  // --- التحقق من الصلاحيات ---
+  const canCreate = !isStudent; // الطلاب لا ينشئون مجموعات
+  
+  // صلاحية الحذف والدعوة:
+  // 1. إذا كان المستخدم هو المنشئ (createdBy == user.uid)
+  // 2. أو إذا كان المستخدم أدمن
+  const isOwner = selectedChat && selectedChat.createdBy === user.uid;
+  const canModify = isOwner || isAdmin;
 
   return (
     <div className="flex-1 w-full flex flex-col md:flex-row bg-[#080808]/60 border border-white/10 rounded-[2.5rem] overflow-hidden backdrop-blur-xl shadow-2xl mb-10 h-[calc(100vh-180px)]" dir={dir}>
@@ -214,7 +238,7 @@ export default function CommunicationHub() {
               <h2 className="text-lg font-black tracking-tighter text-white uppercase">{t('chat_title')}</h2>
           </div>
           {canCreate && (
-              <button onClick={() => setShowCreateModal(true)} className="p-2 bg-cyan-600/10 hover:bg-cyan-600 text-cyan-500 hover:text-white rounded-xl transition-all border border-cyan-500/20 shadow-lg">
+              <button onClick={() => setShowCreateModal(true)} className="p-2 bg-cyan-600/10 hover:bg-cyan-600 text-cyan-500 hover:text-white rounded-xl transition-all border border-cyan-500/20 shadow-lg" title="New Squad">
                   <IconPlus size={20}/>
               </button>
           )}
@@ -228,8 +252,16 @@ export default function CommunicationHub() {
               </div>
           )}
           
+          {chats.length === 0 && !loadingChats && (
+              <div className="text-center py-10 text-white/30 text-xs font-mono uppercase">
+                  No active frequencies
+              </div>
+          )}
+          
           {chats.map(chat => {
             const isTeacherChat = isStudent && chat.createdBy === userData?.teacherId;
+            const isMyChat = chat.createdBy === user.uid;
+
             return (
               <motion.div 
                   key={chat.id} 
@@ -241,10 +273,11 @@ export default function CommunicationHub() {
                       : 'bg-white/5 border-transparent hover:bg-white/10 hover:border-white/10'
                   }`}
               >
-                <div className="overflow-hidden">
+                <div className="overflow-hidden flex-1 mr-2">
                   <div className={`font-black text-sm transition-colors truncate uppercase tracking-tight flex items-center gap-2 ${selectedChat?.id === chat.id ? 'text-cyan-400' : 'text-zinc-300'}`}>
                       {chat.name}
                       {isTeacherChat && <span className="bg-emerald-500/20 text-emerald-500 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30">COMMAND</span>}
+                      {isMyChat && <span className="bg-purple-500/20 text-purple-400 text-[8px] px-1.5 py-0.5 rounded border border-purple-500/30">OWNER</span>}
                   </div>
                   <div className="text-[9px] text-white/20 truncate mt-1 font-mono uppercase tracking-widest">
                       {chat.lastMessage || "..."}
@@ -252,9 +285,9 @@ export default function CommunicationHub() {
                 </div>
                 
                 {chat.type === 'private' ? (
-                    isTeacherChat ? <IconSchool size={14} className="text-emerald-500"/> : <IconLock size={14} className="text-orange-500" />
+                    isTeacherChat ? <IconSchool size={14} className="text-emerald-500 shrink-0"/> : <IconLock size={14} className="text-orange-500 shrink-0" />
                 ) : (
-                    <IconWorld size={14} className="text-cyan-500" />
+                    <IconWorld size={14} className="text-cyan-500 shrink-0" />
                 )}
               </motion.div>
             );
@@ -275,7 +308,7 @@ export default function CommunicationHub() {
               <div className="flex items-center gap-4 overflow-hidden">
                   <button onClick={() => setSelectedChat(null)} className="md:hidden p-2 hover:bg-white/10 rounded-xl text-white"><IconArrowLeft size={20}/></button>
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-cyan-600 flex items-center justify-center font-black text-white text-lg shadow-lg border border-white/10 uppercase shrink-0">
-                      {selectedChat.name[0]}
+                      {selectedChat.name?.[0] || "#"}
                   </div>
                   <div className="flex flex-col truncate">
                       <h3 className="font-black text-white text-base leading-none uppercase tracking-tight truncate">{selectedChat.name}</h3>
@@ -289,13 +322,24 @@ export default function CommunicationHub() {
               </div>
               
               <div className="flex items-center gap-2">
-                  {canInvite && (
-                    <button onClick={() => setShowInviteModal(true)} className="p-2.5 bg-white/5 hover:bg-white/10 text-cyan-400 border border-white/10 rounded-xl transition-all shadow-lg" title="Invite">
+                  {/* زر الدعوة: يظهر للمالك أو الأدمن */}
+                  {canModify && (
+                    <button 
+                        onClick={() => setShowInviteModal(true)} 
+                        className="p-2.5 bg-white/5 hover:bg-white/10 text-cyan-400 border border-white/10 rounded-xl transition-all shadow-lg" 
+                        title="Invite Operatives"
+                    >
                         <IconUserPlus size={20} />
                     </button>
                   )}
-                  {canDelete && (
-                    <button onClick={handleDeleteChat} className="p-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-xl transition-all shadow-lg" title="Delete Squad">
+                  
+                  {/* زر الحذف: يظهر للمالك أو الأدمن */}
+                  {canModify && (
+                    <button 
+                        onClick={handleDeleteChat} 
+                        className="p-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-xl transition-all shadow-lg" 
+                        title="Delete Squad"
+                    >
                         <IconTrash size={20} />
                     </button>
                   )}
@@ -303,6 +347,12 @@ export default function CommunicationHub() {
             </header>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-opacity-[0.02] relative">
+              {messages.length === 0 && (
+                  <div className="text-center text-white/20 mt-10 text-xs font-mono uppercase">
+                      Start transmission...
+                  </div>
+              )}
+              
               {messages.map((m) => {
                 const isMe = m.senderId === user.uid;
                 return (
@@ -336,7 +386,7 @@ export default function CommunicationHub() {
         )}
       </main>
 
-      {/* Invite Modal (خاص للأستاذ) */}
+      {/* Invite Modal (خاص للأستاذ أو المالك) */}
       <AnimatePresence>
         {showInviteModal && (
           <div className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">

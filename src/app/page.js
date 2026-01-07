@@ -92,13 +92,42 @@ export default function Page() {
     // --- واجهة الأستاذ (Teacher Interface) ---
     if (isTeacher) {
       links = [
-        { title: t('nav_create_db') || "DB", icon: <IconPencil className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('teacher_db') },
-        { title: t('nav_students') || "Students", icon: <IconUsers className={`${iconClass} text-cyan-400`} />, onClick: () => setCurrentView('teacher_students') },
-        { title: t('nav_test_cards') || "Test", icon: <IconCpu className={`${iconClass} text-purple-400`} />, onClick: () => setCurrentView('category') },
-        { title: t('nav_chat') || "Chat", icon: <IconMessageCircle className={`${iconClass} text-blue-400`} />, onClick: () => setCurrentView('chat') },
-        { title: t('nav_live') || "Live", icon: <IconBroadcast className={`${iconClass} text-red-500`} />, onClick: () => setCurrentView('live') },
-        { title: t('nav_progress') || "Stats", icon: <IconChartBar className={`${iconClass} text-yellow-400`} />, onClick: () => setCurrentView('teacher_progress') },
-        { title: t('nav_settings') || "Config", icon: <IconSettings className={`${iconClass} text-zinc-400`} />, onClick: () => setCurrentView('settings') },
+        // 1. إدارة قاعدة البيانات (Content)
+        { 
+            title: t('nav_create_db') || "DB", 
+            icon: <IconPencil className={`${iconClass} text-emerald-400`} />, 
+            onClick: () => setCurrentView('teacher_db') 
+        },
+        // 2. إدارة الطلاب (TeacherStudents.jsx)
+        { 
+            title: t('nav_students') || "Students", 
+            icon: <IconUsers className={`${iconClass} text-cyan-400`} />, 
+            onClick: () => setCurrentView('teacher_students') 
+        },
+        // 3. الإحصائيات (TeacherProgress.jsx)
+        { 
+            title: t('nav_progress') || "Stats", 
+            icon: <IconChartBar className={`${iconClass} text-yellow-400`} />, 
+            onClick: () => setCurrentView('teacher_progress') 
+        },
+        // 4. المحادثة (الآن يمكنه الحذف)
+        { 
+            title: t('nav_chat') || "Chat", 
+            icon: <IconMessageCircle className={`${iconClass} text-blue-400`} />, 
+            onClick: () => setCurrentView('chat') 
+        },
+        // 5. البث المباشر
+        { 
+            title: t('nav_live') || "Live", 
+            icon: <IconBroadcast className={`${iconClass} text-red-500`} />, 
+            onClick: () => setCurrentView('live') 
+        },
+        // 6. الإعدادات
+        { 
+            title: t('nav_settings') || "Config", 
+            icon: <IconSettings className={`${iconClass} text-zinc-400`} />, 
+            onClick: () => setCurrentView('settings') 
+        },
       ];
     } 
     // --- واجهة الطالب (Student Interface) ---
