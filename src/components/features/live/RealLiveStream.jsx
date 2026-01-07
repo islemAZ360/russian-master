@@ -8,6 +8,8 @@ import {
 import { useUI } from "@/context/UIContext";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/hooks/useLanguage";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default function RealLiveStream() {
   const { startBroadcast, liveState } = useUI(); 
@@ -21,13 +23,46 @@ export default function RealLiveStream() {
   // إضافة سجلات وهمية للشعور بالتقنية
   const addLog = (msg) => setLogs(prev => [...prev.slice(-3), `> ${msg}`]);
 
-  // --- 1. بدء البث للأستاذ ---
-  const handleStartClass = () => {
+  // --- 1. بدء البث للأستاذ (تم التعديل لإرسال الإشعارات) ---
+  const handleStartClass = async () => {
       setStatus("scanning");
       addLog("INITIALIZING CLASSROOM PROTOCOL...");
       
       // اسم الغرفة يكون معرف الأستاذ لضمان الخصوصية والثبات
       const classRoomId = `CLASS_${user.uid}`;
+      
+      try {
+          addLog("BROADCASTING SIGNAL TO SQUAD...");
+          
+          // جلب جميع الطلاب المرتبطين بهذا الأستاذ
+          const q = query(collection(db, "users"), where("teacherId", "==", user.uid));
+          const snapshot = await getDocs(q);
+          
+          if (!snapshot.empty) {
+              // إنشاء إشعار لكل طالب
+              const notificationsPromises = snapshot.docs.map(studentDoc => {
+                  return addDoc(collection(db, "notifications"), {
+                      userId: studentDoc.id,
+                      target: 'student',
+                      type: 'live_start', // نوع جديد للإشعارات
+                      title: "🔴 LIVE CLASS STARTED",
+                      message: `Commander ${user.displayName || "Teacher"} is live now. Tap to join!`,
+                      roomId: classRoomId, // نرسل معرف الغرفة في الإشعار
+                      senderId: user.uid,
+                      createdAt: serverTimestamp(),
+                      read: false
+                  });
+              });
+              
+              await Promise.all(notificationsPromises);
+              addLog(`SIGNAL SENT TO ${snapshot.size} OPERATIVES.`);
+          } else {
+              addLog("NO OPERATIVES FOUND IN ROSTER.");
+          }
+      } catch (error) {
+          console.error("Failed to notify students:", error);
+          addLog("WARNING: SIGNAL RELAY FAILED.");
+      }
       
       setTimeout(() => {
           addLog("SECURE CHANNEL ESTABLISHED.");

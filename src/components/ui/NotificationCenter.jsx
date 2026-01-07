@@ -5,21 +5,21 @@ import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp, addDoc, collection } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion'; 
-// FIX: استبدال IconShieldAlert بـ IconShield لتجنب ReferenceError
 import { 
   IconBell, IconX, IconUserPlus, IconAward, 
-  IconMessageCircle, IconShield, IconCheck, IconLoader2, IconInfoCircle 
+  IconMessageCircle, IconShield, IconCheck, IconLoader2, 
+  IconInfoCircle, IconBroadcast 
 } from '@tabler/icons-react';
 import { useLanguage } from '@/hooks/useLanguage';
 
 export default function NotificationCenter() {
-  const { notifications, removeNotification, setCurrentView, setShowSupport } = useUI();
+  // إضافة startBroadcast للتعامل مع إشعارات البث
+  const { notifications, removeNotification, setCurrentView, setShowSupport, startBroadcast } = useUI();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [processingId, setProcessingId] = useState(null);
   const { t, dir } = useLanguage();
 
-  // FIX: التأكد من أن الإشعارات مصفوفة دائماً لتجنب الأخطاء عند التحميل
   const safeNotifications = Array.isArray(notifications) ? notifications : [];
 
   const handleAcceptInvite = async (notification) => {
@@ -30,7 +30,7 @@ export default function NotificationCenter() {
     try {
         const { teacherId, newRole } = notification.actionPayload;
 
-        // 1. تحديث بيانات المستخدم ليصبح طالباً
+        // 1. تحديث بيانات المستخدم
         const userRef = doc(db, "users", user.uid);
         await updateDoc(userRef, {
             role: newRole,
@@ -52,7 +52,7 @@ export default function NotificationCenter() {
         // 3. حذف الدعوة
         await removeNotification(notification.id);
 
-        // 4. إعادة تحميل الصفحة لتطبيق الصلاحيات الجديدة
+        // 4. إعادة التحميل
         window.location.reload();
 
     } catch (error) {
@@ -66,12 +66,28 @@ export default function NotificationCenter() {
       await removeNotification(id);
   };
 
+  // --- التوجيه الذكي عند الضغط على الإشعار ---
   const handleNavigation = (n) => {
+    // دعوات الانضمام لها أزرار خاصة ولا يتم تفعيلها بالنقر العام
     if (n.type === 'invite') return;
 
-    if (n.type === 'support_reply') setShowSupport(true);
-    else if (n.type === 'rank') setCurrentView('leaderboard');
-    else if (n.type === 'admin_alert') setCurrentView('admin_panel');
+    // 1. معالجة إشعار البث المباشر (الجديد)
+    if (n.type === 'live_start' && n.roomId) {
+        startBroadcast(n.roomId); // دالة بدء البث من الـ Context
+    }
+    // 2. ردود الدعم الفني
+    else if (n.type === 'support_reply') {
+        setShowSupport(true);
+    }
+    // 3. الترقيات والجوائز
+    else if (n.type === 'rank') {
+        setCurrentView('leaderboard');
+    }
+    // 4. تنبيهات الأدمن
+    else if (n.type === 'admin_alert') {
+        // إذا كان المستخدم أدمن يذهب للوحة، وإلا يكتفي بالقراءة
+        // (يمكن توجيهه لصفحة خاصة إذا لزم الأمر)
+    }
     
     setIsOpen(false);
     removeNotification(n.id);
@@ -83,13 +99,14 @@ export default function NotificationCenter() {
       'rank': t('notif_type_rank') || "PROMOTION",
       'support_reply': t('notif_type_support') || "SUPPORT",
       'admin_alert': t('notif_type_admin') || "ALERT",
+      'live_start': "🔴 LIVE STREAM", // عنوان إشعار البث
       'info': "SYSTEM INFO"
     };
     return map[type] || "SYSTEM ALERT";
   };
 
   const formatTime = (timestamp) => {
-      if (!timestamp) return "Processing..."; 
+      if (!timestamp) return "..."; 
       if (timestamp?.toDate) {
           try {
               return new Date(timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -98,13 +115,13 @@ export default function NotificationCenter() {
       return "Now";
   };
 
-  // دالة مساعدة لاختيار الأيقونة بأمان (لتجنب تعطل التطبيق)
   const getIcon = (type) => {
     switch (type) {
         case 'invite': return <IconUserPlus size={20} />;
         case 'rank': return <IconAward size={20} />;
         case 'support_reply': return <IconMessageCircle size={20} />;
-        case 'admin_alert': return <IconShield size={20} />; // تم الإصلاح هنا
+        case 'admin_alert': return <IconShield size={20} />;
+        case 'live_start': return <IconBroadcast size={20} className="animate-pulse text-red-500" />; // أيقونة البث
         default: return <IconInfoCircle size={20} />;
     }
   };

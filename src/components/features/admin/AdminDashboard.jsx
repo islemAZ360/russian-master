@@ -5,6 +5,7 @@ import {
   collection, onSnapshot, doc, updateDoc, query, orderBy, 
   deleteDoc, addDoc, serverTimestamp, arrayUnion, arrayRemove, limit, setDoc, getDoc
 } from "firebase/firestore";
+// تم مراجعة الأيقونات للتأكد من وجودها في المكتبة
 import { 
   IconShieldLock, IconUsers, IconLayoutDashboard, 
   IconBroadcast, IconMessage2, IconBan, IconTrash, 
@@ -47,17 +48,18 @@ export default function AdminDashboard({ currentUser }) {
 
   // --- جلب البيانات ---
   useEffect(() => {
+    // استخدام try-catch داخل onSnapshot ليس ضرورياً ولكن جيد للأمان
     const unsubUsers = onSnapshot(query(collection(db, "users"), orderBy("createdAt", "desc")), (snap) => {
         setUsers(snap.docs.map(d => ({id: d.id, ...d.data()})));
-    });
+    }, (err) => console.error("Admin Users Error:", err));
     
     const unsubTickets = onSnapshot(query(collection(db, "support_tickets"), orderBy("lastUpdate", "desc")), (snap) => {
         setTickets(snap.docs.map(d => ({id: d.id, ...d.data()})));
-    });
+    }, (err) => console.error("Admin Tickets Error:", err));
     
     const unsubChats = onSnapshot(collection(db, "chats"), (snap) => {
         setChats(snap.docs.map(d => ({id: d.id, ...d.data()})));
-    });
+    }, (err) => console.error("Admin Chats Error:", err));
 
     return () => { unsubUsers(); unsubTickets(); unsubChats(); };
   }, []);
@@ -103,7 +105,6 @@ export default function AdminDashboard({ currentUser }) {
   const kickUserFromChat = async (chatId, userId) => { if (confirm(t('admin_kick_user'))) await updateDoc(doc(db, "chats", chatId), { members: arrayRemove(userId) }); };
   const toggleBan = async (uid, currentStatus) => { if(confirm(currentStatus ? t('admin_unban') : t('admin_ban_user'))) await updateDoc(doc(db, "users", uid), { isBanned: !currentStatus }); };
   
-  // === تعديل هام هنا: دعم كل الرتب ===
   const handleRoleChange = async (uid, newRole) => {
       try {
           await updateDoc(doc(db, "users", uid), { role: newRole });
@@ -188,7 +189,6 @@ export default function AdminDashboard({ currentUser }) {
                                                 </div>
                                             </td>
                                             <td className="p-6">
-                                                {/* === FIX: القائمة المنسدلة الكاملة === */}
                                                 <select 
                                                     value={u.role || 'user'} 
                                                     onChange={(e) => handleRoleChange(u.id, e.target.value)}

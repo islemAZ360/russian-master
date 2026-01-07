@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { 
   IconUser, IconTrophy, IconFlame, IconTarget, 
   IconActivity, IconLock, IconMedal, IconCrown, 
-  IconDna, IconChartRadar, IconSchool, IconShieldCheck
+  IconDna, IconChartRadar, IconSchool, IconShieldCheck, IconBook, IconMessage
 } from "@tabler/icons-react";
 import { useLanguage } from "@/hooks/useLanguage";
 
@@ -120,6 +120,8 @@ export default function CyberDeck({ user, stats, cards = [] }) {
        analytics.displayRank.color === 'text-emerald-400' ? '#34d399' : '#06b6d4')
     : '#06b6d4';
 
+  const isTeacher = user?.role === 'teacher';
+
   return (
     <div className="w-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20" dir={dir}>
         
@@ -153,11 +155,25 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                             </span>
                         </div>
                         
-                        <h1 className="text-4xl md:text-6xl font-black text-white tracking-tighter mb-6 truncate uppercase">
+                        <h1 className="text-4xl md:text-6xl font-black text-white tracking-tighter mb-4 truncate uppercase">
                             {user?.displayName || "OPERATIVE"}
                         </h1>
 
-                        <div className="space-y-2">
+                        {/* --- معلومات الأستاذ الإضافية --- */}
+                        {isTeacher && user?.subject && (
+                            <div className="flex items-center gap-2 justify-center md:justify-start mb-2 text-emerald-400">
+                                <IconBook size={16}/>
+                                <span className="text-sm font-bold uppercase tracking-wide">{user.subject}</span>
+                            </div>
+                        )}
+                        {isTeacher && user?.contactInfo && (
+                            <div className="flex items-center gap-2 justify-center md:justify-start mb-4 text-white/50">
+                                <IconMessage size={16}/>
+                                <span className="text-xs font-mono">{user.contactInfo}</span>
+                            </div>
+                        )}
+
+                        <div className="space-y-2 mt-4">
                             <div className="flex justify-between text-[10px] font-mono text-white/30 uppercase tracking-widest">
                                 <span>{t('profile_exp')}: {analytics.xp}</span>
                                 <span>{t('profile_next')}: {analytics.nextRank ? analytics.nextRank.min : "MAX"}</span>

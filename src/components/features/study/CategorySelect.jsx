@@ -36,11 +36,21 @@ const DataModuleCard = React.memo(({ category, stats, onClick, index, isDark, t 
   const percentage = stats.total > 0 ? Math.round((stats.mastered / stats.total) * 100) : 0;
   const isMastered = percentage === 100;
   
-  // وظيفة ذكية لتحويل اسم المجموعة من قاعدة البيانات إلى مفتاح ترجمة
-  // مثال: "Society & Ethics" -> "cat_society_ethics"
-  const getCatKey = (name) => {
-    if (!name) return "cat_uncategorized";
-    return `cat_${name.toLowerCase().replace(/ & /g, '_').replace(/ /g, '_')}`;
+  // FIX: دالة ذكية لعرض الاسم
+  // تحاول العثور على الترجمة، وإذا فشلت تعرض الاسم الأصلي كما هو (للتصنيفات المخصصة)
+  const getDisplayName = () => {
+    if (!category) return t('cat_uncategorized');
+    
+    // إنشاء المفتاح المتوقع في ملف الترجمة
+    const key = `cat_${category.toLowerCase().replace(/ & /g, '_').replace(/ /g, '_')}`;
+    
+    // محاولة الترجمة
+    const translated = t(key);
+    
+    // t() تعيد المفتاح نفسه إذا لم تجد الترجمة
+    // لذا نتحقق: إذا كانت النتيجة تساوي المفتاح، نعرض الاسم الأصلي (category)
+    // وإلا نعرض الترجمة
+    return translated === key ? category : translated;
   };
 
   const theme = isMastered 
@@ -65,9 +75,9 @@ const DataModuleCard = React.memo(({ category, stats, onClick, index, isDark, t 
             <div className={`p-2 rounded-lg ${isDark ? 'bg-white/5' : 'bg-black/5'} ${theme.text}`}><IconVersions size={22} /></div>
             <div>
               <span className="block text-[9px] opacity-40 font-mono tracking-widest uppercase">SEQ_ID: {index + 1}</span>
-              {/* ترجمة اسم المجموعة ديناميكياً */}
+              {/* هنا يتم استدعاء الدالة المصححة */}
               <h3 className={`text-lg font-bold ${isDark ? 'text-white' : 'text-gray-800'} leading-none mt-1`}>
-                {t(getCatKey(category))}
+                {getDisplayName()}
               </h3>
             </div>
           </div>
@@ -91,7 +101,7 @@ DataModuleCard.displayName = "DataModuleCard";
 export function CategorySelect({ categories = [], cards = [], activeCategory, onSelect }) {
   const [search, setSearch] = useState("");
   const { isDark } = useSettings();
-  const { t, dir } = useLanguage(); // استدعاء الهوك الجديد
+  const { t, dir } = useLanguage(); 
 
   const filteredCategories = useMemo(() => {
     return categories.map(cat => {
@@ -107,7 +117,7 @@ export function CategorySelect({ categories = [], cards = [], activeCategory, on
   return (
     <div className="w-full h-full flex flex-col px-4 md:px-8 pt-4 pb-0" dir={dir}>
       
-      {/* هيدر الصفحة - تم إصلاح النصوص الظاهرة في الصور */}
+      {/* هيدر الصفحة */}
       <div className="shrink-0 mb-8">
         <div className="flex flex-col md:flex-row justify-between items-end gap-6">
             <motion.div initial={{opacity:0, x: -20}} animate={{opacity:1, x:0}}>
@@ -123,7 +133,7 @@ export function CategorySelect({ categories = [], cards = [], activeCategory, on
                 </div>
             </motion.div>
 
-            {/* حقل البحث مع ترجمة الـ Placeholder */}
+            {/* حقل البحث */}
             <div className="w-full md:w-80 relative group">
                 <IconSearch size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-cyan-500 transition-colors"/>
                 <input 

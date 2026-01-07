@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   IconMessage, IconPlus, IconLock, IconSend, IconUserPlus, 
   IconArrowLeft, IconX, IconHash, IconUsers, IconWorld, IconTrash,
-  IconShieldLock
+  IconShieldLock, IconSchool
 } from "@tabler/icons-react";
 import { db } from "@/lib/firebase";
 import { 
@@ -35,7 +35,7 @@ export default function CommunicationHub() {
 
   const messagesEndRef = useRef(null);
 
-  // 1. جلب الدردشات المسموحة
+  // 1. جلب الدردشات المسموحة (تم تعديل المنطق هنا)
   useEffect(() => {
     if (!user) return;
 
@@ -44,14 +44,23 @@ export default function CommunicationHub() {
     const unsub = onSnapshot(q, (snapshot) => {
         const allChats = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         
-        // التصفية حسب الرتبة
+        // التصفية حسب الرتبة والعلاقة
         const filtered = allChats.filter(chat => {
-            // الأدمن يرى كل شيء
+            // 1. الأدمن يرى كل شيء
             if (isAdmin) return true;
-            // المجموعات العامة يراها الجميع
+
+            // 2. المجموعات العامة يراها الجميع
             if (chat.type === 'public') return true;
-            // المجموعات الخاصة: يجب أن يكون المستخدم عضواً فيها أو منشئها
+
+            // 3. المجموعات الخاصة:
+            
+            // أ. إذا كنت عضواً فيها أو منشئها
             if (chat.members?.includes(user.uid) || chat.createdBy === user.uid) return true;
+            
+            // ب. (FIXED) إذا كنت طالباً وهذه الغرفة أنشأها أستاذي
+            if (isStudent && userData?.teacherId && chat.createdBy === userData.teacherId) {
+                return true;
+            }
             
             return false;
         });
@@ -60,11 +69,19 @@ export default function CommunicationHub() {
     });
 
     return () => unsub();
-  }, [user, isAdmin]);
+  }, [user, isAdmin, isStudent, userData]);
 
   // 2. جلب الرسائل
   useEffect(() => {
     if (!selectedChat) return;
+    
+    // إذا دخل الطالب غرفة أستاذه ولم يكن في قائمة الأعضاء، نضيفه تلقائياً لضمان استلامه للإشعارات مستقبلاً
+    if (isStudent && userData?.teacherId === selectedChat.createdBy && !selectedChat.members?.includes(user.uid)) {
+        updateDoc(doc(db, "chats", selectedChat.id), {
+            members: arrayUnion(user.uid)
+        }).catch(err => console.error("Auto-join failed", err));
+    }
+
     const q = query(
         collection(db, "chats", selectedChat.id, "messages"), 
         orderBy("createdAt", "asc"),
@@ -77,7 +94,7 @@ export default function CommunicationHub() {
     });
 
     return () => unsub();
-  }, [selectedChat]);
+  }, [selectedChat, isStudent, user, userData]);
 
   // 3. جلب طلاب الأستاذ للدعوة
   useEffect(() => {
@@ -167,28 +184,39 @@ export default function CommunicationHub() {
         </div>
         
         <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
-          {chats.map(chat => (
-            <motion.div 
-                key={chat.id} 
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setSelectedChat(chat)} 
-                className={`p-4 rounded-2xl cursor-pointer transition-all border group flex justify-between items-center ${
-                    selectedChat?.id === chat.id 
-                    ? 'bg-cyan-600/10 border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.1)]' 
-                    : 'bg-white/5 border-transparent hover:bg-white/10 hover:border-white/10'
-                }`}
-            >
-              <div className="overflow-hidden">
-                <div className={`font-black text-sm transition-colors truncate uppercase tracking-tight ${selectedChat?.id === chat.id ? 'text-cyan-400' : 'text-zinc-300'}`}>
-                    {chat.name}
+          {chats.map(chat => {
+            // تحديد أيقونة مميزة لغرف الأستاذ
+            const isTeacherChat = isStudent && chat.createdBy === userData?.teacherId;
+            
+            return (
+              <motion.div 
+                  key={chat.id} 
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => setSelectedChat(chat)} 
+                  className={`p-4 rounded-2xl cursor-pointer transition-all border group flex justify-between items-center ${
+                      selectedChat?.id === chat.id 
+                      ? 'bg-cyan-600/10 border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.1)]' 
+                      : 'bg-white/5 border-transparent hover:bg-white/10 hover:border-white/10'
+                  }`}
+              >
+                <div className="overflow-hidden">
+                  <div className={`font-black text-sm transition-colors truncate uppercase tracking-tight flex items-center gap-2 ${selectedChat?.id === chat.id ? 'text-cyan-400' : 'text-zinc-300'}`}>
+                      {chat.name}
+                      {isTeacherChat && <span className="bg-emerald-500/20 text-emerald-500 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30">TEACHER</span>}
+                  </div>
+                  <div className="text-[9px] text-white/20 truncate mt-1 font-mono uppercase tracking-widest">
+                      {chat.lastMessage || "..."}
+                  </div>
                 </div>
-                <div className="text-[9px] text-white/20 truncate mt-1 font-mono uppercase tracking-widest">
-                    {chat.lastMessage || "..."}
-                </div>
-              </div>
-              {chat.type === 'private' ? <IconLock size={14} className="text-orange-500" /> : <IconWorld size={14} className="text-emerald-500" />}
-            </motion.div>
-          ))}
+                
+                {chat.type === 'private' ? (
+                    isTeacherChat ? <IconSchool size={14} className="text-emerald-500"/> : <IconLock size={14} className="text-orange-500" />
+                ) : (
+                    <IconWorld size={14} className="text-cyan-500" />
+                )}
+              </motion.div>
+            );
+          })}
         </div>
       </aside>
 

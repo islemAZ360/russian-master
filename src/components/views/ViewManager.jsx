@@ -1,6 +1,7 @@
 "use client";
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { IconLoader2 } from '@tabler/icons-react'; // أيقونة للتحميل
 
 // استيراد الهوكس الأساسية
 import { useUI } from '@/hooks/useUI';
@@ -21,46 +22,42 @@ import SettingsViewWrapper from './SettingsViewWrapper';
 import CommunicationHub from '@/components/features/chat/CommunicationHub';
 import { CategorySelect } from '@/components/features/study/CategorySelect';
 
-// === استيراد صفحات الأستاذ الجديدة (تمت إضافتها) ===
+// === استيراد صفحات الأستاذ الجديدة ===
 import TeacherStudents from '@/components/features/teacher/TeacherStudents';
 import TeacherProgress from '@/components/features/teacher/TeacherProgress';
 
 /**
  * مدير العروض المركزي (ViewManager)
- * النسخة النهائية: تربط جميع الصفحات ببعضها
+ * تم إصلاح مشكلة اختفاء المحتوى عند التنقل
  */
 export default function ViewManager(props) {
   const { currentView, setActiveCategory, activeCategory, setCurrentView } = useUI();
   const { isJunior, isAdmin, isTeacher, isStudent } = useAuth();
   const { t, dir, isRTL, isLoaded } = useLanguage();
 
-  // إعدادات الحركة (Transitions)
+  // إعدادات الحركة (Transitions) - تم تبسيطها لمنع التعليق
   const pageVariants = {
     initial: { 
       opacity: 0, 
-      x: isRTL ? -30 : 30,
-      filter: "blur(15px)",
-      scale: 0.97
+      scale: 0.98,
+      filter: "blur(4px)"
     },
     animate: { 
       opacity: 1, 
-      x: 0, 
+      scale: 1, 
       filter: "blur(0px)",
-      scale: 1,
-      transition: { type: "spring", stiffness: 280, damping: 28, mass: 0.5 }
+      transition: { duration: 0.3, ease: "easeOut" }
     },
     exit: { 
       opacity: 0, 
-      x: isRTL ? 30 : -30,
-      filter: "blur(15px)",
-      scale: 1.03,
-      transition: { duration: 0.3, ease: "easeInOut" }
+      scale: 1.02,
+      filter: "blur(4px)",
+      transition: { duration: 0.2, ease: "easeIn" }
     }
   };
 
+  // دالة عرض المحتوى بناءً على الحالة
   const renderViewContent = () => {
-    if (!isLoaded) return null;
-
     switch (currentView) {
       // --- الصفحة الرئيسية ---
       case 'home':
@@ -71,9 +68,8 @@ export default function ViewManager(props) {
         if (isJunior || isAdmin) return <AdminView />;
         return <AccessDenied />;
 
-      // --- صفحات الأستاذ (تم الربط الفعلي الآن) ---
+      // --- صفحات الأستاذ ---
       case 'teacher_db':
-        // الأستاذ يستخدم DataView لإضافة محتواه
         if (!isTeacher) return <AccessDenied />;
         return (
           <DataView 
@@ -81,17 +77,15 @@ export default function ViewManager(props) {
             addCard={props.addCard} 
             deleteCard={props.deleteCard} 
             updateCard={props.updateCard} 
-            readOnly={false} // الأستاذ يملك صلاحية التعديل
+            readOnly={false} 
           />
         );
 
       case 'teacher_students':
-        // صفحة إدارة الطلاب
         if (!isTeacher) return <AccessDenied />;
         return <TeacherStudents />;
 
       case 'teacher_progress':
-        // صفحة الإحصائيات
         if (!isTeacher) return <AccessDenied />;
         return <TeacherProgress />;
 
@@ -137,7 +131,6 @@ export default function ViewManager(props) {
 
       // --- الأرشيف (Data View) ---
       case 'data':
-        // الأستاذ والأدمن فقط يمكنهم التعديل من هذه الصفحة
         const canEdit = isTeacher || isAdmin || isJunior;
         return (
           <DataView 
@@ -171,16 +164,26 @@ export default function ViewManager(props) {
     }
   };
 
+  // FIX: إذا لم يتم تحميل الإعدادات بعد، نعرض شاشة تحميل بدلاً من null لتجنب اختفاء الواجهة
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center h-full w-full">
+        <IconLoader2 className="animate-spin text-cyan-500" size={40} />
+      </div>
+    );
+  }
+
   return (
-    <div className="w-full h-full relative overflow-hidden flex flex-col items-center" dir={dir}>
-        <AnimatePresence mode="wait" initial={false}>
+    <div className="w-full h-full relative flex flex-col items-center" dir={dir}>
+        {/* استخدام mode="wait" يضمن خروج الصفحة القديمة قبل دخول الجديدة */}
+        <AnimatePresence mode="wait">
           <motion.div 
             key={currentView}
             variants={pageVariants}
             initial="initial"
             animate="animate"
             exit="exit"
-            className="w-full h-full will-change-transform flex flex-col scroll-smooth"
+            className="w-full h-full flex flex-col flex-1" // flex-1 يضمن ملء المساحة
           >
             {renderViewContent()}
           </motion.div>
