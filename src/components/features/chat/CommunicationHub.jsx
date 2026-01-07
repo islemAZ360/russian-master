@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   IconMessage, IconPlus, IconLock, IconSend, IconUserPlus, 
   IconArrowLeft, IconX, IconHash, IconUsers, IconWorld, IconTrash,
-  IconShieldLock, IconSchool
+  IconShieldLock, IconSchool, IconLoader2
 } from "@tabler/icons-react";
 import { db } from "@/lib/firebase";
 import { 
@@ -22,6 +22,7 @@ export default function CommunicationHub() {
   const [selectedChat, setSelectedChat] = useState(null);
   const [chats, setChats] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [loadingChats, setLoadingChats] = useState(true);
   
   const [inputText, setInputText] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -35,47 +36,72 @@ export default function CommunicationHub() {
 
   const messagesEndRef = useRef(null);
 
-  // 1. جلب الدردشات المسموحة (تم تعديل المنطق هنا)
+  // 1. جلب الدردشات (نظام متعدد الاستعلامات لحل مشكلة الاختفاء)
   useEffect(() => {
     if (!user) return;
+    setLoadingChats(true);
 
-    const q = query(collection(db, "chats"), orderBy("lastActivity", "desc"));
-    
-    const unsub = onSnapshot(q, (snapshot) => {
-        const allChats = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-        
-        // التصفية حسب الرتبة والعلاقة
-        const filtered = allChats.filter(chat => {
-            // 1. الأدمن يرى كل شيء
-            if (isAdmin) return true;
+    const chatsMap = new Map();
+    const unsubscribers = [];
 
-            // 2. المجموعات العامة يراها الجميع
-            if (chat.type === 'public') return true;
+    // دالة لتحديث الحالة عند وصول بيانات جديدة من أي استعلام
+    const updateLocalChats = () => {
+        const uniqueChats = Array.from(chatsMap.values())
+            .sort((a, b) => {
+                const timeA = a.lastActivity?.seconds || 0;
+                const timeB = b.lastActivity?.seconds || 0;
+                return timeB - timeA;
+            });
+        setChats(uniqueChats);
+        setLoadingChats(false);
+    };
 
-            // 3. المجموعات الخاصة:
-            
-            // أ. إذا كنت عضواً فيها أو منشئها
-            if (chat.members?.includes(user.uid) || chat.createdBy === user.uid) return true;
-            
-            // ب. (FIXED) إذا كنت طالباً وهذه الغرفة أنشأها أستاذي
-            if (isStudent && userData?.teacherId && chat.createdBy === userData.teacherId) {
-                return true;
-            }
-            
-            return false;
-        });
+    // الاستعلام 1: المجموعات العامة (Public)
+    const qPublic = query(collection(db, "chats"), where("type", "==", "public"));
+    unsubscribers.push(onSnapshot(qPublic, (snap) => {
+        snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        updateLocalChats();
+    }));
 
-        setChats(filtered);
-    });
+    // الاستعلام 2: المجموعات التي أنا عضو فيها
+    const qMember = query(collection(db, "chats"), where("members", "array-contains", user.uid));
+    unsubscribers.push(onSnapshot(qMember, (snap) => {
+        snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        updateLocalChats();
+    }));
 
-    return () => unsub();
+    // الاستعلام 3: المجموعات التي أنشأتها أنا (هام للأستاذ ليرى مجموعاته الخاصة)
+    const qOwner = query(collection(db, "chats"), where("createdBy", "==", user.uid));
+    unsubscribers.push(onSnapshot(qOwner, (snap) => {
+        snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        updateLocalChats();
+    }));
+
+    // الاستعلام 4: للطالب - مجموعات أستاذه
+    if (isStudent && userData?.teacherId) {
+        const qTeacher = query(collection(db, "chats"), where("createdBy", "==", userData.teacherId));
+        unsubscribers.push(onSnapshot(qTeacher, (snap) => {
+            snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
+            updateLocalChats();
+        }));
+    }
+
+    // إذا كان أدمن، نجلب كل شيء (اختياري، يمكن الاكتفاء بما سبق لتقليل الحمل)
+    if (isAdmin) {
+        // الأدمن يرى كل شيء عبر الاستعلامات السابقة + العامة، 
+        // أو يمكن إضافة استعلام شامل إذا كانت القواعد تسمح بذلك للأدمن حصراً
+    }
+
+    return () => {
+        unsubscribers.forEach(unsub => unsub());
+    };
   }, [user, isAdmin, isStudent, userData]);
 
   // 2. جلب الرسائل
   useEffect(() => {
     if (!selectedChat) return;
     
-    // إذا دخل الطالب غرفة أستاذه ولم يكن في قائمة الأعضاء، نضيفه تلقائياً لضمان استلامه للإشعارات مستقبلاً
+    // الانضمام التلقائي للطالب لغرف أستاذه
     if (isStudent && userData?.teacherId === selectedChat.createdBy && !selectedChat.members?.includes(user.uid)) {
         updateDoc(doc(db, "chats", selectedChat.id), {
             members: arrayUnion(user.uid)
@@ -133,7 +159,6 @@ export default function CommunicationHub() {
   const handleCreateGroup = async () => {
     if (!newGroup.name.trim()) return;
     
-    // الأستاذ ينشئ خاص دائماً، الأدمن/اليوزر يمكنه الاختيار
     const finalType = isTeacher ? 'private' : newGroup.type;
 
     try {
@@ -148,7 +173,12 @@ export default function CommunicationHub() {
         
         setShowCreateModal(false);
         setNewGroup({ name: "", type: "public" });
-        setSelectedChat({ id: docRef.id, name: newGroup.name, type: finalType, createdBy: user.uid, members: [user.uid] });
+        // تحديد الشات الجديد مباشرة
+        const newChatData = { id: docRef.id, name: newGroup.name, type: finalType, createdBy: user.uid, members: [user.uid] };
+        setSelectedChat(newChatData);
+        
+        // إضافته يدوياً للقائمة فوراً لتجنب انتظار السيرفر
+        setChats(prev => [newChatData, ...prev]);
         
     } catch (e) { console.error(e); }
   };
@@ -159,12 +189,23 @@ export default function CommunicationHub() {
           await updateDoc(doc(db, "chats", selectedChat.id), {
               members: arrayUnion(studentId)
           });
+          alert("Operative added to channel.");
       } catch (e) { console.error(e); }
   };
 
-  // الصلاحيات
-  const canCreate = !isStudent; // الطالب لا ينشئ
+  const handleDeleteChat = async () => {
+      if(!selectedChat) return;
+      if(!confirm("Are you sure you want to dismantle this squad?")) return;
+      
+      try {
+          await deleteDoc(doc(db, "chats", selectedChat.id));
+          setSelectedChat(null);
+      } catch(e) { console.error(e); }
+  };
+
+  const canCreate = !isStudent; 
   const canInvite = selectedChat && (selectedChat.createdBy === user.uid || isAdmin);
+  const canDelete = selectedChat && (selectedChat.createdBy === user.uid || isAdmin);
 
   return (
     <div className="flex-1 w-full flex flex-col md:flex-row bg-[#080808]/60 border border-white/10 rounded-[2.5rem] overflow-hidden backdrop-blur-xl shadow-2xl mb-10 h-[calc(100vh-180px)]" dir={dir}>
@@ -184,10 +225,15 @@ export default function CommunicationHub() {
         </div>
         
         <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
+          {loadingChats && chats.length === 0 && (
+              <div className="text-center py-10 opacity-50 flex flex-col items-center">
+                  <IconLoader2 className="animate-spin mb-2"/>
+                  <span className="text-[10px]">SYNCING FREQUENCIES...</span>
+              </div>
+          )}
+          
           {chats.map(chat => {
-            // تحديد أيقونة مميزة لغرف الأستاذ
             const isTeacherChat = isStudent && chat.createdBy === userData?.teacherId;
-            
             return (
               <motion.div 
                   key={chat.id} 
@@ -202,7 +248,7 @@ export default function CommunicationHub() {
                 <div className="overflow-hidden">
                   <div className={`font-black text-sm transition-colors truncate uppercase tracking-tight flex items-center gap-2 ${selectedChat?.id === chat.id ? 'text-cyan-400' : 'text-zinc-300'}`}>
                       {chat.name}
-                      {isTeacherChat && <span className="bg-emerald-500/20 text-emerald-500 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30">TEACHER</span>}
+                      {isTeacherChat && <span className="bg-emerald-500/20 text-emerald-500 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30">COMMAND</span>}
                   </div>
                   <div className="text-[9px] text-white/20 truncate mt-1 font-mono uppercase tracking-widest">
                       {chat.lastMessage || "..."}
@@ -229,27 +275,35 @@ export default function CommunicationHub() {
           </div>
         ) : (
           <>
-            <header className="h-20 border-b border-white/5 flex items-center px-6 bg-black/40 backdrop-blur-md gap-4 shrink-0 z-10">
-              <button onClick={() => setSelectedChat(null)} className="md:hidden p-2 hover:bg-white/10 rounded-xl text-white"><IconArrowLeft size={20}/></button>
-              <div className="flex items-center gap-4 flex-1 overflow-hidden">
-                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-cyan-600 flex items-center justify-center font-black text-white text-lg shadow-lg border border-white/10 uppercase shrink-0">
-                    {selectedChat.name[0]}
-                 </div>
-                 <div className="flex flex-col truncate">
-                     <h3 className="font-black text-white text-base leading-none uppercase tracking-tight truncate">{selectedChat.name}</h3>
-                     <div className="flex items-center gap-2 mt-1.5">
-                        <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${selectedChat.type === 'private' ? 'bg-orange-500' : 'bg-emerald-500'}`}></span>
-                        <span className="text-[8px] text-white/30 font-black uppercase tracking-widest truncate">
-                            {selectedChat.type === 'private' ? t('chat_server_private') : t('chat_server_public')}
-                        </span>
-                     </div>
-                 </div>
+            <header className="h-20 border-b border-white/5 flex items-center px-6 bg-black/40 backdrop-blur-md gap-4 shrink-0 z-10 justify-between">
+              <div className="flex items-center gap-4 overflow-hidden">
+                  <button onClick={() => setSelectedChat(null)} className="md:hidden p-2 hover:bg-white/10 rounded-xl text-white"><IconArrowLeft size={20}/></button>
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-cyan-600 flex items-center justify-center font-black text-white text-lg shadow-lg border border-white/10 uppercase shrink-0">
+                      {selectedChat.name[0]}
+                  </div>
+                  <div className="flex flex-col truncate">
+                      <h3 className="font-black text-white text-base leading-none uppercase tracking-tight truncate">{selectedChat.name}</h3>
+                      <div className="flex items-center gap-2 mt-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${selectedChat.type === 'private' ? 'bg-orange-500' : 'bg-emerald-500'}`}></span>
+                          <span className="text-[8px] text-white/30 font-black uppercase tracking-widest truncate">
+                              {selectedChat.type === 'private' ? t('chat_server_private') : t('chat_server_public')}
+                          </span>
+                      </div>
+                  </div>
               </div>
-              {canInvite && (
-                <button onClick={() => setShowInviteModal(true)} className="p-2.5 bg-white/5 hover:bg-white/10 text-cyan-400 border border-white/10 rounded-xl transition-all shadow-lg">
-                    <IconUserPlus size={20} />
-                </button>
-              )}
+              
+              <div className="flex items-center gap-2">
+                  {canInvite && (
+                    <button onClick={() => setShowInviteModal(true)} className="p-2.5 bg-white/5 hover:bg-white/10 text-cyan-400 border border-white/10 rounded-xl transition-all shadow-lg" title="Invite">
+                        <IconUserPlus size={20} />
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button onClick={handleDeleteChat} className="p-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-xl transition-all shadow-lg" title="Delete Squad">
+                        <IconTrash size={20} />
+                    </button>
+                  )}
+              </div>
             </header>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-opacity-[0.02] relative">

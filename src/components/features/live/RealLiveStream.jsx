@@ -20,34 +20,34 @@ export default function RealLiveStream() {
   const [status, setStatus] = useState("idle"); // idle, scanning, connected
   const [logs, setLogs] = useState([]);
 
-  // إضافة سجلات وهمية للشعور بالتقنية
+  // سجلات النظام (Log Console)
   const addLog = (msg) => setLogs(prev => [...prev.slice(-3), `> ${msg}`]);
 
-  // --- 1. بدء البث للأستاذ (تم التعديل لإرسال الإشعارات) ---
+  // --- 1. بدء البث للأستاذ (مع إرسال الإشعارات) ---
   const handleStartClass = async () => {
       setStatus("scanning");
       addLog("INITIALIZING CLASSROOM PROTOCOL...");
       
-      // اسم الغرفة يكون معرف الأستاذ لضمان الخصوصية والثبات
+      // اسم الغرفة الثابت للأستاذ
       const classRoomId = `CLASS_${user.uid}`;
       
       try {
           addLog("BROADCASTING SIGNAL TO SQUAD...");
           
-          // جلب جميع الطلاب المرتبطين بهذا الأستاذ
+          // 1. جلب جميع الطلاب المرتبطين بهذا الأستاذ
           const q = query(collection(db, "users"), where("teacherId", "==", user.uid));
           const snapshot = await getDocs(q);
           
           if (!snapshot.empty) {
-              // إنشاء إشعار لكل طالب
+              // 2. إرسال إشعار لكل طالب
               const notificationsPromises = snapshot.docs.map(studentDoc => {
                   return addDoc(collection(db, "notifications"), {
                       userId: studentDoc.id,
                       target: 'student',
-                      type: 'live_start', // نوع جديد للإشعارات
+                      type: 'live_start', // النوع الجديد الذي يفهمه NotificationCenter
                       title: "🔴 LIVE CLASS STARTED",
                       message: `Commander ${user.displayName || "Teacher"} is live now. Tap to join!`,
-                      roomId: classRoomId, // نرسل معرف الغرفة في الإشعار
+                      roomId: classRoomId, // نمرر معرف الغرفة ليدخل الطالب مباشرة
                       senderId: user.uid,
                       createdAt: serverTimestamp(),
                       read: false
@@ -64,6 +64,7 @@ export default function RealLiveStream() {
           addLog("WARNING: SIGNAL RELAY FAILED.");
       }
       
+      // تأخير بسيط للمحاكاة قبل الدخول
       setTimeout(() => {
           addLog("SECURE CHANNEL ESTABLISHED.");
           startBroadcast(classRoomId); 
@@ -100,7 +101,7 @@ export default function RealLiveStream() {
     }, 1500);
   };
 
-  // --- حالة: البث نشط حالياً ---
+  // --- حالة: البث نشط حالياً (Screen Active) ---
   if (liveState.isActive) {
       return (
         <div className="flex flex-col items-center justify-center h-full w-full text-center" dir={dir}>

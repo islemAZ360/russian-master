@@ -4,11 +4,12 @@ import { motion } from "framer-motion";
 import { 
   IconUser, IconTrophy, IconFlame, IconTarget, 
   IconActivity, IconLock, IconMedal, IconCrown, 
-  IconDna, IconChartRadar, IconSchool, IconShieldCheck, IconBook, IconMessage
+  IconDna, IconChartRadar, IconSchool, IconShieldCheck, 
+  IconBook, IconMessage // تم إضافة أيقونات جديدة للمادة والتواصل
 } from "@tabler/icons-react";
 import { useLanguage } from "@/hooks/useLanguage";
 
-// --- تكوين الرتب بناءً على XP (للطلاب والمستخدمين) ---
+// --- تكوين الرتب ---
 const RANKS_CONFIG = [
     { id: "recruit", min: 0, color: "text-zinc-400", bg: "bg-zinc-500", icon: <IconUser /> },
     { id: "soldier", min: 100, color: "text-emerald-400", bg: "bg-emerald-500", icon: <IconTarget /> },
@@ -49,7 +50,7 @@ const SkillRadar = ({ stats, color }) => {
           animate={{ opacity: 0.6, scale: 1 }}
           transition={{ duration: 1.5, ease: "circOut" }}
           points={points} 
-          fill={`${color}33`} // إضافة شفافية للون
+          fill={`${color}33`} 
           stroke={color} 
           strokeWidth="2" 
         />
@@ -76,7 +77,7 @@ export default function CyberDeck({ user, stats, cards = [] }) {
     const learningCards = cards.filter(c => c.level > 0 && c.level < 5).length;
     const masteryRate = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
     
-    // حساب الرتبة الافتراضية بناءً على XP
+    // حساب الرتبة
     const rankIndex = RANKS_CONFIG.findIndex((r, i) => {
         const next = RANKS_CONFIG[i + 1];
         return xp >= r.min && (!next || xp < next.min);
@@ -91,7 +92,7 @@ export default function CyberDeck({ user, stats, cards = [] }) {
 
     const activityScore = Math.min(100, (learningCards * 10 + streak * 5));
 
-    // تحديد العرض النهائي بناءً على الدور (Role)
+    // تحديد العرض النهائي بناءً على الدور
     let displayRank = xpRank;
     let customTitle = null;
 
@@ -109,11 +110,10 @@ export default function CyberDeck({ user, stats, cards = [] }) {
     return {
         xp, streak, totalCards, masteredCards,
         masteryRate, displayRank, nextRank, rankProgress, activityScore, customTitle,
-        xpRankId: xpRank.id // نحتفظ بمعرف الرتبة الأصلية لحساب الأوسمة
+        xpRankId: xpRank.id
     };
   }, [stats, cards, user, t]);
 
-  // تحديد اللون الرئيسي للرادار
   const themeColor = analytics.displayRank.color.includes('text-') 
     ? (analytics.displayRank.color === 'text-red-500' ? '#ef4444' : 
        analytics.displayRank.color === 'text-purple-500' ? '#a855f7' : 
@@ -125,10 +125,9 @@ export default function CyberDeck({ user, stats, cards = [] }) {
   return (
     <div className="w-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20" dir={dir}>
         
-        {/* صف الهوية والتحليل */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            {/* 1. Identity Card */}
+            {/* 1. بطاقة الهوية */}
             <div className="lg:col-span-8 bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-8 relative overflow-hidden group shadow-2xl">
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none"></div>
                 <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 blur-[100px] rounded-full"></div>
@@ -159,17 +158,21 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                             {user?.displayName || "OPERATIVE"}
                         </h1>
 
-                        {/* --- معلومات الأستاذ الإضافية --- */}
-                        {isTeacher && user?.subject && (
-                            <div className="flex items-center gap-2 justify-center md:justify-start mb-2 text-emerald-400">
-                                <IconBook size={16}/>
-                                <span className="text-sm font-bold uppercase tracking-wide">{user.subject}</span>
-                            </div>
-                        )}
-                        {isTeacher && user?.contactInfo && (
-                            <div className="flex items-center gap-2 justify-center md:justify-start mb-4 text-white/50">
-                                <IconMessage size={16}/>
-                                <span className="text-xs font-mono">{user.contactInfo}</span>
+                        {/* --- الجديد: عرض معلومات الأستاذ --- */}
+                        {isTeacher && (
+                            <div className="flex flex-col gap-2 mb-4 items-center md:items-start">
+                                {user?.subject && (
+                                    <div className="flex items-center gap-2 text-emerald-400">
+                                        <IconBook size={16}/>
+                                        <span className="text-sm font-bold uppercase tracking-wide">{user.subject}</span>
+                                    </div>
+                                )}
+                                {user?.contactInfo && (
+                                    <div className="flex items-center gap-2 text-white/50">
+                                        <IconMessage size={16}/>
+                                        <span className="text-xs font-mono">{user.contactInfo}</span>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -197,7 +200,7 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                 </div>
             </div>
 
-            {/* 2. Performance Metrics */}
+            {/* 2. رادار الأداء */}
             <div className="lg:col-span-4 bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-8 flex flex-col items-center justify-center relative shadow-2xl overflow-hidden min-h-[400px]">
                 <div className="absolute top-8 left-8 flex items-center gap-2 opacity-30">
                     <IconChartRadar size={20} className={analytics.displayRank.color}/>
@@ -213,7 +216,7 @@ export default function CyberDeck({ user, stats, cards = [] }) {
             </div>
         </div>
 
-        {/* 3. Badges Grid */}
+        {/* 3. شبكة الأوسمة */}
         <div className="space-y-8">
             <div className="flex items-center gap-4 px-2">
                 <div className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40">
