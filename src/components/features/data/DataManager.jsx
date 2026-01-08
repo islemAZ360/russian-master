@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { 
   IconTrash, IconPencil, IconSearch, IconDatabase, IconArrowDown, 
   IconPlus, IconCategory, IconSettings, IconX, IconCheck, IconFolder, 
-  IconLock, IconEye
+  IconLock, IconEye, IconCpu, IconServer
 } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -22,7 +22,7 @@ const getCatTranslation = (catName, t) => {
 
 // --- 1. مكون بطاقة الذاكرة الفردية (MemoryNode) ---
 const MemoryNode = React.memo(({ 
-    card, index, canEdit, // نستلم canEdit بدلاً من isJunior
+    card, index, canEdit, 
     editingId, editForm, 
     startEdit, saveEdit, cancelEdit, onDelete, setEditForm, 
     categories, t 
@@ -32,74 +32,88 @@ const MemoryNode = React.memo(({
         setEditForm(prev => ({ ...prev, [field]: value }));
     };
 
+    // تحديد ما إذا كانت البطاقة "نظام" (لا يمكن حذفها بسهولة) أو "مخصصة"
+    // (في هذا التصميم نفترض أن البطاقات القابلة للتعديل هي فقط التي يملكها المستخدم)
+    const isSystemCard = !card.id || card.id.toString().length < 5; // افتراض بسيط للتمييز
+
     return (
         <motion.div 
             layout
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
+            transition={{ delay: index * 0.05 }}
             className="group relative h-full w-full"
         >
-            <div className={`relative h-full w-full bg-[#0a0a0a] rounded-3xl border border-white/10 overflow-hidden transition-all duration-300 ${canEdit ? 'hover:border-cyan-500/30 hover:shadow-2xl' : 'hover:border-white/20'}`}>
+            <div className={`relative h-full w-full bg-[#0a0a0a] rounded-3xl border border-white/5 overflow-hidden transition-all duration-300 hover:border-cyan-500/30 hover:shadow-[0_0_30px_rgba(6,182,212,0.1)] group-hover:-translate-y-1`}>
+                
+                {/* خلفية متوهجة خفيفة */}
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+
                 <div className="relative z-10 p-6 flex flex-col h-full justify-between min-h-[220px]">
                     
                     {editingId === card.id ? (
-                        /* وضع التعديل (Edit Mode) - يظهر فقط إذا كان canEdit true */
+                        /* وضع التعديل (Edit Mode) */
                         <div className="flex flex-col gap-3 h-full justify-center animate-in fade-in zoom-in-95">
                             <input 
                                 value={editForm.russian} 
                                 onChange={(e) => handleChange('russian', e.target.value)} 
-                                className="bg-black border border-cyan-500 rounded-xl p-3 text-center text-white outline-none font-bold" 
+                                className="bg-black/50 border border-cyan-500 rounded-xl p-3 text-center text-white outline-none font-bold text-sm" 
                                 placeholder="Russian" 
                             />
                             <input 
                                 value={editForm.arabic} 
                                 onChange={(e) => handleChange('arabic', e.target.value)} 
-                                className="bg-black border border-white/20 rounded-xl p-3 text-center text-white outline-none font-bold" 
+                                className="bg-black/50 border border-white/20 rounded-xl p-3 text-center text-white outline-none font-bold text-sm" 
                                 placeholder="Arabic" 
                                 dir="auto"
                             />
                             <select 
                                 value={editForm.category} 
                                 onChange={(e) => handleChange('category', e.target.value)}
-                                className="bg-black border border-white/10 rounded-xl p-2 text-[10px] font-black text-cyan-500 outline-none uppercase"
+                                className="bg-black/50 border border-white/10 rounded-xl p-2 text-[10px] font-black text-cyan-500 outline-none uppercase"
                             >
                                 {categories.filter(c => c !== "All").map(c => (
                                     <option key={c} value={c}>{getCatTranslation(c, t)}</option>
                                 ))}
                             </select>
                             <div className="flex gap-2 mt-2">
-                                <button onClick={saveEdit} className="flex-1 bg-green-600 text-white py-3 rounded-xl font-black text-xs shadow-lg hover:bg-green-500 transition-colors"><IconCheck size={20} className="mx-auto"/></button>
-                                <button onClick={cancelEdit} className="flex-1 bg-zinc-800 text-white py-3 rounded-xl font-black text-xs hover:bg-zinc-700 transition-colors"><IconX size={20} className="mx-auto"/></button>
+                                <button onClick={saveEdit} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl font-black text-xs shadow-lg transition-colors"><IconCheck size={18} className="mx-auto"/></button>
+                                <button onClick={cancelEdit} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-2 rounded-xl font-black text-xs transition-colors"><IconX size={18} className="mx-auto"/></button>
                             </div>
                         </div>
                     ) : (
                         /* وضع العرض (View Mode) */
                         <>
                             <div className="flex justify-between items-start">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-cyan-950/40 text-cyan-400 text-[9px] font-black uppercase tracking-widest border border-cyan-500/20">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 text-cyan-400 text-[9px] font-black uppercase tracking-widest border border-white/10 group-hover:border-cyan-500/30 transition-colors">
                                     <IconCategory size={12} /> {getCatTranslation(card.category, t)}
                                 </span>
                                 
                                 {canEdit ? (
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all scale-90 translate-x-2 group-hover:translate-x-0">
-                                        <button onClick={() => startEdit(card)} className="p-2 rounded-xl bg-white/5 hover:bg-cyan-600 text-gray-400 hover:text-white transition-colors border border-white/10"><IconPencil size={14}/></button>
+                                        <button onClick={() => startEdit(card)} className="p-2 rounded-xl bg-white/5 hover:bg-indigo-600 text-gray-400 hover:text-white transition-colors border border-white/10"><IconPencil size={14}/></button>
                                         <button onClick={() => onDelete(card.id)} className="p-2 rounded-xl bg-white/5 hover:bg-red-600 text-gray-400 hover:text-white transition-colors border border-white/10"><IconTrash size={14}/></button>
                                     </div>
                                 ) : (
-                                    <div className="opacity-20 text-white">
+                                    <div className="opacity-20 text-white" title="System Protected">
                                         <IconLock size={14} />
                                     </div>
                                 )}
                             </div>
 
-                            <div className="py-6 text-center flex-1 flex flex-col justify-center">
-                                <h3 className="text-2xl font-black text-white group-hover:text-cyan-400 transition-colors tracking-tight select-text">
+                            <div className="py-6 text-center flex-1 flex flex-col justify-center relative">
+                                <h3 className="text-2xl font-black text-white group-hover:text-cyan-400 transition-colors tracking-tight select-text drop-shadow-md">
                                     {card.russian}
                                 </h3>
+                                {/* زخرفة خلفية للنص */}
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-cyan-500/10 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                             </div>
 
-                            <div className="mt-auto pt-4 border-t border-white/5">
+                            <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-end">
+                                <span className="text-[8px] font-mono text-white/20 uppercase tracking-widest">
+                                    ID: {card.id?.toString().substring(0,4) || "SYS"}
+                                </span>
                                 <p className="text-sm text-white/40 group-hover:text-white text-right font-bold transition-colors select-text" dir="auto">
                                     {card.arabic}
                                 </p>
@@ -117,35 +131,27 @@ MemoryNode.displayName = "MemoryNode";
 export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
   const { t, dir } = useLanguage();
   
-  // تحديد الصلاحية بناءً على وجود الدوال
-  // إذا مررنا null في onAdd (كما فعلنا في ViewManager)، فهذا يعني وضع القراءة فقط
   const canEdit = !!(onAdd && onDelete && onUpdate);
 
-  // حالات البحث والفلترة والتحميل
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [displayLimit, setDisplayLimit] = useState(20);
   
-  // حالة الإضافة
   const [newCard, setNewCard] = useState({ russian: "", arabic: "", category: "" });
   const [isNewCategoryMode, setIsNewCategoryMode] = useState(false);
 
-  // حالة التعديل
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ russian: "", arabic: "", category: "" });
 
-  // حالة مدير المجموعات
   const [showCatManager, setShowCatManager] = useState(false);
   const [editingCatName, setEditingCatName] = useState(null);
   const [newCatNameInput, setNewCatNameInput] = useState("");
 
-  // استخراج المجموعات الفريدة
   const categories = useMemo(() => {
     const cats = new Set(cards.map(c => c.category || "General"));
     return ["All", ...Array.from(cats).sort()];
   }, [cards]);
 
-  // منطق البحث والفلترة الذكي
   const filteredCards = useMemo(() => {
       const s = search.toLowerCase();
       return cards.filter(c => {
@@ -157,7 +163,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
 
   useEffect(() => { setDisplayLimit(20); }, [search, filter]);
 
-  // --- العمليات الأساسية ---
+  // --- العمليات ---
 
   const handleAddSubmit = () => {
       if(newCard.russian && newCard.arabic && newCard.category && canEdit) {
@@ -180,8 +186,6 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
       }
   }, [editingId, editForm, onUpdate, canEdit]);
 
-  // --- وظائف إدارة المجموعات الجماعية ---
-  
   const handleRenameCategory = (oldName) => {
       if (!canEdit) return;
       if (!newCatNameInput.trim() || newCatNameInput === oldName) {
@@ -196,12 +200,12 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
 
   const handleDeleteCategory = (catName) => {
       if (!canEdit) return;
-      if (!confirm(`WARNING: This will permanently delete group "${catName}" and ALL ${cards.filter(c=>c.category===catName).length} records inside it.`)) return;
+      if (!confirm(`WARNING: Delete group "${catName}" and ALL its records?`)) return;
       const cardsToDelete = cards.filter(c => c.category === catName);
       cardsToDelete.forEach(card => onDelete(card.id));
   };
 
-  // --- واجهة مدير المجموعات (Category Manager Modal) ---
+  // --- Modal ---
   const CategoryManagerModal = () => (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md">
           <motion.div initial={{scale:0.9, opacity:0}} animate={{scale:1, opacity:1}} className="bg-[#0c0c0c] border border-white/10 w-full max-w-xl rounded-[2.5rem] p-8 shadow-2xl flex flex-col max-h-[85vh]">
@@ -250,67 +254,65 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
   return (
     <div className="w-full flex flex-col p-4 md:p-10 font-sans min-h-screen" dir={dir}>
       
-      {/* 1. رأس الصفحة (Header) */}
+      {/* 1. Header */}
       <div className="flex flex-col items-center justify-center mb-12 text-center animate-in fade-in duration-700">
-          <span className="text-[10px] font-black tracking-[0.5em] text-cyan-500 uppercase mb-3 block">
-              {canEdit ? t('archive_header') : 'READ_ONLY_ACCESS'}
-          </span>
-          <h1 className="text-5xl md:text-8xl font-black text-white tracking-tighter mb-6 uppercase">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[9px] font-black uppercase tracking-[0.3em] mb-4">
+               <IconServer size={12} /> {canEdit ? "WRITE ACCESS GRANTED" : "READ ONLY MODE"}
+          </div>
+          <h1 className="text-5xl md:text-8xl font-black text-white tracking-tighter mb-6 uppercase drop-shadow-2xl">
               {t('nav_archive')}
           </h1>
           <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3 text-[10px] font-bold text-gray-500 bg-white/5 px-6 py-2 rounded-full border border-white/10 backdrop-blur-md uppercase tracking-widest">
+              <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400 bg-[#0a0a0a] px-6 py-3 rounded-2xl border border-white/10 backdrop-blur-md uppercase tracking-widest shadow-lg">
                   <IconDatabase size={16} className="text-cyan-500"/> <span>{filteredCards.length} {t('archive_items')}</span>
               </div>
               {canEdit ? (
                   <button 
                     onClick={() => setShowCatManager(true)} 
-                    className="flex items-center gap-2 text-[10px] font-black text-cyan-400 bg-cyan-500/10 px-6 py-2 rounded-full hover:bg-cyan-500 hover:text-white transition-all border border-cyan-500/20 uppercase tracking-widest"
+                    className="flex items-center gap-2 text-[10px] font-black text-white bg-indigo-600 px-6 py-3 rounded-2xl hover:bg-indigo-500 transition-all border border-indigo-400/20 uppercase tracking-widest shadow-lg shadow-indigo-900/20"
                   >
                       <IconSettings size={14}/> {t('archive_manage_groups')}
                   </button>
               ) : (
-                  <div className="flex items-center gap-2 text-[10px] font-black text-white/30 bg-white/5 px-6 py-2 rounded-full border border-white/5 uppercase tracking-widest cursor-not-allowed">
+                  <div className="flex items-center gap-2 text-[10px] font-black text-white/30 bg-white/5 px-6 py-3 rounded-2xl border border-white/5 uppercase tracking-widest cursor-not-allowed">
                       <IconEye size={14}/> Viewer Mode
                   </div>
               )}
           </div>
       </div>
 
-      {/* 2. شريط التحكم العائم (البحث + الإضافة) */}
+      {/* 2. Control Bar */}
       <div className="sticky top-6 z-40 mb-12 flex justify-center">
-         <div className="w-full max-w-6xl bg-[#111]/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col md:flex-row gap-5 items-center">
+         <div className="w-full max-w-6xl bg-[#0a0a0a]/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.7)] flex flex-col md:flex-row gap-5 items-center">
              
-             {/* البحث - متاح للجميع */}
              <div className="flex-1 flex items-center gap-4 w-full px-4 group">
-                <IconSearch className="text-gray-600 group-focus-within:text-cyan-500 transition-colors" size={22} />
+                <IconSearch className="text-gray-500 group-focus-within:text-cyan-500 transition-colors" size={22} />
                 <input 
                     type="text" 
                     value={search} 
                     onChange={(e) => setSearch(e.target.value)} 
                     placeholder={t('archive_search_placeholder')} 
-                    className="flex-1 bg-transparent text-white outline-none text-sm font-black h-12 uppercase font-mono tracking-wider"
+                    className="flex-1 bg-transparent text-white outline-none text-sm font-black h-12 uppercase font-mono tracking-wider placeholder:text-gray-700"
                 />
              </div>
 
-             {/* الإضافة الذكية - مخفية للطلاب */}
              {canEdit && (
                  <div className="w-full md:w-auto flex flex-col md:flex-row items-center gap-3 border-t md:border-t-0 md:border-l border-white/10 pt-4 md:pt-0 md:pl-5">
                      <div className="flex w-full md:w-auto gap-3">
-                         <input value={newCard.russian} onChange={e => setNewCard({...newCard, russian: e.target.value})} placeholder={t('archive_rus_ph')} className="flex-1 md:w-32 bg-black border border-white/10 rounded-2xl px-5 py-3 text-xs font-bold text-white focus:border-cyan-500 transition-all" />
-                         <input value={newCard.arabic} onChange={e => setNewCard({...newCard, arabic: e.target.value})} placeholder={t('archive_ara_ph')} className="flex-1 md:w-32 bg-black border border-white/10 rounded-2xl px-5 py-3 text-xs font-bold text-white text-right focus:border-cyan-500 transition-all" />
+                         <input value={newCard.russian} onChange={e => setNewCard({...newCard, russian: e.target.value})} placeholder={t('archive_rus_ph')} className="flex-1 md:w-32 bg-black/50 border border-white/10 rounded-2xl px-5 py-3 text-xs font-bold text-white focus:border-cyan-500 transition-all outline-none" />
+                         <input value={newCard.arabic} onChange={e => setNewCard({...newCard, arabic: e.target.value})} placeholder={t('archive_ara_ph')} className="flex-1 md:w-32 bg-black/50 border border-white/10 rounded-2xl px-5 py-3 text-xs font-bold text-white text-right focus:border-cyan-500 transition-all outline-none" />
                      </div>
                      <div className="flex w-full md:w-auto gap-3">
                         {isNewCategoryMode ? (
                             <div className="flex items-center gap-2 flex-1">
-                                <input autoFocus value={newCard.category} onChange={e => setNewCard({...newCard, category: e.target.value})} placeholder={t('archive_new_group_ph')} className="flex-1 bg-black border border-cyan-500 rounded-2xl px-4 py-3 text-xs font-black text-white" />
+                                <input autoFocus value={newCard.category} onChange={e => setNewCard({...newCard, category: e.target.value})} placeholder={t('archive_new_group_ph')} className="flex-1 bg-black/50 border border-cyan-500 rounded-2xl px-4 py-3 text-xs font-black text-white outline-none" />
                                 <button onClick={() => setIsNewCategoryMode(false)} className="text-red-500 hover:scale-110 transition-transform"><IconX size={20}/></button>
                             </div>
                         ) : (
                             <select 
                                 value={newCard.category} 
                                 onChange={(e) => { if (e.target.value === 'NEW') setIsNewCategoryMode(true); else setNewCard({...newCard, category: e.target.value}); }} 
-                                className="flex-1 md:w-40 bg-black border border-white/10 rounded-2xl px-4 py-3 text-[10px] font-black uppercase text-white outline-none cursor-pointer hover:border-white/30 transition-colors"
+                                className="flex-1 md:w-40 bg-black/50 border border-white/10 rounded-2xl px-4 py-3 text-[10px] font-black uppercase text-white outline-none cursor-pointer hover:border-white/30 transition-colors"
                             >
                                 <option value="" disabled>{t('archive_group_label')}</option>
                                 {categories.filter(c => c !== "All").map(c => (
@@ -320,7 +322,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
                             </select>
                         )}
                         <button onClick={handleAddSubmit} className="h-12 w-12 bg-cyan-600 hover:bg-cyan-500 text-white rounded-2xl flex items-center justify-center transition-all shadow-xl shadow-cyan-900/20 active:scale-95">
-                            <IconPlus size={28}/>
+                            <IconPlus size={24}/>
                         </button>
                      </div>
                  </div>
@@ -328,28 +330,28 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
          </div>
       </div>
 
-      {/* 3. فلاتر التصنيف */}
-      <div className="flex flex-wrap justify-center gap-3 mb-12 animate-in slide-in-from-bottom-2 duration-700">
+      {/* 3. Filters */}
+      <div className="flex flex-wrap justify-center gap-2 mb-12 animate-in slide-in-from-bottom-2 duration-700 max-w-5xl mx-auto">
           {categories.map(cat => (
               <button 
                 key={cat} 
                 onClick={() => { setFilter(cat); setDisplayLimit(20); }} 
-                className={`px-6 py-2.5 text-[9px] font-black uppercase rounded-full transition-all border tracking-widest
+                className={`px-5 py-2 text-[9px] font-black uppercase rounded-xl transition-all border tracking-widest
                 ${filter === cat 
-                    ? "bg-cyan-600 text-white border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)] scale-105" 
-                    : "bg-white/5 text-gray-500 border-transparent hover:border-white/20 hover:text-white"}`}
+                    ? "bg-cyan-950 text-cyan-400 border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
+                    : "bg-[#0a0a0a] text-gray-500 border-white/5 hover:border-white/20 hover:text-white"}`}
               >
                   {getCatTranslation(cat, t)}
               </button>
           ))}
       </div>
 
-      {/* 4. شبكة السجلات */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 pb-32 w-full max-w-7xl mx-auto">
+      {/* 4. Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-32 w-full max-w-7xl mx-auto">
             {filteredCards.slice(0, displayLimit).map((card, index) => (
                 <MemoryNode 
-                    key={card.id} card={card} index={index} 
-                    canEdit={canEdit} // تمرير الصلاحية للبطاقة
+                    key={card.id || index} card={card} index={index} 
+                    canEdit={canEdit}
                     editingId={editingId} editForm={editForm} startEdit={startEdit}
                     saveEdit={saveEdit} cancelEdit={() => setEditingId(null)}
                     onDelete={onDelete} setEditForm={setEditForm} t={t}
@@ -358,7 +360,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
             ))}
       </div>
 
-      {/* 5. زر تحميل المزيد */}
+      {/* 5. Load More */}
       {displayLimit < filteredCards.length && (
             <div className="flex flex-col items-center justify-center pb-32">
                 <button onClick={() => setDisplayLimit(p => p + 20)} className="group flex flex-col items-center gap-4 text-gray-600 hover:text-cyan-400 transition-all">
@@ -370,7 +372,6 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
             </div>
       )}
 
-      {/* مودال إدارة المجموعات - يظهر فقط إذا كان هناك صلاحية */}
       <AnimatePresence>
           {showCatManager && canEdit && <CategoryManagerModal />}
       </AnimatePresence>
