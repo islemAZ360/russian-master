@@ -12,9 +12,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   
   /**
-   * دالة تهيئة الملف الشخصي (Profile Initialization)
-   * تُستخدم لإنشاء مستند المستخدم في Firestore لأول مرة
-   * الرتبة الافتراضية هنا هي 'user' (يوزر عادي)
+   * تهيئة ملف المستخدم في قاعدة البيانات عند أول دخول
    */
   const initializeUserProfile = useCallback(async (firebaseUser) => {
     if (!firebaseUser) return;
@@ -23,17 +21,18 @@ export const AuthProvider = ({ children }) => {
       const userRef = doc(db, "users", firebaseUser.uid);
       const snap = await getDoc(userRef);
       
-      // إذا كان المستخدم جديداً تماماً (لم يتم إنشاء مستنده بعد)
+      // إذا كان المستخدم جديداً، ننشئ له ملفاً
       if (!snap.exists()) {
-        // إذا كان الإيميل هو إيميل الماستر، نعطيه رتبة ماستر، غير ذلك رتبة يوزر عادي
-        const initialRole = firebaseUser.email?.toLowerCase() === MASTER_EMAIL?.toLowerCase() ? 'master' : 'user';
+        // التحقق مما إذا كان هذا هو الإيميل الرئيسي (الماستر)
+        const isMasterEmail = firebaseUser.email?.toLowerCase() === MASTER_EMAIL?.toLowerCase();
+        const initialRole = isMasterEmail ? 'master' : 'user';
         
         const newProfile = {
           email: firebaseUser.email,
-          displayName: firebaseUser.displayName || 'Novice Agent', // اسم مؤقت
+          displayName: firebaseUser.displayName || 'New Agent',
           photoURL: firebaseUser.photoURL || "/avatars/avatar1.png",
-          role: initialRole, // user, student, teacher, admin, master
-          teacherId: null,   // معرف الأستاذ (للطلبة فقط)
+          role: initialRole, 
+          teacherId: null,
           xp: 0,
           streak: 0,
           isBanned: false,
@@ -43,42 +42,37 @@ export const AuthProvider = ({ children }) => {
         
         await setDoc(userRef, newProfile);
       } else {
-        // إذا كان موجوداً، نكتفي بتحديث وقت آخر دخول
+        // إذا كان موجوداً، نحدث وقت الدخول فقط
         await updateDoc(userRef, { lastLogin: serverTimestamp() });
       }
     } catch (e) { 
-        console.error("Critical Profile Initialization Error:", e); 
+        console.error("Profile Init Error:", e); 
     }
   }, []);
 
   useEffect(() => {
-    // المستمع الرئيسي لحالة تسجيل الدخول
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
-        
-        // محاولة تهيئة الملف إذا لم يكن موجوداً
         await initializeUserProfile(firebaseUser);
         
-        // البدء بمراقبة بيانات المستخدم في Firestore في الوقت الفعلي
+        // الاشتراك في تحديثات بيانات المستخدم (للتحديث الفوري للصلاحيات أو الحظر)
         const userRef = doc(db, "users", firebaseUser.uid);
         const unsubscribeDoc = onSnapshot(userRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
             setUserData(data);
             
-            // بروتوكول الحظر الفوري (لأي شخص غير الماستر)
+            // نظام الحماية: طرد المستخدم فوراً إذا تم حظره (إلا إذا كان الماستر)
             if (data.isBanned && firebaseUser.email?.toLowerCase() !== MASTER_EMAIL?.toLowerCase()) {
+              alert("ACCESS DENIED: Your neural link has been terminated.");
               signOut(auth);
+              window.location.reload();
             }
           }
-        }, (err) => {
-          console.error("User Data Stream Error:", err);
         });
 
-        // تنظيف مستمع المستند عند تسجيل الخروج
         return () => unsubscribeDoc();
-
       } else {
         setUser(null);
         setUserData(null);
@@ -89,57 +83,64 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribeAuth();
   }, [initializeUserProfile]);
 
-  /**
-   * وظيفة إنهاء الجلسة بشكل آمن
-   */
   const logout = async () => {
     try {
         await signOut(auth);
-        window.location.reload(); // إعادة تحميل النظام لتصفير كافة الحالات
+        // إعادة تحميل الصفحة لتنظيف أي كاش أو حالات عالقة
+        window.location.reload();
     } catch (e) {
-        console.error("Security Termination Failed:", e);
+        console.error("Logout Error:", e);
     }
   };
 
-  // تحديد الرتبة الحالية لسهولة الاستخدام
-  const currentRole = userData?.role || 'user';
+  // --- تعريف الرتب والصلاحيات (Role Logic) ---
+  const role = userData?.role || 'user';
+  
+  // 1. الماستر: يملك كل الصلاحيات (لا يمكن حظره)
+  const isMaster = role === 'master' || user?.email?.toLowerCase() === MASTER_EMAIL?.toLowerCase();
+  
+  // 2. الأدمن: يشمل الماستر والأدمن العادي
+  const isAdmin = isMaster || role === 'admin';
+  
+  // 3. الجونيور (Junior Admin): رتبة مساعدة
+  // (يستطيع دخول لوحة التحكم، لكن يمكننا تقييده في مكونات معينة لاحقاً)
+  const isJunior = isAdmin || role === 'junior_admin' || role === 'moderator';
 
-  // القيم التي سيتم تصديرها لكافة أنحاء التطبيق
+  // 4. الأستاذ (يملك أدوات إدارة المحتوى والطلاب)
+  // ملاحظة: الأدمن يملك صلاحيات الأستاذ أيضاً لتجربة النظام
+  const isTeacher = role === 'teacher' || isAdmin; 
+
+  // 5. الطالب
+  const isStudent = role === 'student';
+
+  // 6. المستخدم العادي
+  const isUser = role === 'user';
+
   const value = {
     user, 
     userData, 
     loading, 
     logout,
+    role,
     
-    // --- نظام الصلاحيات الجديد (RBAC) ---
-    role: currentRole, // user, student, teacher, admin, master
-    
-    // 1. صلاحيات الماستر والأدمن (يديرون الموقع والأساتذة)
-    isMaster: currentRole === 'master',
-    isAdmin: currentRole === 'admin' || currentRole === 'master',
-    
-    // 2. صلاحيات الأستاذ (واجهة خاصة، إدارة طلبة، إنشاء محتوى خاص)
-    isTeacher: currentRole === 'teacher',
-    
-    // 3. صلاحيات الطالب (يتبع لأستاذ، محتوى محدد، شات محدد)
-    isStudent: currentRole === 'student',
-    
-    // 4. صلاحيات المستخدم العادي (محتوى عام، شات عام)
-    isUser: currentRole === 'user',
+    // Flags للصلاحيات
+    isMaster,
+    isAdmin,
+    isJunior,  // <--- هذا ما طلبته للتحكم في الوصول
+    isTeacher,
+    isStudent,
+    isUser,
 
-    // --- بيانات إضافية للعلاقات ---
-    teacherId: userData?.teacherId || null, // للطلاب: معرف أستاذهم
+    // بيانات إضافية
+    teacherId: userData?.teacherId || null,
     isBanned: userData?.isBanned === true
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// الهوك المخصص للوصول السهل لبيانات الهوية
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider. Neural link failed.');
-  }
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
   return context;
 };
