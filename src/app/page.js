@@ -90,7 +90,6 @@ export default function Page() {
     let links = [];
 
     // --- واجهة الأستاذ (فقط إذا لم يكن أدمن) ---
-    // التعديل: (isTeacher && !isAdmin) يضمن أن الأدمن لا يعامل كأستاذ هنا
     if (isTeacher && !isAdmin) {
       links = [
         { 
@@ -125,11 +124,12 @@ export default function Page() {
         },
       ];
     } 
-    // --- واجهة الطالب ---
+    // --- واجهة الطالب (تمت إضافة الرئيسية والألعاب) ---
     else if (isStudent) {
       links = [
+        { title: t('nav_home'), icon: <IconHome className={`${iconClass} text-white/70`} />, onClick: () => setCurrentView('home') },
         { title: t('nav_study') || "Mission", icon: <IconCpu className={`${iconClass} text-purple-400`} />, onClick: () => setCurrentView('category') },
-        { title: t('nav_data') || "Intel", icon: <IconDatabase className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('data') },
+        { title: t('nav_games'), icon: <IconDeviceGamepad className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('games') },
         { title: t('nav_chat') || "Squad", icon: <IconMessageCircle className={`${iconClass} text-cyan-400`} />, onClick: () => setCurrentView('chat') },
         { title: t('nav_live') || "Live", icon: <IconSchool className={`${iconClass} text-red-500`} />, onClick: () => setCurrentView('live') },
         { title: t('nav_rewards') || "Rank", icon: <IconTrophy className={`${iconClass} text-yellow-400`} />, onClick: () => setCurrentView('leaderboard') },

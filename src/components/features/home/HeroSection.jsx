@@ -1,39 +1,47 @@
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
-import { IconRocket, IconTerminal, IconSparkles, IconActivity, IconSchool, IconShieldLock } from "@tabler/icons-react";
+import { 
+  IconRocket, IconTerminal, IconSparkles, IconActivity, 
+  IconSchool, IconShieldLock, IconBook 
+} from "@tabler/icons-react";
 import { BorderBeam } from "@/components/ui/BorderBeam";
 import { DecryptText } from "@/components/ui/DecryptText";
 import { MagneticButton } from "@/components/ui/MagneticButton";
 import { useSettings } from "@/context/SettingsContext";
 import { useLanguage } from "@/hooks/useLanguage";
-import { useAuth } from "@/context/AuthContext"; // استدعاء هوك المصادقة
+import { useAuth } from "@/context/AuthContext";
 
 export function HeroSection({ onStart, onOpenGame }) {
   const { isDark } = useSettings();
   const { t, dir, isRTL } = useLanguage();
-  const { user, userData, isTeacher, isStudent, isAdmin } = useAuth(); // جلب الرتب
+  const { user, userData, isTeacher, isStudent, isAdmin } = useAuth();
 
-  // تحديد النصوص والأيقونات بناءً على الرتبة
+  // تخصيص الواجهة بناءً على الرتبة
   let roleTitle = "OPERATIVE";
   let mainActionText = t('btn_start');
   let statusText = t('hero_status');
   let RoleIcon = IconRocket;
+  let subMessage = t('hero_line2');
 
   if (isAdmin) {
       roleTitle = "COMMANDER";
       mainActionText = "SYSTEM CONTROL";
       statusText = "SYSTEM: ROOT ACCESS";
       RoleIcon = IconShieldLock;
+      subMessage = "> Full command privileges active.";
   } else if (isTeacher) {
       roleTitle = "INSTRUCTOR";
-      mainActionText = "MANAGE CLASS";
+      mainActionText = "MANAGE CLASS"; // الأستاذ يذهب لإدارة المحتوى/الطلاب
       statusText = "SYSTEM: CLASSROOM ACTIVE";
       RoleIcon = IconSchool;
+      subMessage = "> Monitoring student progress.";
   } else if (isStudent) {
       roleTitle = "STUDENT";
-      mainActionText = "CONTINUE STUDY";
+      mainActionText = "CONTINUE MISSION"; // الطالب يذهب للدراسة
       statusText = "SYSTEM: LEARNING MODE";
+      RoleIcon = IconBook;
+      subMessage = "> Neural link established with teacher.";
   }
 
   // تحديد الاسم الذي سيظهر في التأثير المشفر
@@ -44,7 +52,7 @@ export function HeroSection({ onStart, onOpenGame }) {
       className="w-full h-full flex flex-col md:flex-row items-center justify-between p-6 md:p-12 relative z-10 gap-12" 
       dir={dir}
     >
-      {/* القسم الأيسر: نصوص الترحيب والحالة */}
+      {/* القسم الأيسر: الترحيب والحالة */}
       <motion.div 
         initial={{ opacity: 0, x: isRTL ? 50 : -50 }} 
         animate={{ opacity: 1, x: 0 }} 
@@ -81,11 +89,11 @@ export function HeroSection({ onStart, onOpenGame }) {
                 : 'text-zinc-500 border-indigo-400 bg-black/[0.02]'
             }`}>
                 <p className="mb-1">{t('hero_line1')}</p>
-                <p>{t('hero_line2')}</p>
+                <p>{subMessage}</p>
             </div>
         </div>
 
-        {/* كروت الإحصائيات الصغيرة */}
+        {/* كروت الإحصائيات المصغرة */}
         <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -98,28 +106,31 @@ export function HeroSection({ onStart, onOpenGame }) {
         </motion.div>
       </motion.div>
 
-      {/* القسم الأيمن: أزرار العمليات الكبيرة */}
+      {/* القسم الأيمن: الأزرار الرئيسية */}
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }} 
         animate={{ opacity: 1, scale: 1 }} 
         transition={{ duration: 0.8, delay: 0.3 }}
         className="flex-1 flex flex-col items-center justify-center gap-10 relative"
       >
-        {/* زر الإجراء الرئيسي (المغناطيسي) */}
+        {/* الزر الرئيسي (المغناطيسي) */}
         <MagneticButton 
             onClick={() => {
-                // توجيه ذكي حسب الرتبة
-                if (isTeacher) {
-                    // الأستاذ يذهب لصفحة الطلاب أو المحتوى (هنا اخترنا المحتوى)
-                    // يمكنك تغييرها لـ onStart() التي توجه لـ category في page.js
-                    // ولكن بما أننا في ViewManager وجهنا الـ links، فزر الهيرو يفضل أن يذهب لأهم صفحة
-                    // سنستخدم onStart الافتراضي وسيعالج page.js التوجيه
+                // تنفيذ الإجراء المناسب عند الضغط
+                if (isTeacher && !isAdmin) {
+                    // الأستاذ يذهب لإدارة المحتوى (Teacher DB)
+                    // ملاحظة: يتم تمرير onStart من ViewManager أو Page، وسيقوم Page.js بالتعامل مع التوجيه
+                    // ولكن لضمان التوجيه الصحيح يمكننا استخدام الدالة الممررة
                     onStart(); 
                 } else if (isAdmin) {
-                    // الأدمن يذهب للوحة التحكم (عبر onOpenAdmin لو كانت ممررة، أو onStart)
-                    onStart(); // حالياً يذهب للدراسة، يمكن تعديله في page.js
+                    // الأدمن يذهب للوحة التحكم (إذا كانت الدالة ممررة)
+                     // في Page.js قمنا بتمرير onOpenAdmin للأدمن
+                     // ولكن هنا نستخدم onStart العامة التي توجه للـ Category/Study
+                     // يمكن للأدمن استخدام الشريط السفلي للوصول للوحة التحكم
+                    onStart();
                 } else {
-                    onStart(); // الطالب والمستخدم يذهبون للدراسة
+                    // الطالب يذهب للدراسة
+                    onStart(); 
                 }
             }} 
             className="group relative w-64 h-64 md:w-72 md:h-72 flex items-center justify-center focus:outline-none"
@@ -149,6 +160,7 @@ export function HeroSection({ onStart, onOpenGame }) {
         </MagneticButton>
 
         {/* زر التسلل العصبي (الألعاب) */}
+        {/* يظهر للجميع، بما فيهم الطالب الآن */}
         <MagneticButton 
           onClick={onOpenGame} 
           className={`relative group w-full max-w-sm overflow-hidden rounded-[1.5rem] border p-6 transition-all active:scale-95 ${
@@ -185,9 +197,6 @@ export function HeroSection({ onStart, onOpenGame }) {
   );
 }
 
-/**
- * مكون فرعي للإحصائيات (Stat Pill)
- */
 function StatPill({ value, label, color, isDark }) {
     return (
         <div className={`px-5 py-3 rounded-2xl border backdrop-blur-md flex items-center gap-3 transition-all hover:-translate-y-1 ${

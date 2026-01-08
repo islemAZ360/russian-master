@@ -28,15 +28,12 @@ export default function CommunicationHub() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   
-  // للمجموعة الجديدة
   const [newGroup, setNewGroup] = useState({ name: "", type: "public" });
-  
-  // قائمة الطلاب المتاحين للدعوة (للأستاذ)
   const [myStudentsToInvite, setMyStudentsToInvite] = useState([]);
 
   const messagesEndRef = useRef(null);
 
-  // 1. جلب الدردشات (نظام متعدد الاستعلامات لحل مشكلة الاختفاء)
+  // 1. جلب الدردشات
   useEffect(() => {
     if (!user) return;
     setLoadingChats(true);
@@ -44,11 +41,9 @@ export default function CommunicationHub() {
     const chatsMap = new Map();
     const unsubscribers = [];
 
-    // دالة لتحديث الحالة عند وصول بيانات جديدة من أي استعلام
     const updateLocalChats = () => {
         const uniqueChats = Array.from(chatsMap.values())
             .sort((a, b) => {
-                // ترتيب حسب آخر نشاط
                 const timeA = a.lastActivity?.seconds || 0;
                 const timeB = b.lastActivity?.seconds || 0;
                 return timeB - timeA;
@@ -57,36 +52,32 @@ export default function CommunicationHub() {
         setLoadingChats(false);
     };
 
+    const addToMapAndSync = (snap) => {
+        snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        // التعامل مع الحذف: إذا عادت الـ snapshot ببيانات، يجب أن نتأكد من إزالة العناصر المحذوفة من الـ map
+        // (في هذه البنية المبسطة، التحديث التفاؤلي في دالة الحذف هو الحل الأسرع، 
+        // لكن هنا نضمن التحديث عند الإضافة أيضاً)
+        snap.docChanges().forEach((change) => {
+            if (change.type === "removed") {
+                chatsMap.delete(change.doc.id);
+            }
+        });
+        updateLocalChats();
+    };
+
     try {
-        // الاستعلام 1: المجموعات العامة (Public)
         const qPublic = query(collection(db, "chats"), where("type", "==", "public"));
-        unsubscribers.push(onSnapshot(qPublic, (snap) => {
-            snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-            updateLocalChats();
-        }));
+        unsubscribers.push(onSnapshot(qPublic, addToMapAndSync));
 
-        // الاستعلام 2: المجموعات التي أنا عضو فيها
         const qMember = query(collection(db, "chats"), where("members", "array-contains", user.uid));
-        unsubscribers.push(onSnapshot(qMember, (snap) => {
-            snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-            updateLocalChats();
-        }));
+        unsubscribers.push(onSnapshot(qMember, addToMapAndSync));
 
-        // الاستعلام 3: المجموعات التي أنشأتها أنا (هام للأستاذ ليرى مجموعاته الخاصة ويحذفها)
-        // هذا الاستعلام يضمن ظهور المجموعات التي أنشأها المعلم حتى لو لم يكن في قائمة الأعضاء لسبب ما
         const qOwner = query(collection(db, "chats"), where("createdBy", "==", user.uid));
-        unsubscribers.push(onSnapshot(qOwner, (snap) => {
-            snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-            updateLocalChats();
-        }));
+        unsubscribers.push(onSnapshot(qOwner, addToMapAndSync));
 
-        // الاستعلام 4: للطالب - مجموعات أستاذه (للانضمام التلقائي أو الرؤية)
         if (isStudent && userData?.teacherId) {
             const qTeacher = query(collection(db, "chats"), where("createdBy", "==", userData.teacherId));
-            unsubscribers.push(onSnapshot(qTeacher, (snap) => {
-                snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-                updateLocalChats();
-            }));
+            unsubscribers.push(onSnapshot(qTeacher, addToMapAndSync));
         }
     } catch (err) {
         console.error("Chat Query Error:", err);
@@ -102,7 +93,6 @@ export default function CommunicationHub() {
   useEffect(() => {
     if (!selectedChat) return;
     
-    // الانضمام التلقائي للطالب لغرف أستاذه إذا لم يكن عضواً
     if (isStudent && userData?.teacherId === selectedChat.createdBy && !selectedChat.members?.includes(user.uid)) {
         updateDoc(doc(db, "chats", selectedChat.id), {
             members: arrayUnion(user.uid)
@@ -123,7 +113,7 @@ export default function CommunicationHub() {
     return () => unsub();
   }, [selectedChat, isStudent, user, userData]);
 
-  // 3. جلب طلاب الأستاذ للدعوة (عند فتح المودال)
+  // 3. جلب طلاب الأستاذ للدعوة
   useEffect(() => {
       if (showInviteModal && isTeacher) {
           const q = query(collection(db, "users"), where("teacherId", "==", user.uid));
@@ -160,8 +150,6 @@ export default function CommunicationHub() {
   const handleCreateGroup = async () => {
     if (!newGroup.name.trim()) return;
     
-    // الأستاذ ينشئ مجموعات خاصة افتراضياً (للفصل)
-    // إذا كان المستخدم "user" عادي، ينشئ عامة. الأستاذ يمكنه اختيار النوع.
     const finalType = isTeacher ? (newGroup.type || 'private') : newGroup.type;
 
     try {
@@ -177,10 +165,10 @@ export default function CommunicationHub() {
         setShowCreateModal(false);
         setNewGroup({ name: "", type: "public" });
         
-        // الانتقال للمحادثة الجديدة فوراً
         const newChatData = { id: docRef.id, name: newGroup.name, type: finalType, createdBy: user.uid, members: [user.uid] };
         setSelectedChat(newChatData);
-        // التحديث المحلي سيحدث تلقائياً عبر onSnapshot
+        // تحديث محلي فوري للقائمة
+        setChats(prev => [newChatData, ...prev]);
         
     } catch (e) { console.error(e); }
   };
@@ -195,35 +183,30 @@ export default function CommunicationHub() {
       } catch (e) { console.error(e); }
   };
 
-  // --- إصلاح حذف المحادثة ---
+  // --- 🔥 إصلاح حذف المحادثة (التحديث الفوري) ---
   const handleDeleteChat = async () => {
       if(!selectedChat) return;
-      
-      // رسالة تأكيد
       if(!confirm(t('admin_confirm_delete') || "Are you sure you want to dismantle this squad?")) return;
       
+      const chatIdToDelete = selectedChat.id;
+
       try {
-          // 1. حذف وثيقة المحادثة
-          await deleteDoc(doc(db, "chats", selectedChat.id));
+          // 1. التحديث الفوري للواجهة (Optimistic Update)
+          // نحذف الشات من القائمة المحلية فوراً قبل انتظار السيرفر
+          setChats(prevChats => prevChats.filter(chat => chat.id !== chatIdToDelete));
+          setSelectedChat(null); // العودة للقائمة الرئيسية
+
+          // 2. التنفيذ الفعلي في قاعدة البيانات
+          await deleteDoc(doc(db, "chats", chatIdToDelete));
           
-          // 2. تصفير المحادثة المختارة
-          setSelectedChat(null);
-          
-          // ملاحظة: الرسائل الفرعية (Subcollection) ستبقى في فايربيس كـ "Orphaned Documents"
-          // ولكنها لن تظهر في التطبيق لأن الأب حذف. لحذفها بالكامل يحتاج Cloud Function،
-          // ولكن هذا يكفي للواجهة الأمامية.
       } catch(e) { 
           console.error("Delete Error:", e);
           alert("Failed to delete squad.");
+          // في حال الفشل، يمكن إعادة تحميل الصفحة أو إعادة القائمة (اختياري)
       }
   };
 
-  // --- التحقق من الصلاحيات ---
-  const canCreate = !isStudent; // الطلاب لا ينشئون مجموعات
-  
-  // صلاحية الحذف والدعوة:
-  // 1. إذا كان المستخدم هو المنشئ (createdBy == user.uid)
-  // 2. أو إذا كان المستخدم أدمن
+  const canCreate = !isStudent; 
   const isOwner = selectedChat && selectedChat.createdBy === user.uid;
   const canModify = isOwner || isAdmin;
 
@@ -258,40 +241,45 @@ export default function CommunicationHub() {
               </div>
           )}
           
-          {chats.map(chat => {
-            const isTeacherChat = isStudent && chat.createdBy === userData?.teacherId;
-            const isMyChat = chat.createdBy === user.uid;
+          <AnimatePresence>
+            {chats.map(chat => {
+                const isTeacherChat = isStudent && chat.createdBy === userData?.teacherId;
+                const isMyChat = chat.createdBy === user.uid;
 
-            return (
-              <motion.div 
-                  key={chat.id} 
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setSelectedChat(chat)} 
-                  className={`p-4 rounded-2xl cursor-pointer transition-all border group flex justify-between items-center ${
-                      selectedChat?.id === chat.id 
-                      ? 'bg-cyan-600/10 border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.1)]' 
-                      : 'bg-white/5 border-transparent hover:bg-white/10 hover:border-white/10'
-                  }`}
-              >
-                <div className="overflow-hidden flex-1 mr-2">
-                  <div className={`font-black text-sm transition-colors truncate uppercase tracking-tight flex items-center gap-2 ${selectedChat?.id === chat.id ? 'text-cyan-400' : 'text-zinc-300'}`}>
-                      {chat.name}
-                      {isTeacherChat && <span className="bg-emerald-500/20 text-emerald-500 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30">COMMAND</span>}
-                      {isMyChat && <span className="bg-purple-500/20 text-purple-400 text-[8px] px-1.5 py-0.5 rounded border border-purple-500/30">OWNER</span>}
-                  </div>
-                  <div className="text-[9px] text-white/20 truncate mt-1 font-mono uppercase tracking-widest">
-                      {chat.lastMessage || "..."}
-                  </div>
-                </div>
-                
-                {chat.type === 'private' ? (
-                    isTeacherChat ? <IconSchool size={14} className="text-emerald-500 shrink-0"/> : <IconLock size={14} className="text-orange-500 shrink-0" />
-                ) : (
-                    <IconWorld size={14} className="text-cyan-500 shrink-0" />
-                )}
-              </motion.div>
-            );
-          })}
+                return (
+                <motion.div 
+                    key={chat.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setSelectedChat(chat)} 
+                    className={`p-4 rounded-2xl cursor-pointer transition-all border group flex justify-between items-center ${
+                        selectedChat?.id === chat.id 
+                        ? 'bg-cyan-600/10 border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.1)]' 
+                        : 'bg-white/5 border-transparent hover:bg-white/10 hover:border-white/10'
+                    }`}
+                >
+                    <div className="overflow-hidden flex-1 mr-2">
+                    <div className={`font-black text-sm transition-colors truncate uppercase tracking-tight flex items-center gap-2 ${selectedChat?.id === chat.id ? 'text-cyan-400' : 'text-zinc-300'}`}>
+                        {chat.name}
+                        {isTeacherChat && <span className="bg-emerald-500/20 text-emerald-500 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30">COMMAND</span>}
+                        {isMyChat && <span className="bg-purple-500/20 text-purple-400 text-[8px] px-1.5 py-0.5 rounded border border-purple-500/30">OWNER</span>}
+                    </div>
+                    <div className="text-[9px] text-white/20 truncate mt-1 font-mono uppercase tracking-widest">
+                        {chat.lastMessage || "..."}
+                    </div>
+                    </div>
+                    
+                    {chat.type === 'private' ? (
+                        isTeacherChat ? <IconSchool size={14} className="text-emerald-500 shrink-0"/> : <IconLock size={14} className="text-orange-500 shrink-0" />
+                    ) : (
+                        <IconWorld size={14} className="text-cyan-500 shrink-0" />
+                    )}
+                </motion.div>
+                );
+            })}
+          </AnimatePresence>
         </div>
       </aside>
 
@@ -322,26 +310,23 @@ export default function CommunicationHub() {
               </div>
               
               <div className="flex items-center gap-2">
-                  {/* زر الدعوة: يظهر للمالك أو الأدمن */}
                   {canModify && (
-                    <button 
-                        onClick={() => setShowInviteModal(true)} 
-                        className="p-2.5 bg-white/5 hover:bg-white/10 text-cyan-400 border border-white/10 rounded-xl transition-all shadow-lg" 
-                        title="Invite Operatives"
-                    >
-                        <IconUserPlus size={20} />
-                    </button>
-                  )}
-                  
-                  {/* زر الحذف: يظهر للمالك أو الأدمن */}
-                  {canModify && (
-                    <button 
-                        onClick={handleDeleteChat} 
-                        className="p-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-xl transition-all shadow-lg" 
-                        title="Delete Squad"
-                    >
-                        <IconTrash size={20} />
-                    </button>
+                    <>
+                        <button 
+                            onClick={() => setShowInviteModal(true)} 
+                            className="p-2.5 bg-white/5 hover:bg-white/10 text-cyan-400 border border-white/10 rounded-xl transition-all shadow-lg" 
+                            title="Invite Operatives"
+                        >
+                            <IconUserPlus size={20} />
+                        </button>
+                        <button 
+                            onClick={handleDeleteChat} 
+                            className="p-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-xl transition-all shadow-lg" 
+                            title="Delete Squad"
+                        >
+                            <IconTrash size={20} />
+                        </button>
+                    </>
                   )}
               </div>
             </header>
@@ -386,7 +371,7 @@ export default function CommunicationHub() {
         )}
       </main>
 
-      {/* Invite Modal (خاص للأستاذ أو المالك) */}
+      {/* Invite Modal */}
       <AnimatePresence>
         {showInviteModal && (
           <div className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
