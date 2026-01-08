@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   IconBell, IconX, IconUserPlus, IconAward, 
   IconMessageCircle, IconShield, IconCheck, IconLoader2, 
-  IconInfoCircle, IconBroadcast, IconSchool
+  IconInfoCircle, IconBroadcast, IconSchool, IconBook, IconTrendingUp
 } from '@tabler/icons-react';
 import { useLanguage } from '@/hooks/useLanguage';
 
@@ -33,16 +33,16 @@ export default function NotificationCenter() {
         // أ. تحديث بيانات المستخدم الحالي (الطالب)
         const userRef = doc(db, "users", user.uid);
         await updateDoc(userRef, {
-            role: 'student',        // الترقية لرتبة طالب
-            teacherId: teacherId,   // الربط بالأستاذ
+            role: 'student',        
+            teacherId: teacherId,   
             updatedAt: serverTimestamp()
         });
 
         // ب. إرسال إشعار للأستاذ بأن الدعوة قُبلت
         await addDoc(collection(db, "notifications"), {
-            userId: teacherId, // إرسال للأستاذ
+            userId: teacherId, 
             target: 'teacher',
-            type: "recruit_success", // نوع خاص لتمييز النجاح
+            type: "recruit_success", 
             title: "✅ RECRUITMENT SUCCESS",
             message: `Operative ${user.displayName || "Agent"} joined your squad.`,
             senderId: user.uid,
@@ -53,7 +53,6 @@ export default function NotificationCenter() {
         // ج. حذف إشعار الدعوة
         await deleteDoc(doc(db, "notifications", notification.id));
 
-        // د. تحديث الصفحة لتطبيق الصلاحيات الجديدة
         alert(`You have joined ${teacherName}'s squad! Reloading systems...`);
         window.location.reload();
 
@@ -72,41 +71,48 @@ export default function NotificationCenter() {
 
   // --- 3. التوجيه عند النقر ---
   const handleNavigation = (n) => {
-    // الدعوات تتطلب ضغط زر القبول، النقر العام لا يفعل شيئاً
+    // الدعوات تتطلب ضغط زر القبول
     if (n.type === 'invite') return;
 
-    // أ. البث المباشر: الانضمام للغرفة
+    // أ. البث المباشر
     if (n.type === 'live_start' && n.roomId) {
         setIsOpen(false);
-        // توجيه المستخدم لصفحة البث وبدء الفيديو
         setCurrentView('live');
         setTimeout(() => startBroadcast(n.roomId), 500);
         return;
     }
     
-    // ب. رد الدعم الفني
-    if (n.type === 'support_reply') {
+    // ب. رسائل الأدمن أو الدعم (تفتح نافذة الدعم)
+    if (n.type === 'support_reply' || n.type === 'admin_msg') {
         setShowSupport(true);
     }
     
-    // ج. الترقية
-    if (n.type === 'rank' || n.type === 'recruit_success') {
-        setCurrentView('leaderboard'); // أو teacher_students للأستاذ
+    // ج. الترقية أو الجوائز (تفتح البروفايل/الترتيب)
+    if (n.type === 'rank_up' || n.type === 'recruit_success') {
+        setCurrentView('leaderboard'); 
     }
 
-    // إغلاق القائمة وحذف الإشعار (تمت قراءته)
+    // د. محتوى جديد من الأستاذ (يفتح صفحة الدروس)
+    if (n.type === 'new_content') {
+        setCurrentView('category'); 
+    }
+
+    // إغلاق القائمة وحذف الإشعار بعد التفاعل
     setIsOpen(false);
     removeNotification(n.id);
   };
 
+  // عناوين الإشعارات حسب النوع
   const getNotifTitle = (type) => {
     const map = {
       'invite': t('notif_type_invite') || "SQUAD INVITE",
-      'rank': t('notif_type_rank') || "PROMOTION",
-      'support_reply': t('notif_type_support') || "SUPPORT",
-      'admin_alert': t('notif_type_admin') || "ALERT",
+      'rank_up': "🎖️ RANK PROMOTION",
+      'support_reply': "SUPPORT REPLY",
+      'admin_msg': "👮‍♂️ ADMIN MESSAGE",
+      'admin_alert': "⚠️ SYSTEM ALERT",
       'live_start': "🔴 LIVE STREAM",
       'recruit_success': "SQUAD UPDATE",
+      'new_content': "📚 NEW INTEL",
       'info': "SYSTEM INFO"
     };
     return map[type] || "SYSTEM MESSAGE";
@@ -128,11 +134,13 @@ export default function NotificationCenter() {
   const getIcon = (type) => {
     switch (type) {
         case 'invite': return <IconSchool size={20} className="text-purple-400"/>;
-        case 'rank': return <IconAward size={20} className="text-yellow-400"/>;
+        case 'rank_up': return <IconTrendingUp size={20} className="text-yellow-400"/>;
         case 'support_reply': return <IconMessageCircle size={20} className="text-blue-400"/>;
+        case 'admin_msg': return <IconShield size={20} className="text-red-500"/>;
         case 'admin_alert': return <IconShield size={20} className="text-red-500"/>;
         case 'live_start': return <IconBroadcast size={20} className="animate-pulse text-red-500" />;
         case 'recruit_success': return <IconUserPlus size={20} className="text-emerald-400"/>;
+        case 'new_content': return <IconBook size={20} className="text-cyan-400"/>;
         default: return <IconInfoCircle size={20} className="text-gray-400"/>;
     }
   };
@@ -141,16 +149,18 @@ export default function NotificationCenter() {
     <div className={`fixed top-6 ${dir === 'rtl' ? 'left-6' : 'right-6'} z-[9999] font-sans`} dir={dir}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className={`p-3 rounded-2xl border transition-all duration-300 shadow-2xl group relative
-          ${safeNotifications.length > 0 
-            ? 'bg-cyan-600 border-cyan-400 text-white animate-pulse shadow-[0_0_20px_rgba(6,182,212,0.4)]' 
-            : 'bg-[#0a0a0a]/80 border-white/10 text-white/40 hover:text-white hover:border-white/20'
-          }`}
+        className={`relative p-3 rounded-2xl border transition-all duration-300 shadow-2xl group
+          bg-[#0a0a0a]/90 border-white/10 text-white hover:bg-white/10 hover:border-cyan-500/50
+        `}
       >
-        <IconBell size={24} className={safeNotifications.length > 0 ? "animate-swing" : ""} />
+        {/* FIX: إزالة التوهج الغبي (animate-pulse) واستبداله باهتزاز بسيط للأيقونة فقط عند وجود إشعارات */}
+        <IconBell 
+            size={24} 
+            className={safeNotifications.length > 0 ? "text-cyan-400 animate-swing" : "text-white/60"} 
+        />
         
         {safeNotifications.length > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[10px] flex items-center justify-center font-black text-white border-2 border-[#0a0a0a]">
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 rounded-full text-[10px] flex items-center justify-center font-black text-white border-2 border-[#0a0a0a] shadow-lg animate-in zoom-in">
             {safeNotifications.length}
           </span>
         )}
@@ -191,7 +201,9 @@ export default function NotificationCenter() {
                                 onClick={() => handleNavigation(n)} 
                                 className={`p-5 border-b border-white/5 flex gap-4 items-start relative group transition-all 
                                 ${n.type === 'invite' ? 'bg-purple-500/5' : 'hover:bg-white/5 cursor-pointer'}
-                                ${n.type === 'live_start' ? 'bg-red-900/10 border-l-2 border-l-red-500' : ''}`}
+                                ${n.type === 'admin_msg' ? 'bg-red-500/5 border-l-2 border-l-red-500' : ''}
+                                ${n.type === 'rank_up' ? 'bg-yellow-500/5 border-l-2 border-l-yellow-500' : ''}
+                                ${n.type === 'new_content' ? 'bg-cyan-500/5 border-l-2 border-l-cyan-500' : ''}`}
                             >
                                 {/* Icon */}
                                 <div className="mt-1 shrink-0 p-2.5 rounded-xl bg-[#1a1a1a] border border-white/10 shadow-lg">

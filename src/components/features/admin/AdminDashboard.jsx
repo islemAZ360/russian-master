@@ -4,7 +4,7 @@ import { db } from '@/lib/firebase';
 import { 
   collection, onSnapshot, doc, updateDoc, query, orderBy, 
   deleteDoc, setDoc, serverTimestamp, arrayUnion, arrayRemove, limit, 
-  deleteField, where, addDoc 
+  deleteField, where, addDoc, getDoc 
 } from "firebase/firestore";
 import { 
   IconShield, IconUsers, IconLayoutDashboard, 
@@ -124,25 +124,28 @@ export default function AdminDashboard({ currentUser }) {
       if (existingTicket) { 
           setSelectedTicket(existingTicket); 
       } else {
+          // إنشاء تذكرة افتراضية للبدء
           setSelectedTicket({ 
               id: targetUser.id, 
               userEmail: targetUser.email, 
               userId: targetUser.id, 
               messages: [], 
               status: 'initiated_by_admin', 
-              isVirtual: true 
+              isVirtual: true // لم يتم حفظها في قاعدة البيانات بعد
           });
       }
       setActiveView('support'); 
       setIsMobileMenuOpen(false);
   };
 
+  // --- FIX: إرسال الرد مع الإشعار ---
   const sendSupportReply = async () => {
       if(!selectedTicket || !replyText.trim()) return;
       try {
           const ticketRef = doc(db, "support_tickets", selectedTicket.id);
           const newMsg = { text: replyText, sender: 'admin', time: Date.now() };
           
+          // 1. حفظ الرسالة في تذكرة الدعم
           if (selectedTicket.isVirtual) {
               await setDoc(ticketRef, { 
                   userId: selectedTicket.id, 
@@ -150,14 +153,6 @@ export default function AdminDashboard({ currentUser }) {
                   messages: [newMsg], 
                   lastUpdate: Date.now(), 
                   status: 'replied' 
-              });
-              // إشعار
-              await addDoc(collection(db, "notifications"), { 
-                  userId: selectedTicket.id, 
-                  title: "SUPPORT REPLY", 
-                  message: "Admin has responded to your ticket.", 
-                  type: "support_reply", 
-                  createdAt: serverTimestamp() 
               });
               setSelectedTicket(prev => ({ ...prev, isVirtual: false, messages: [newMsg] }));
           } else {
@@ -167,6 +162,19 @@ export default function AdminDashboard({ currentUser }) {
                   status: 'replied' 
               });
           }
+
+          // 2. 🔥 إرسال إشعار للمستخدم (الجزء الجديد)
+          await addDoc(collection(db, "notifications"), {
+              userId: selectedTicket.userId, // المستلم
+              target: 'user',
+              type: "support_reply", // سيقوم بفتح نافذة الدعم عند النقر
+              title: "📩 INCOMING TRANSMISSION",
+              message: `Admin Command: "${replyText.substring(0, 30)}${replyText.length>30?'...':''}"`,
+              senderId: currentUser.uid,
+              createdAt: serverTimestamp(),
+              read: false
+          });
+
           setReplyText("");
       } catch (e) { console.error(e); }
   };
@@ -317,7 +325,6 @@ export default function AdminDashboard({ currentUser }) {
                                                         : <span className="inline-flex w-fit items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-500 text-[9px] font-black border border-emerald-500/20 uppercase tracking-wider"><IconActivity size={10}/> Active</span>
                                                     }
                                                     
-                                                    {/* عرض اسم الأستاذ إذا كان طالباً */}
                                                     {u.role === 'student' && u.teacherId && (
                                                         <div className="flex items-center gap-2 mt-1">
                                                             <IconSchool size={12} className="text-purple-400"/>
@@ -384,7 +391,6 @@ export default function AdminDashboard({ currentUser }) {
                 {/* 4. Chat Control */}
                 {activeView === 'chat_control' && (
                     <div className="h-full flex flex-col md:flex-row overflow-hidden animate-in fade-in duration-500">
-                        {/* ... (نفس كود الشات السابق بدون تغيير كبير، فقط تحديث التنسيق إذا لزم) ... */}
                         <div className={`w-full md:w-80 border-r border-white/10 bg-black/30 flex flex-col shrink-0 ${browsingChat ? 'hidden md:flex' : 'flex'}`}>
                             <div className="p-6 border-b border-white/5 font-black text-[10px] text-white/40 uppercase tracking-widest shrink-0">Available Frequencies</div>
                             <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
@@ -435,7 +441,6 @@ export default function AdminDashboard({ currentUser }) {
                 {/* 5. Support Tickets */}
                 {activeView === 'support' && (
                     <div className="h-full flex flex-col md:flex-row p-0 gap-8 overflow-hidden animate-in fade-in duration-500">
-                        {/* نفس كود التذاكر السابق */}
                         <div className="w-full md:w-80 bg-[#0c0c0c] border border-white/10 rounded-3xl overflow-hidden flex flex-col shadow-2xl shrink-0">
                             <div className="p-5 border-b border-white/5 font-black text-[10px] text-white/40 uppercase tracking-widest shrink-0">Signal Queue</div>
                             <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
