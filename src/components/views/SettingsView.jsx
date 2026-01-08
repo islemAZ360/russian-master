@@ -119,35 +119,37 @@ export default function SettingsView() {
     }
   };
 
-  // --- 3. مغادرة الفصل (للطلاب) ---
+  // --- 3. مغادرة الفصل (للطلاب) - مع إشعار الأستاذ ---
   const handleLeaveClass = async () => {
       if (!confirm("WARNING: Are you sure you want to leave your current squad? You will lose access to teacher's content.")) return;
       
       setLoading(true);
       try {
-          const oldTeacherId = userData.teacherId;
+          // حفظ معرف الأستاذ القديم قبل الحذف لإرسال الإشعار
+          const oldTeacherId = userData?.teacherId;
 
-          // تحديث مستند المستخدم (حذف التبعية)
+          // تحديث مستند المستخدم (حذف التبعية وإعادة الرتبة ليوزر عادي)
           await updateDoc(doc(db, "users", user.uid), {
-              role: 'user', // العودة لرتبة مستخدم عادي
+              role: 'user', 
               teacherId: deleteField()
           });
 
-          // إشعار الأستاذ
+          // 🔥 إرسال إشعار للأستاذ
           if (oldTeacherId) {
               await addDoc(collection(db, "notifications"), {
                   userId: oldTeacherId,
                   target: 'teacher',
-                  type: "info",
-                  title: "OPERATIVE DEPARTURE",
-                  message: `${user.displayName || "Student"} has left your squad.`,
+                  type: "info", // نوع معلوماتي
+                  title: "⚠️ OPERATIVE DEPARTURE",
+                  message: `${user.displayName || "A Student"} has resigned from your squad.`,
+                  senderId: user.uid,
                   createdAt: serverTimestamp(),
                   read: false
               });
           }
 
           alert("You have left the squad.");
-          window.location.reload();
+          window.location.reload(); // إعادة تحميل لتحديث الواجهة والصلاحيات
 
       } catch (error) {
           console.error(error);

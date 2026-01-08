@@ -1,7 +1,9 @@
 "use client";
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { db, MASTER_EMAIL } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+import { 
+  collection, query, where, onSnapshot, doc, deleteDoc, getDocs, writeBatch 
+} from 'firebase/firestore';
 import { useAuth } from './AuthContext'; 
 
 // الحالة الافتراضية الثابتة لنظام البث المباشر
@@ -14,18 +16,17 @@ const defaultLiveState = {
 export const UIContext = createContext(null);
 
 export const UIProvider = ({ children }) => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   
-  // --- 1. حالات الواجهة الأساسية (Navigation & UI) ---
+  // --- 1. حالات الواجهة الأساسية ---
   const [currentView, setCurrentView] = useState('home');
   const [activeCategory, setActiveCategory] = useState('All');
   const [showSupport, setShowSupport] = useState(false);
   const [activeOverlayGame, setActiveOverlayGame] = useState(null);
   
-  // ضمان أن الإشعارات تبدأ كمصفوفة فارغة دائماً
   const [notifications, setNotifications] = useState([]);
 
-  // --- 2. حالة البث المباشر (Live Signals) ---
+  // --- 2. حالة البث المباشر ---
   const [liveStream, setLiveStream] = useState(defaultLiveState);
 
   // --- 3. وظائف التحكم في البث (Live Actions) ---
@@ -35,17 +36,46 @@ export const UIProvider = ({ children }) => {
     setCurrentView('live');
   }, []);
 
-  const endBroadcast = useCallback(() => {
+  // 🔥 التعديل: حذف إشعارات البث تلقائياً عند الإغلاق
+  const endBroadcast = useCallback(async () => {
+    const roomToDelete = liveStream.roomName;
+    
+    // 1. تصفير الحالة المحلية
     setLiveStream(defaultLiveState);
-    // العودة التلقائية للقاعدة عند إنهاء البث
     setCurrentView(prev => prev === 'live' ? 'home' : prev);
-  }, []);
+
+    // 2. تنظيف الإشعارات من قاعدة البيانات (للطلاب)
+    if (roomToDelete) {
+        try {
+            // البحث عن كل الإشعارات المتعلقة بهذه الغرفة
+            const q = query(
+                collection(db, "notifications"),
+                where("type", "==", "live_start"),
+                where("roomId", "==", roomToDelete)
+            );
+            
+            const snapshot = await getDocs(q);
+            
+            if (!snapshot.empty) {
+                // استخدام Batch للحذف السريع والمجمع
+                const batch = writeBatch(db);
+                snapshot.docs.forEach((doc) => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+                console.log(`🧹 Cleaned up ${snapshot.size} live notifications for room: ${roomToDelete}`);
+            }
+        } catch (error) {
+            console.error("Failed to clean live notifications:", error);
+        }
+    }
+  }, [liveStream.roomName]);
 
   const toggleMinimize = useCallback((minimize) => {
     setLiveStream(prev => ({ ...prev, isMinimized: minimize }));
   }, []);
 
-  // مراقبة التنقل لتصغير الفيديو تلقائياً إذا خرج المستخدم من صفحة اللايف
+  // مراقبة التنقل لتصغير الفيديو تلقائياً
   useEffect(() => {
     if (liveStream.isActive) {
       if (currentView !== 'live') {
@@ -56,7 +86,7 @@ export const UIProvider = ({ children }) => {
     }
   }, [currentView, liveStream.isActive]);
 
-  // --- 4. نظام الإشعارات المطور (Advanced Notification Engine) ---
+  // --- 4. نظام الإشعارات المطور (Fetching Logic) ---
   
   useEffect(() => {
     if (!user) {
@@ -64,89 +94,82 @@ export const UIProvider = ({ children }) => {
         return;
     }
     
-    // أ. جلب إشعارات المستخدم الشخصية (Invites, Support Replies, etc.)
+    const unsubscribers = [];
+
+    // أ. جلب إشعارات المستخدم الشخصية (للجميع)
     const myNotifsQuery = query(
         collection(db, "notifications"), 
         where("userId", "==", user.uid)
     );
     
     const unsubMy = onSnapshot(myNotifsQuery, (snap) => {
-        const myData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        
-        setNotifications(prev => {
-            // تصفية الإشعارات القديمة ودمج الجديدة مع إشعارات الأدمن إن وجدت
-            const adminNotifs = prev.filter(n => n.target === 'admin');
-            const all = [...adminNotifs, ...myData];
-            // إزالة التكرار بناءً على الـ ID
-            const unique = Array.from(new Map(all.map(item => [item.id, item])).values());
-            // الترتيب من الأحدث للأقدم
-            return unique.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-        });
-    }, (error) => console.error("Notification Sync Error:", error));
+        updateNotificationsState(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    unsubscribers.push(unsubMy);
 
-    // ب. جلب إشعارات الإدارة (Support Tickets Alerts) - فقط للأدمن الرئيسي
-    let unsubAdmin = () => {};
-    if (user.email === MASTER_EMAIL) {
+    // ب. جلب إشعارات الإدارة (للأدمن فقط) - الردود والتبليغات
+    if (isAdmin) {
         const adminQuery = query(
             collection(db, "notifications"), 
             where("target", "==", "admin")
         );
         
-        unsubAdmin = onSnapshot(adminQuery, (snap) => {
-            const adminData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            
-            setNotifications(prev => {
-                const userNotifs = prev.filter(n => n.target !== 'admin');
-                const all = [...userNotifs, ...adminData];
-                const unique = Array.from(new Map(all.map(item => [item.id, item])).values());
-                return unique.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-            });
+        const unsubAdmin = onSnapshot(adminQuery, (snap) => {
+            updateNotificationsState(snap.docs.map(d => ({ id: d.id, ...d.data() })), true);
         });
+        unsubscribers.push(unsubAdmin);
     }
 
     return () => { 
-        unsubMy(); 
-        unsubAdmin(); 
+        unsubscribers.forEach(unsub => unsub());
     };
-  }, [user]);
+  }, [user, isAdmin]);
 
-  // حذف إشعار بعد التفاعل معه
+  // دالة مساعدة لدمج الإشعارات ومنع التكرار
+  const updateNotificationsState = (newDocs, isAdminSource = false) => {
+      setNotifications(prev => {
+          // دمج القائمة الحالية مع الجديدة
+          let merged = [];
+          if (isAdminSource) {
+              const userOnly = prev.filter(n => n.target !== 'admin');
+              merged = [...userOnly, ...newDocs];
+          } else {
+              const adminOnly = prev.filter(n => n.target === 'admin');
+              merged = [...adminOnly, ...newDocs];
+          }
+
+          // إزالة التكرار بناءً على ID
+          const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
+          
+          // الترتيب من الأحدث للأقدم
+          return unique.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      });
+  };
+
+  // حذف إشعار (يدوي)
   const removeNotification = async (id) => {
     try { 
         await deleteDoc(doc(db, "notifications", id)); 
-        setNotifications(prev => prev.filter(n => n.id !== id));
     } catch (e) { 
         console.error("Failed to delete notification record:", e); 
+        // تحديث محلي احتياطي
+        setNotifications(prev => prev.filter(n => n.id !== id));
     }
   };
 
-  // --- 5. تصدير القيم (Context Value) ---
   const value = {
-      // رؤية الصفحات والمودالز
-      currentView, 
-      setCurrentView, 
-      activeCategory, 
-      setActiveCategory,
-      showSupport, 
-      setShowSupport,
-      activeOverlayGame, 
-      setActiveOverlayGame,
-      
-      // الإشعارات
-      notifications, 
-      removeNotification,
-      
-      // البث المباشر
+      currentView, setCurrentView, 
+      activeCategory, setActiveCategory,
+      showSupport, setShowSupport,
+      activeOverlayGame, setActiveOverlayGame,
+      notifications, removeNotification,
       liveState: liveStream, 
-      startBroadcast, 
-      endBroadcast, 
-      toggleMinimize
+      startBroadcast, endBroadcast, toggleMinimize
   };
 
   return <UIContext.Provider value={value}>{children}</UIContext.Provider>;
 };
 
-// هوك الاستخدام (Consumer Hook)
 export const useUI = () => {
   const context = useContext(UIContext);
   if (!context) {
