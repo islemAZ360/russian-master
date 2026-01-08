@@ -11,7 +11,7 @@ import {
   IconBroadcast, IconMessage2, IconBan, IconTrash, 
   IconMenu2, IconSend, IconDeviceGamepad, IconHome, 
   IconUserMinus, IconMessages, IconMessagePlus, IconSearch,
-  IconSchool, IconUnlink, IconActivity
+  IconSchool, IconUnlink, IconActivity, IconLock, IconWorld, IconPencil, IconCheck, IconX
 } from '@tabler/icons-react';
 import { useUI } from '@/context/UIContext';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -46,8 +46,14 @@ export default function AdminDashboard({ currentUser }) {
   const [replyText, setReplyText] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   
+  // حالات الدردشة والتعديل
   const [browsingChat, setBrowsingChat] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
+  
+  // حالة الرسالة التي يتم تعديلها حالياً
+  const [editingMsgId, setEditingMsgId] = useState(null);
+  const [editContent, setEditContent] = useState("");
+
   const chatEndRef = useRef(null);
 
   // --- جلب البيانات ---
@@ -60,6 +66,7 @@ export default function AdminDashboard({ currentUser }) {
         setTickets(snap.docs.map(d => ({id: d.id, ...d.data()})));
     });
     
+    // جلب كل المحادثات (بما فيها الخاصة) لأن قواعد الأمان تسمح للأدمن بذلك
     const unsubChats = onSnapshot(collection(db, "chats"), (snap) => {
         setChats(snap.docs.map(d => ({id: d.id, ...d.data()})));
     });
@@ -101,7 +108,7 @@ export default function AdminDashboard({ currentUser }) {
       try {
           await updateDoc(doc(db, "users", studentId), {
               teacherId: deleteField(),
-              role: 'user' // إعادة تعيين الرتبة لمستخدم عادي
+              role: 'user' 
           });
           alert("Link severed.");
       } catch (e) { console.error(e); }
@@ -124,28 +131,25 @@ export default function AdminDashboard({ currentUser }) {
       if (existingTicket) { 
           setSelectedTicket(existingTicket); 
       } else {
-          // إنشاء تذكرة افتراضية للبدء
           setSelectedTicket({ 
               id: targetUser.id, 
               userEmail: targetUser.email, 
               userId: targetUser.id, 
               messages: [], 
               status: 'initiated_by_admin', 
-              isVirtual: true // لم يتم حفظها في قاعدة البيانات بعد
+              isVirtual: true
           });
       }
       setActiveView('support'); 
       setIsMobileMenuOpen(false);
   };
 
-  // --- FIX: إرسال الرد مع الإشعار ---
   const sendSupportReply = async () => {
       if(!selectedTicket || !replyText.trim()) return;
       try {
           const ticketRef = doc(db, "support_tickets", selectedTicket.id);
           const newMsg = { text: replyText, sender: 'admin', time: Date.now() };
           
-          // 1. حفظ الرسالة في تذكرة الدعم
           if (selectedTicket.isVirtual) {
               await setDoc(ticketRef, { 
                   userId: selectedTicket.id, 
@@ -163,11 +167,10 @@ export default function AdminDashboard({ currentUser }) {
               });
           }
 
-          // 2. 🔥 إرسال إشعار للمستخدم (الجزء الجديد)
           await addDoc(collection(db, "notifications"), {
-              userId: selectedTicket.userId, // المستلم
+              userId: selectedTicket.userId, 
               target: 'user',
-              type: "support_reply", // سيقوم بفتح نافذة الدعم عند النقر
+              type: "support_reply",
               title: "📩 INCOMING TRANSMISSION",
               message: `Admin Command: "${replyText.substring(0, 30)}${replyText.length>30?'...':''}"`,
               senderId: currentUser.uid,
@@ -180,13 +183,31 @@ export default function AdminDashboard({ currentUser }) {
   };
 
   const deleteMessage = async (msgId) => { 
-      if (confirm("Delete this message?")) 
+      if (confirm("Delete this message permanently?")) 
           await deleteDoc(doc(db, "chats", browsingChat.id, "messages", msgId)); 
   };
 
-  const kickUserFromChat = async (chatId, userId) => { 
-      if (confirm("Kick user from squad?")) 
-          await updateDoc(doc(db, "chats", chatId), { members: arrayRemove(userId) }); 
+  // --- منطق تعديل الرسالة ---
+  const startEditing = (msg) => {
+      setEditingMsgId(msg.id);
+      setEditContent(msg.text);
+  };
+
+  const saveEditedMessage = async () => {
+      if (!editContent.trim()) return;
+      try {
+          await updateDoc(doc(db, "chats", browsingChat.id, "messages", editingMsgId), {
+              text: editContent,
+              isEdited: true,
+              editedBy: 'admin',
+              editedAt: serverTimestamp()
+          });
+          setEditingMsgId(null);
+          setEditContent("");
+      } catch (e) {
+          console.error("Update failed:", e);
+          alert("Failed to update message.");
+      }
   };
 
   const filteredUsers = users.filter(u => 
@@ -388,7 +409,7 @@ export default function AdminDashboard({ currentUser }) {
                     </div>
                 )}
 
-                {/* 4. Chat Control */}
+                {/* 4. Chat Control (Enhanced) */}
                 {activeView === 'chat_control' && (
                     <div className="h-full flex flex-col md:flex-row overflow-hidden animate-in fade-in duration-500">
                         <div className={`w-full md:w-80 border-r border-white/10 bg-black/30 flex flex-col shrink-0 ${browsingChat ? 'hidden md:flex' : 'flex'}`}>
@@ -398,9 +419,13 @@ export default function AdminDashboard({ currentUser }) {
                                     <div key={chat.id} onClick={() => setBrowsingChat(chat)} className={`p-5 rounded-2xl cursor-pointer transition-all border group flex flex-col gap-2 ${browsingChat?.id === chat.id ? 'bg-indigo-600/10 border-indigo-600/50 shadow-[0_0_20px_rgba(79,70,229,0.1)]' : 'bg-white/5 border-transparent hover:bg-white/10 hover:border-white/20'}`}>
                                         <div className="flex justify-between items-start">
                                             <h3 className="font-black text-white text-base leading-tight truncate w-3/4 group-hover:text-indigo-400 transition-colors uppercase tracking-tighter">{chat.name}</h3>
+                                            {/* أيقونة القفل للمحادثات الخاصة */}
+                                            {chat.type === 'private' ? <IconLock size={14} className="text-orange-500"/> : <IconWorld size={14} className="text-cyan-500"/>}
                                         </div>
                                         <div className="flex items-center gap-3 text-[9px] font-mono text-gray-500 uppercase tracking-widest">
                                             <span>{chat.members?.length || 0} Agents</span>
+                                            {/* عرض اسم المنشئ */}
+                                            {chat.createdBy && <span className="text-white/30">ID: {chat.createdBy.substring(0,6)}</span>}
                                         </div>
                                     </div>
                                 ))}
@@ -411,7 +436,10 @@ export default function AdminDashboard({ currentUser }) {
                             {browsingChat ? (
                                 <>
                                     <div className="p-6 bg-white/[0.02] border-b border-white/10 flex justify-between items-center shadow-xl shrink-0 z-10">
-                                        <h3 className="font-black text-indigo-400 uppercase tracking-tighter text-2xl leading-none">{browsingChat.name}</h3>
+                                        <div className="flex items-center gap-3">
+                                            <button onClick={() => setBrowsingChat(null)} className="md:hidden p-2 bg-white/5 rounded text-white"><IconMessages/></button>
+                                            <h3 className="font-black text-indigo-400 uppercase tracking-tighter text-2xl leading-none">{browsingChat.name}</h3>
+                                        </div>
                                         <button onClick={() => { if(confirm("Terminate channel?")) deleteDoc(doc(db, "chats", browsingChat.id)) }} className="px-4 py-2 bg-red-950/40 text-red-500 rounded-xl border border-red-500/30 font-black text-[10px] uppercase tracking-widest transition-all hover:bg-red-600 hover:text-white"><IconTrash size={16} className="inline mr-1"/> Terminate</button>
                                     </div>
                                     <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar bg-opacity-5 relative">
@@ -419,10 +447,50 @@ export default function AdminDashboard({ currentUser }) {
                                             <div key={msg.id} className="group flex flex-col gap-2 max-w-[85%] animate-in fade-in">
                                                 <div className="flex items-center gap-3">
                                                     <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest bg-indigo-500/5 px-2 py-0.5 rounded-md border border-indigo-500/20">{msg.senderName}</span>
+                                                    {msg.isEdited && <span className="text-[8px] text-white/30 font-mono">(EDITED BY ADMIN)</span>}
                                                 </div>
+                                                
                                                 <div className="relative group/msg">
-                                                    <div className="p-5 rounded-3xl bg-zinc-900/60 border border-white/5 text-sm text-zinc-300 shadow-xl backdrop-blur-sm group-hover/msg:border-red-500/30 transition-all leading-relaxed">{msg.text}</div>
-                                                    <button onClick={() => deleteMessage(msg.id)} className="absolute -right-12 top-1/2 -translate-y-1/2 p-3 bg-red-600/10 text-red-500 border border-red-500/20 rounded-2xl opacity-0 group-hover/msg:opacity-100 transition-all hover:bg-red-600 hover:text-white shadow-2xl scale-75 group-hover/msg:scale-100"><IconTrash size={18}/></button>
+                                                    {editingMsgId === msg.id ? (
+                                                        // وضع التعديل
+                                                        <div className="flex flex-col gap-2 p-4 bg-zinc-900 border border-indigo-500/50 rounded-2xl">
+                                                            <textarea 
+                                                                value={editContent} 
+                                                                onChange={(e) => setEditContent(e.target.value)}
+                                                                className="w-full bg-black/50 border-0 text-white text-sm p-2 rounded outline-none resize-none"
+                                                                rows={3}
+                                                            />
+                                                            <div className="flex gap-2 justify-end">
+                                                                <button onClick={saveEditedMessage} className="p-2 bg-emerald-600 rounded-lg text-white hover:bg-emerald-500"><IconCheck size={16}/></button>
+                                                                <button onClick={() => setEditingMsgId(null)} className="p-2 bg-zinc-700 rounded-lg text-white hover:bg-zinc-600"><IconX size={16}/></button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        // وضع العرض
+                                                        <div className="p-5 rounded-3xl bg-zinc-900/60 border border-white/5 text-sm text-zinc-300 shadow-xl backdrop-blur-sm group-hover/msg:border-white/10 transition-all leading-relaxed">
+                                                            {msg.text}
+                                                        </div>
+                                                    )}
+
+                                                    {/* أزرار الإجراءات (تظهر عند التحويم) */}
+                                                    {editingMsgId !== msg.id && (
+                                                        <div className="absolute -right-24 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover/msg:opacity-100 transition-all">
+                                                            <button 
+                                                                onClick={() => startEditing(msg)} 
+                                                                className="p-2 bg-indigo-600/10 text-indigo-400 border border-indigo-500/20 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-lg"
+                                                                title="Edit Message"
+                                                            >
+                                                                <IconPencil size={16}/>
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => deleteMessage(msg.id)} 
+                                                                className="p-2 bg-red-600/10 text-red-500 border border-red-500/20 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-lg"
+                                                                title="Delete Message"
+                                                            >
+                                                                <IconTrash size={16}/>
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
