@@ -50,7 +50,7 @@ export default function Page() {
   const { t, dir, isLoaded } = useLanguage();
   const { speak, playSFX } = useAudio();
   
-  // 2. إدارة حالة نظام الدراسة (مع الأخذ في الاعتبار أدوار المستخدم)
+  // 2. إدارة حالة نظام الدراسة
   const { 
     cards, currentCard, stats, handleSwipe, 
     resetProgress, addCard, deleteCard, updateCard, 
@@ -89,40 +89,35 @@ export default function Page() {
     const iconClass = "w-full transition-all duration-300";
     let links = [];
 
-    // --- واجهة الأستاذ (Teacher Interface) ---
-    if (isTeacher) {
+    // --- واجهة الأستاذ (فقط إذا لم يكن أدمن) ---
+    // التعديل: (isTeacher && !isAdmin) يضمن أن الأدمن لا يعامل كأستاذ هنا
+    if (isTeacher && !isAdmin) {
       links = [
-        // 1. إدارة قاعدة البيانات (Content)
         { 
             title: t('nav_create_db') || "DB", 
             icon: <IconPencil className={`${iconClass} text-emerald-400`} />, 
             onClick: () => setCurrentView('teacher_db') 
         },
-        // 2. إدارة الطلاب (TeacherStudents.jsx)
         { 
             title: t('nav_students') || "Students", 
             icon: <IconUsers className={`${iconClass} text-cyan-400`} />, 
             onClick: () => setCurrentView('teacher_students') 
         },
-        // 3. الإحصائيات (TeacherProgress.jsx)
         { 
             title: t('nav_progress') || "Stats", 
             icon: <IconChartBar className={`${iconClass} text-yellow-400`} />, 
             onClick: () => setCurrentView('teacher_progress') 
         },
-        // 4. المحادثة (الآن يمكنه الحذف)
         { 
             title: t('nav_chat') || "Chat", 
             icon: <IconMessageCircle className={`${iconClass} text-blue-400`} />, 
             onClick: () => setCurrentView('chat') 
         },
-        // 5. البث المباشر
         { 
             title: t('nav_live') || "Live", 
             icon: <IconBroadcast className={`${iconClass} text-red-500`} />, 
             onClick: () => setCurrentView('live') 
         },
-        // 6. الإعدادات
         { 
             title: t('nav_settings') || "Config", 
             icon: <IconSettings className={`${iconClass} text-zinc-400`} />, 
@@ -130,7 +125,7 @@ export default function Page() {
         },
       ];
     } 
-    // --- واجهة الطالب (Student Interface) ---
+    // --- واجهة الطالب ---
     else if (isStudent) {
       links = [
         { title: t('nav_study') || "Mission", icon: <IconCpu className={`${iconClass} text-purple-400`} />, onClick: () => setCurrentView('category') },
@@ -141,7 +136,7 @@ export default function Page() {
         { title: t('nav_settings') || "Config", icon: <IconSettings className={`${iconClass} text-zinc-400`} />, onClick: () => setCurrentView('settings') },
       ];
     }
-    // --- واجهة المستخدم العادي / الأدمن ---
+    // --- واجهة المستخدم العادي + الأدمن ---
     else {
       links = [
         { title: t('nav_home'), icon: <IconHome className={`${iconClass} text-white/70`} />, onClick: () => setCurrentView('home') },
@@ -154,6 +149,7 @@ export default function Page() {
         { title: t('nav_settings'), icon: <IconSettings className={`${iconClass} text-zinc-400`} />, onClick: () => setCurrentView('settings') },
       ];
 
+      // إضافة زر الأدمن فقط للأدمن
       if (isAdmin) {
         links.push({ title: t('nav_admin'), icon: <IconShield className={`${iconClass} text-red-600`} />, onClick: () => setCurrentView('admin_panel') });
       } else {

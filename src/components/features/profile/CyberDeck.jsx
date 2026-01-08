@@ -11,15 +11,15 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// --- تكوين الرتب ---
+// تكوين الرتب (يجب أن يطابق militaryRanks.js تقريباً للعرض)
 const RANKS_CONFIG = [
     { id: "recruit", min: 0, color: "text-zinc-400", bg: "bg-zinc-500", icon: <IconUser /> },
-    { id: "soldier", min: 100, color: "text-emerald-400", bg: "bg-emerald-500", icon: <IconTarget /> },
-    { id: "hacker", min: 500, color: "text-cyan-400", bg: "bg-cyan-500", icon: <IconActivity /> },
-    { id: "elite", min: 1500, color: "text-violet-400", bg: "bg-violet-500", icon: <IconMedal /> },
-    { id: "commander", min: 3000, color: "text-orange-400", bg: "bg-orange-500", icon: <IconTrophy /> },
-    { id: "legend", min: 5000, color: "text-yellow-400", bg: "bg-yellow-500", icon: <IconCrown /> },
-    { id: "cybergod", min: 10000, color: "text-red-500", bg: "bg-red-500", icon: <IconFlame /> },
+    { id: "private", min: 500, color: "text-emerald-400", bg: "bg-emerald-500", icon: <IconTarget /> },
+    { id: "corporal", min: 1500, color: "text-cyan-400", bg: "bg-cyan-500", icon: <IconActivity /> },
+    { id: "lieutenant", min: 7500, color: "text-violet-400", bg: "bg-violet-500", icon: <IconMedal /> },
+    { id: "major", min: 30000, color: "text-orange-400", bg: "bg-orange-500", icon: <IconTrophy /> },
+    { id: "general", min: 120000, color: "text-red-500", bg: "bg-red-500", icon: <IconCrown /> },
+    { id: "cybergod", min: 500000, color: "text-yellow-400", bg: "bg-yellow-500", icon: <IconFlame /> },
 ];
 
 const SkillRadar = ({ stats, color }) => {
@@ -259,7 +259,6 @@ export default function CyberDeck({ user, stats, cards = [] }) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {RANKS_CONFIG.map((r, i) => {
-                    if (i === 0) return null;
                     const isUnlocked = analytics.xp >= r.min;
                     
                     return (
@@ -280,7 +279,7 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                                 </div>
                                 <div>
                                     <h4 className={`text-lg font-black tracking-tight uppercase ${isUnlocked ? 'text-white' : 'text-white/20'}`}>
-                                        {t(`rank_${r.id}`)}
+                                        {t(`rank_${r.id}`) || r.id}
                                     </h4>
                                     <p className="text-[9px] font-mono text-white/30 uppercase tracking-widest mt-1">
                                         {isUnlocked ? t('profile_unlocked') : `${t('profile_requires')} ${r.min} XP`}

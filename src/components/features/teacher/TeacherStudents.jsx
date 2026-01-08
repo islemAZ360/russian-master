@@ -1,13 +1,13 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, orderBy, limit } from "firebase/firestore";
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, limit, orderBy } from "firebase/firestore";
 import { 
   IconUserPlus, IconSearch, IconUsers, IconUser, 
   IconCheck, IconLoader2, IconSchool, IconShield,
-  IconSend, IconMailForward
+  IconSend, IconMailForward, IconRefresh
 } from '@tabler/icons-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 
@@ -21,44 +21,49 @@ export default function TeacherStudents() {
   const [allUsers, setAllUsers] = useState([]); // المستخدمون المحتملون للتجنيد
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [invitedUsers, setInvitedUsers] = useState([]); // لتتبع من تم إرسال الدعوة لهم في هذه الجلسة
+  const [invitedUsers, setInvitedUsers] = useState([]); 
 
-  // 1. جلب طلابي الحاليين (My Squad)
+  // 1. جلب طلابي الحاليين (My Squad) - مع معالجة الأخطاء
   useEffect(() => {
     if (!user) return;
     
+    // استعلام بسيط ومباشر لجلب الطلاب المرتبطين بهذا الأستاذ
     const q = query(
       collection(db, "users"), 
       where("teacherId", "==", user.uid)
     );
     
     const unsub = onSnapshot(q, (snap) => {
-      setMyStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const studentsList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      console.log("My Students Found:", studentsList.length); // للتأكد في الكونسول
+      setMyStudents(studentsList);
       setLoading(false);
+    }, (error) => {
+        console.error("Error fetching students:", error);
+        setLoading(false);
     });
     
     return () => unsub();
   }, [user]);
 
   // 2. جلب المستخدمين للتجنيد (Recruitment Pool)
-  // نجلب المستخدمين الذين ليسوا أساتذة ولا أدمن، وليسوا طلابي بالفعل
   useEffect(() => {
     if (activeTab === 'recruit') {
         const fetchPotentialRecruits = async () => {
             setLoading(true);
             try {
-                // جلب آخر 100 مستخدم (أو الكل حسب حجم الداتا)
-                // يفضل هنا استخدام دالة سحابية للبحث الحقيقي، لكن هذا سيعمل للنسخ الأولية
+                // جلب المستخدمين العاديين فقط
                 const q = query(
                     collection(db, "users"),
-                    where("role", "==", "user"), // فقط المستخدمين العاديين
-                    limit(100)
+                    where("role", "==", "user"), 
+                    limit(50) 
                 );
                 
                 const snap = await getDocs(q);
+                // استبعاد الطلاب الذين يتبعون لي بالفعل
                 const users = snap.docs
                     .map(d => ({ id: d.id, ...d.data() }))
-                    .filter(u => u.teacherId !== user.uid); // استبعاد طلابي الحاليين
+                    .filter(u => u.teacherId !== user.uid);
                 
                 setAllUsers(users);
             } catch (e) {
@@ -76,15 +81,13 @@ export default function TeacherStudents() {
       if (!user) return;
       
       try {
-          // إضافة إشعار للمستخدم المستهدف
           await addDoc(collection(db, "notifications"), {
-              userId: targetUser.id,      // المستلم
-              target: 'student',          // نوع الهدف
-              type: 'invite',             // نوع الإشعار (مهم جداً ليظهر زر القبول)
+              userId: targetUser.id,      
+              target: 'student',          
+              type: 'invite',             
               title: "🎓 SQUAD INVITATION",
               message: `Commander ${user.displayName || "Teacher"} invited you to join their squad.`,
               
-              // بيانات ضرورية لعملية القبول
               actionPayload: {
                   teacherId: user.uid,
                   teacherName: user.displayName || "Teacher",
@@ -96,16 +99,14 @@ export default function TeacherStudents() {
               read: false
           });
 
-          // تحديث الحالة المحلية لإظهار علامة الصح
           setInvitedUsers(prev => [...prev, targetUser.id]);
           
       } catch (error) {
           console.error("Invite Failed:", error);
-          alert("Failed to send invite signal.");
+          alert("Failed to send invite.");
       }
   };
 
-  // تصفية المستخدمين في البحث
   const filteredRecruits = allUsers.filter(u => 
       u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
       u.email?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -148,10 +149,15 @@ export default function TeacherStudents() {
         {/* Content Area */}
         <div className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-6 shadow-2xl relative overflow-hidden flex flex-col">
             
-            {/* === Tab 1: My Squad (الطلاب الحاليين) === */}
+            {/* === Tab 1: My Squad === */}
             {activeTab === 'my_squad' && (
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
-                    {myStudents.length === 0 ? (
+                    {loading && myStudents.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center gap-4 text-cyan-500/50">
+                            <IconLoader2 className="animate-spin" size={32}/>
+                            <span className="text-xs font-black uppercase tracking-widest">Syncing Squad Data...</span>
+                        </div>
+                    ) : myStudents.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center opacity-30 text-center">
                             <IconSchool size={64} className="mb-4 text-cyan-500"/>
                             <h3 className="text-lg font-black uppercase tracking-widest">Squad Empty</h3>
@@ -171,7 +177,7 @@ export default function TeacherStudents() {
                                         <img src={student.photoURL || "/avatars/avatar1.png"} className="w-full h-full object-cover"/>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-white font-bold truncate uppercase">{student.displayName}</div>
+                                        <div className="text-white font-bold truncate uppercase">{student.displayName || "Unknown Agent"}</div>
                                         <div className="text-[10px] text-emerald-500 font-mono flex items-center gap-1">
                                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                             OPERATIVE
@@ -188,10 +194,10 @@ export default function TeacherStudents() {
                 </div>
             )}
 
-            {/* === Tab 2: Recruit (البحث والدعوة) === */}
+            {/* === Tab 2: Recruit === */}
             {activeTab === 'recruit' && (
                 <div className="flex flex-col h-full">
-                    {/* شريط البحث */}
+                    {/* Search */}
                     <div className="relative mb-6">
                         <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" size={20}/>
                         <input 
@@ -210,7 +216,7 @@ export default function TeacherStudents() {
                             </div>
                         ) : filteredRecruits.length === 0 ? (
                             <div className="text-center py-20 opacity-30">
-                                <p className="text-xs font-black uppercase tracking-widest">{t('recruit_no_results') || "No candidates found matching criteria"}</p>
+                                <p className="text-xs font-black uppercase tracking-widest">{t('recruit_no_results') || "No candidates found"}</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -230,7 +236,7 @@ export default function TeacherStudents() {
                                                     <img src={candidate.photoURL || "/avatars/avatar1.png"} className="w-full h-full object-cover"/>
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <div className="text-white font-bold text-sm truncate uppercase">{candidate.displayName || "Unknown User"}</div>
+                                                    <div className="text-white font-bold text-sm truncate uppercase">{candidate.displayName || "Unknown"}</div>
                                                     <div className="text-[10px] text-white/30 font-mono truncate">{candidate.email}</div>
                                                 </div>
                                             </div>
