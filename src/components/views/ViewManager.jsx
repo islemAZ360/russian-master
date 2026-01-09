@@ -22,8 +22,7 @@ import SettingsViewWrapper from './SettingsViewWrapper';
 import CommunicationHub from '@/components/features/chat/CommunicationHub';
 import { CategorySelect } from '@/components/features/study/CategorySelect';
 
-// === استيراد صفحات الأستاذ (Recruitment & Analytics) ===
-// هذه هي المكونات الجديدة التي قمنا بإضافتها
+// === استيراد صفحات الأستاذ ===
 import TeacherStudents from '@/components/features/teacher/TeacherStudents';
 import TeacherProgress from '@/components/features/teacher/TeacherProgress';
 
@@ -32,14 +31,30 @@ export default function ViewManager(props) {
   const { isJunior, isAdmin, isTeacher, isStudent } = useAuth();
   const { dir, isLoaded, t } = useLanguage();
 
-  // إعدادات الحركة (Transitions)
+  // تعديل إعدادات الحركة لمنع الاختفاء المفاجئ
   const pageVariants = {
-    initial: { opacity: 0, scale: 0.98, filter: "blur(4px)" },
-    animate: { opacity: 1, scale: 1, filter: "blur(0px)", transition: { duration: 0.3, ease: "easeOut" } },
-    exit: { opacity: 0, scale: 1.02, filter: "blur(4px)", transition: { duration: 0.2, ease: "easeIn" } }
+    initial: { 
+      opacity: 0, 
+      scale: 0.98, 
+      filter: "blur(4px)",
+      y: 10 
+    },
+    animate: { 
+      opacity: 1, 
+      scale: 1, 
+      filter: "blur(0px)", 
+      y: 0,
+      transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } // حركة سلسة جداً
+    },
+    exit: { 
+      opacity: 0, 
+      scale: 1.02, 
+      filter: "blur(4px)", 
+      transition: { duration: 0.3, ease: "easeIn" } 
+    }
   };
 
-  // مكون فرعي لعرض رسالة "ممنوع الدخول" (Security Gate)
+  // مكون فرعي لعرض رسالة "ممنوع الدخول"
   const AccessDenied = () => (
     <div className="h-full flex flex-col items-center justify-center text-red-500 font-mono tracking-widest gap-4 text-center p-4">
         <IconAlertTriangle size={64} className="animate-pulse" />
@@ -54,19 +69,14 @@ export default function ViewManager(props) {
     </div>
   );
 
-  // دالة تحديد المحتوى المعروض (Routing Logic)
+  // دالة تحديد المحتوى المعروض
   const renderViewContent = () => {
     switch (currentView) {
-      // --- الصفحة الرئيسية ---
       case 'home': return <HeroView />;
-      
-      // --- لوحة التحكم (للأدمن فقط) ---
-      // تم ربط AdminDashboard هنا
       case 'admin_panel': return (isJunior || isAdmin) ? <AdminView /> : <AccessDenied />;
 
-      // === واجهات الأستاذ (Teacher Interfaces) ===
-      
-      case 'teacher_db': // صفحة إنشاء وتعديل المحتوى (Create Content)
+      // === واجهات الأستاذ ===
+      case 'teacher_db': 
         if (!isTeacher) return <AccessDenied />;
         return (
           <DataView 
@@ -74,25 +84,24 @@ export default function ViewManager(props) {
             addCard={props.addCard} 
             deleteCard={props.deleteCard} 
             updateCard={props.updateCard} 
-            readOnly={false} // الأستاذ لديه صلاحية التعديل
+            readOnly={false} 
           />
         );
 
-      case 'teacher_students': // صفحة التجنيد وإدارة الطلاب
+      case 'teacher_students': 
         if (!isTeacher) return <AccessDenied />;
         return <TeacherStudents />; 
 
-      case 'teacher_progress': // صفحة التحليلات المتقدمة
+      case 'teacher_progress': 
         if (!isTeacher) return <AccessDenied />;
         return <TeacherProgress />; 
 
-      // === الواجهات العامة والمشتركة ===
-
+      // === الواجهات العامة ===
       case 'games': return <GamesView />;
       case 'live': return <LiveView />;
       case 'chat': return <CommunicationHub />;
       
-      case 'category': // اختيار الوحدة الدراسية
+      case 'category': 
         return (
           <CategorySelect 
             categories={props.categories} 
@@ -102,7 +111,7 @@ export default function ViewManager(props) {
           />
         );
 
-      case 'study': // شاشة الدراسة (Flashcards)
+      case 'study': 
         return (
           <StudyView 
             cards={props.cards} 
@@ -115,9 +124,7 @@ export default function ViewManager(props) {
           />
         );
 
-      case 'data': // عرض الأرشيف (للطالب للعرض فقط، وللأدمن للتعديل)
-        // الطالب يرى المحتوى لكن لا يعدله (readOnly = true)
-        // الأستاذ يدخل عبر teacher_db للتعديل، لكن هنا نمنح الصلاحية للأدمن أيضاً
+      case 'data': 
         const canEdit = isAdmin || isJunior; 
         return (
           <DataView 
@@ -136,7 +143,7 @@ export default function ViewManager(props) {
     }
   };
 
-  // شاشة تحميل أولية لمنع الوميض
+  // شاشة تحميل
   if (!isLoaded) {
     return (
       <div className="flex items-center justify-center h-full w-full bg-[#050505]">
@@ -151,21 +158,33 @@ export default function ViewManager(props) {
   }
 
   return (
-    <div className="w-full h-full relative flex flex-col items-center" dir={dir}>
-        <AnimatePresence mode="wait">
+    // إضافة overflow-hidden و relative للحاوية الرئيسية لضمان بقاء المحتوى داخل الحدود
+    <div className="w-full h-full relative flex flex-col items-center overflow-hidden" dir={dir}>
+        {/* 
+            التعديل الجوهري هنا:
+            1. mode="popLayout": يسمح بالانتقال المتداخل (Cross-fade) بدلاً من الانتظار (Wait).
+            2. initial={false}: يمنع تشغيل حركة الدخول عند تحميل الصفحة لأول مرة (يمنع الوميض).
+        */}
+        <AnimatePresence mode="popLayout" initial={false}>
           <motion.div 
             key={currentView}
             variants={pageVariants}
             initial="initial"
             animate="animate"
             exit="exit"
-            className="w-full h-full flex flex-col flex-1"
+            // استخدام absolute مع w-full h-full يضمن أن الصفحة الجديدة تأخذ مكان القديمة فوراً
+            // بدون أن تدفعها للأسفل، مما يحل مشكلة الانهيار (Layout Shift)
+            className="w-full h-full flex flex-col flex-1 absolute top-0 left-0 overflow-y-auto custom-scrollbar"
+            // إضافة مفتاح فريد لضمان إعادة التصيير بشكل صحيح
+            style={{ position: 'absolute', width: '100%', height: '100%' }}
           >
-            {renderViewContent()}
+            {/* حاوية داخلية للمحتوى مع هامش آمن */}
+            <div className="w-full min-h-full pb-24">
+                {renderViewContent()}
+            </div>
           </motion.div>
         </AnimatePresence>
         
-        {/* إصلاحات CSS للتخطيط */}
         <style jsx global>{`
             .view-container { 
                 scrollbar-gutter: stable; 
