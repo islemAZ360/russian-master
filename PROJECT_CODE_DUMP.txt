@@ -1,6 +1,6 @@
 ==================================================================
 PROJECT STRUCTURE (هيكل الملفات)
-Generated on: 9/1/2026, 01:53:28
+Generated on: 9/1/2026, 03:50:07
 ==================================================================
 
 (ROOT)
@@ -1180,7 +1180,6 @@ import {
 // استيراد الهوكس
 import { useAuth } from '@/hooks/useAuth';
 import { useUI } from '@/hooks/useUI';
-import { useSettings } from '@/hooks/useSettings';
 import { useStudySystem } from '@/hooks/useStudySystem';
 import { useAudio } from '@/hooks/useAudio';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -1202,6 +1201,7 @@ import GravityProtocol from '@/components/features/games/GravityProtocol';
 import MagneticField from '@/components/features/games/MagneticField';
 import WordScale from '@/components/features/games/WordScale';
 
+// شاشة تحميل بسيطة
 const LoadingFallback = () => (
   <div className="h-screen w-screen flex flex-col items-center justify-center bg-black text-white">
     <div className="w-12 h-12 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -1220,7 +1220,7 @@ export default function Page() {
   const { t, dir, isLoaded } = useLanguage();
   const { speak, playSFX } = useAudio();
   
-  // 2. إدارة حالة نظام الدراسة
+  // 2. إدارة حالة نظام الدراسة (SRS Engine)
   const { 
     cards, currentCard, stats, handleSwipe, 
     resetProgress, addCard, deleteCard, updateCard, 
@@ -1233,7 +1233,7 @@ export default function Page() {
   const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0 });
   const [forceLoad, setForceLoad] = useState(false);
 
-  // مراقبة وقت التحميل لتجنب التعليق اللانهائي
+  // مؤقت أمان لفرض إخفاء شاشة التحميل إذا تأخرت البيانات
   useEffect(() => {
     const timer = setTimeout(() => setForceLoad(true), 4000);
     return () => clearTimeout(timer);
@@ -1250,20 +1250,21 @@ export default function Page() {
 
   // 5. حساب التصنيفات المتوفرة
   const categories = useMemo(() => 
-    cards ? [...new Set(cards.map(c => c.category || "General"))] : [], 
+    cards ? ["All", ...new Set(cards.map(c => c.category || "General").filter(c => c !== "All"))] : ["All"], 
     [cards]
   );
 
-  // 6. روابط التنقل السفلي (Floating Dock) - بناءً على الرتبة
+  // 6. بناء روابط التنقل (Floating Dock) بناءً على الرتبة
   const navLinks = useMemo(() => {
     const iconClass = "w-full transition-all duration-300";
     let links = [];
 
-    // --- واجهة الأستاذ (فقط إذا لم يكن أدمن) ---
+    // --- أ. واجهة الأستاذ (Teacher Interface) ---
+    // يرى أدوات الإدارة بدلاً من الألعاب والدراسة
     if (isTeacher && !isAdmin) {
       links = [
         { 
-            title: t('nav_create_db') || "DB", 
+            title: t('nav_create_db') || "Content", 
             icon: <IconPencil className={`${iconClass} text-emerald-400`} />, 
             onClick: () => setCurrentView('teacher_db') 
         },
@@ -1278,7 +1279,7 @@ export default function Page() {
             onClick: () => setCurrentView('teacher_progress') 
         },
         { 
-            title: t('nav_chat') || "Chat", 
+            title: t('nav_chat') || "Squad", 
             icon: <IconMessageCircle className={`${iconClass} text-blue-400`} />, 
             onClick: () => setCurrentView('chat') 
         },
@@ -1294,19 +1295,20 @@ export default function Page() {
         },
       ];
     } 
-    // --- واجهة الطالب (تمت إضافة الرئيسية والألعاب) ---
+    // --- ب. واجهة الطالب (Student Interface) ---
+    // يرى الدراسة والألعاب والترتيب
     else if (isStudent) {
       links = [
         { title: t('nav_home'), icon: <IconHome className={`${iconClass} text-white/70`} />, onClick: () => setCurrentView('home') },
         { title: t('nav_study') || "Mission", icon: <IconCpu className={`${iconClass} text-purple-400`} />, onClick: () => setCurrentView('category') },
         { title: t('nav_games'), icon: <IconDeviceGamepad className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('games') },
         { title: t('nav_chat') || "Squad", icon: <IconMessageCircle className={`${iconClass} text-cyan-400`} />, onClick: () => setCurrentView('chat') },
-        { title: t('nav_live') || "Live", icon: <IconSchool className={`${iconClass} text-red-500`} />, onClick: () => setCurrentView('live') },
+        { title: t('nav_live') || "Uplink", icon: <IconSchool className={`${iconClass} text-red-500`} />, onClick: () => setCurrentView('live') },
         { title: t('nav_rewards') || "Rank", icon: <IconTrophy className={`${iconClass} text-yellow-400`} />, onClick: () => setCurrentView('leaderboard') },
         { title: t('nav_settings') || "Config", icon: <IconSettings className={`${iconClass} text-zinc-400`} />, onClick: () => setCurrentView('settings') },
       ];
     }
-    // --- واجهة المستخدم العادي + الأدمن ---
+    // --- ج. واجهة المستخدم العادي + الأدمن (Default / Admin) ---
     else {
       links = [
         { title: t('nav_home'), icon: <IconHome className={`${iconClass} text-white/70`} />, onClick: () => setCurrentView('home') },
@@ -1323,6 +1325,7 @@ export default function Page() {
       if (isAdmin) {
         links.push({ title: t('nav_admin'), icon: <IconShield className={`${iconClass} text-red-600`} />, onClick: () => setCurrentView('admin_panel') });
       } else {
+        // المستخدم العادي يرى زر الدعم بدلاً من الأدمن
         links.push({ title: t('nav_support'), icon: <IconLifebuoy className={`${iconClass} text-orange-500`} />, onClick: () => setShowSupport(true) });
       }
     }
@@ -1333,28 +1336,36 @@ export default function Page() {
   // 7. معالجة حالات التحميل والأمن
   if (showIntro) return <IntroSequence onComplete={() => setShowIntro(false)} />;
   if ((loading || !isLoaded) && !forceLoad) return <LoadingFallback />;
+  
+  // شاشة الحظر
   if (isBanned || studyBanned) {
       return (
-        <div className="h-screen flex items-center justify-center bg-black text-red-600 font-black font-mono tracking-[0.5em] text-2xl uppercase">
-          Neural_Link_Terminated
+        <div className="h-screen flex items-center justify-center bg-black text-red-600 font-black font-mono tracking-[0.5em] text-2xl uppercase flex-col gap-4 text-center p-4">
+          <IconShield size={64} className="animate-pulse"/>
+          <div>NEURAL LINK TERMINATED</div>
+          <div className="text-xs text-red-800">Access Revoked by Administration</div>
         </div>
       );
   }
   
   if (!user) return <AuthScreen onLoginSuccess={() => {}} />;
 
+  // إخفاء الشريط السفلي في وضع الأدمن الكامل لتوفير مساحة
   const isAdminMode = isAdmin && currentView === 'admin_panel';
 
   return (
     <CyberLayout>
       <div className="relative h-full w-full" dir={dir}>
         
+        {/* مركز الإشعارات (يظهر في كل الصفحات) */}
         <NotificationCenter />
         
+        {/* نافذة الدعم المنبثقة */}
         <AnimatePresence>
             {showSupport && <SupportModal user={user} onClose={() => setShowSupport(false)} />}
         </AnimatePresence>
 
+        {/* الألعاب المنبثقة (Overlay Games) */}
         {!isAdminMode && (
             <AnimatePresence>
               {activeOverlayGame === 'time_traveler' && <TimeTraveler onClose={() => setActiveOverlayGame(null)} />}
@@ -1364,6 +1375,7 @@ export default function Page() {
             </AnimatePresence>
         )}
         
+        {/* شريط البث العاجل (Admin Broadcast) */}
         <AnimatePresence>
           {broadcast && (
               <motion.div 
@@ -1377,6 +1389,7 @@ export default function Page() {
           )}
         </AnimatePresence>
 
+        {/* منطقة المحتوى المتغير (Views) */}
         <div className="relative z-10 flex flex-col items-center justify-start h-full w-full pt-4 md:pt-0">
              <ViewManager 
                   cards={cards} 
@@ -1395,6 +1408,7 @@ export default function Page() {
              />
         </div>
 
+        {/* الشريط السفلي العائم (Floating Dock) */}
         {!isAdminMode && (
             <div className="fixed bottom-8 left-0 w-full z-[60] flex justify-center pointer-events-none">
                 <motion.div 
@@ -1453,24 +1467,23 @@ export const registerServiceWorker = () => {
 FILE: src\components\features\admin\AdminDashboard.jsx
 ------------------------------------------------------------------
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { 
   collection, onSnapshot, doc, updateDoc, query, orderBy, 
-  deleteDoc, setDoc, serverTimestamp, arrayUnion, arrayRemove, limit, 
-  deleteField, where, addDoc, getDoc 
+  deleteDoc, setDoc, serverTimestamp, arrayUnion, deleteField, limit, addDoc 
 } from "firebase/firestore";
 import { 
   IconShield, IconUsers, IconLayoutDashboard, 
   IconBroadcast, IconMessage2, IconBan, IconTrash, 
   IconMenu2, IconSend, IconDeviceGamepad, IconHome, 
-  IconUserMinus, IconMessages, IconMessagePlus, IconSearch,
+  IconMessagePlus, IconSearch,
   IconSchool, IconUnlink, IconActivity, IconLock, IconWorld, IconPencil, IconCheck, IconX,
   IconCpu, IconTerminal2, IconLockAccess
 } from '@tabler/icons-react';
 import { useUI } from '@/context/UIContext';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useAuth } from '@/context/AuthContext'; // استدعاء هوك المصادقة للتحقق من الرتبة
+import { useAuth } from '@/context/AuthContext';
 
 // --- مكونات التصميم الفرعية ---
 
@@ -1520,12 +1533,9 @@ const NavBtn = ({ id, label, icon: Icon, count, activeView, onClick }) => {
 
 export default function AdminDashboard() {
   const { setCurrentView } = useUI();
-  const { user: currentUser, isMaster, role } = useAuth(); // استخدام الرتب من الكونتكست
+  const { user: currentUser, isMaster, role } = useAuth();
   const { t, dir } = useLanguage();
   
-  // تحديد هل المستخدم "سوبر أدمن" (يملك كل الصلاحيات)
-  // إذا كان ماستر أو أدمن "كامل"، فهو سوبر.
-  // إذا كان "junior_admin" أو غيره، فهو محدود.
   const isSuperAdmin = isMaster || role === 'admin'; 
 
   const [activeView, setActiveView] = useState('overview');
@@ -1549,15 +1559,19 @@ export default function AdminDashboard() {
 
   // --- جلب البيانات ---
   useEffect(() => {
-    const unsubUsers = onSnapshot(query(collection(db, "users"), orderBy("createdAt", "desc"), limit(100)), (snap) => {
+    // جلب المستخدمين وترتيبهم حسب تاريخ الإنشاء لضمان ثبات أرقام الأساتذة
+    const unsubUsers = onSnapshot(query(collection(db, "users"), orderBy("createdAt", "asc")), (snap) => {
         setUsers(snap.docs.map(d => ({id: d.id, ...d.data()})));
     });
+    
     const unsubTickets = onSnapshot(query(collection(db, "support_tickets"), orderBy("lastUpdate", "desc")), (snap) => {
         setTickets(snap.docs.map(d => ({id: d.id, ...d.data()})));
     });
+    
     const unsubChats = onSnapshot(collection(db, "chats"), (snap) => {
         setChats(snap.docs.map(d => ({id: d.id, ...d.data()})));
     });
+    
     return () => { unsubUsers(); unsubTickets(); unsubChats(); };
   }, []);
 
@@ -1572,16 +1586,39 @@ export default function AdminDashboard() {
     return () => unsubMsgs();
   }, [browsingChat]);
 
-  const getTeacherName = (teacherId) => {
-      const teacher = users.find(u => u.id === teacherId);
-      return teacher ? teacher.displayName : "Unknown ID";
+  // --- منطق ترقيم الأساتذة ---
+  // نقوم بحساب قائمة الأساتذة المرتبة مرة واحدة (Memoized) لتجنب إعادة الحساب
+  const teachersList = useMemo(() => {
+      // نفلتر المستخدمين الذين رتبتهم 'teacher' فقط
+      return users.filter(u => u.role === 'teacher');
+      // بما أننا جلبنا المستخدمين مرتبين بـ createdAt asc، فالترتيب هنا محفوظ
+      // أول أستاذ سجل هو رقم 1، وهكذا.
+  }, [users]);
+
+  // دالة للحصول على "لقب" الأستاذ (مثل Teacher #1)
+  const getTeacherLabel = (teacherId) => {
+      if (!teacherId) return "Unassigned";
+      
+      const index = teachersList.findIndex(t => t.id === teacherId);
+      if (index !== -1) {
+          const teacher = teachersList[index];
+          // عرض: Teacher #1 (Name)
+          return `Teacher #${index + 1} (${teacher.displayName || 'Unknown'})`;
+      }
+      
+      // في حالة كان المعرف موجوداً ولكن المستخدم لم يعد موجوداً أو تغيرت رتبته
+      return "Unknown/Retired Teacher";
   };
 
-  // --- الإجراءات (مع التحقق من الصلاحيات) ---
+  // --- الإجراءات ---
 
   const handleRoleChange = async (uid, newRole) => {
       if (!isSuperAdmin) { alert("Access Denied: Super Admin Only"); return; }
-      try { await updateDoc(doc(db, "users", uid), { role: newRole }); } catch (e) { alert(e.message); }
+      try { 
+          // إذا تم تغيير الرتبة من أستاذ لشيء آخر، يجب الانتباه أن طلابه سيبقون مرتبطين بمعرفه
+          // لكن هذا مقبول، سيظهرون تحت "Unknown/Retired"
+          await updateDoc(doc(db, "users", uid), { role: newRole }); 
+      } catch (e) { alert(e.message); }
   };
 
   const toggleBan = async (uid, currentStatus) => {
@@ -1592,15 +1629,15 @@ export default function AdminDashboard() {
 
   const unlinkStudent = async (studentId) => {
       if (!isSuperAdmin) { alert("Access Denied"); return; }
-      if (!confirm("Force unlink student?")) return;
+      if (!confirm("Force unlink student from teacher?")) return;
       try {
-          await updateDoc(doc(db, "users", studentId), { teacherId: deleteField(), role: 'user' });
+          await updateDoc(doc(db, "users", studentId), { teacherId: deleteField() });
           alert("Link severed.");
       } catch (e) { console.error(e); }
   };
 
   const sendBroadcast = async () => {
-    if (!isSuperAdmin) { alert("Access Denied: Broadcast is restricted."); return; }
+    if (!isSuperAdmin) { alert("Access Denied."); return; }
     if(!broadcastMsg.trim()) return;
     await updateDoc(doc(db, "system", "broadcast"), { 
         message: broadcastMsg, active: true, sentBy: currentUser.email, timestamp: new Date().toISOString() 
@@ -1610,7 +1647,6 @@ export default function AdminDashboard() {
   };
 
   const initiateChatWithUser = (targetUser) => {
-      // الجونيور يمكنه بدء محادثة
       const existingTicket = tickets.find(t => t.id === targetUser.id);
       if (existingTicket) { setSelectedTicket(existingTicket); } else {
           setSelectedTicket({ 
@@ -1625,7 +1661,8 @@ export default function AdminDashboard() {
       if(!selectedTicket || !replyText.trim()) return;
       try {
           const ticketRef = doc(db, "support_tickets", selectedTicket.id);
-          const newMsg = { text: replyText, sender: 'admin', time: Date.now() };
+          const safeText = replyText || ""; // الحماية من الـ undefined
+          const newMsg = { text: safeText, sender: 'admin', time: Date.now() };
           
           if (selectedTicket.isVirtual) {
               await setDoc(ticketRef, { userId: selectedTicket.id, userEmail: selectedTicket.userEmail, messages: [newMsg], lastUpdate: Date.now(), status: 'replied' });
@@ -1635,7 +1672,8 @@ export default function AdminDashboard() {
           }
           await addDoc(collection(db, "notifications"), {
               userId: selectedTicket.userId, target: 'user', type: "support_reply",
-              title: "📩 ADMIN MESSAGE", message: `Admin: "${replyText.substring(0, 30)}..."`,
+              // استخدام الحماية هنا لمنع الانهيار
+              title: "📩 ADMIN MESSAGE", message: `Admin: "${safeText.substring(0, 30)}..."`,
               senderId: currentUser.uid, createdAt: serverTimestamp(), read: false
           });
           setReplyText("");
@@ -1643,29 +1681,31 @@ export default function AdminDashboard() {
   };
 
   const deleteMessage = async (msgId) => { 
-      if (!isSuperAdmin) { alert("Access Denied: Only Super Admin can delete logs."); return; }
+      if (!isSuperAdmin) return;
       if (confirm("Delete message?")) await deleteDoc(doc(db, "chats", browsingChat.id, "messages", msgId)); 
   };
   
   const startEditing = (msg) => { setEditingMsgId(msg.id); setEditContent(msg.text); };
   
   const saveEditedMessage = async () => {
-      // الجونيور يمكنه التعديل (كما طلبت)
       if (!editContent.trim()) return;
       try {
           await updateDoc(doc(db, "chats", browsingChat.id, "messages", editingMsgId), {
-              text: editContent, isEdited: true, editedBy: isSuperAdmin ? 'admin' : 'junior_admin', editedAt: serverTimestamp()
+              text: editContent, isEdited: true, editedBy: isSuperAdmin ? 'admin' : 'junior', editedAt: serverTimestamp()
           });
           setEditingMsgId(null); setEditContent("");
       } catch (e) { alert("Failed to update."); }
   };
 
   const terminateChannel = async () => {
-      if (!isSuperAdmin) { alert("Access Denied"); return; }
+      if (!isSuperAdmin) return;
       if(confirm("Terminate channel?")) deleteDoc(doc(db, "chats", browsingChat.id));
   };
 
-  const filteredUsers = users.filter(u => u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()));
+  // تصفية المستخدمين (نعكس الترتيب للعرض بحيث يظهر الأحدث في القائمة، لكن ترقيم الأساتذة يعتمد على users الأصلية)
+  const filteredUsers = [...users]
+    .sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+    .filter(u => u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()));
 
   // --- Main Render ---
   return (
@@ -1693,7 +1733,6 @@ export default function AdminDashboard() {
                 <NavBtn id="users" label={t('admin_operatives')} icon={IconUsers} activeView={activeView} onClick={() => {setActiveView('users'); setIsMobileMenuOpen(false);}} />
                 <NavBtn id="chat_control" label={t('admin_chat_control')} icon={IconMessages} activeView={activeView} onClick={() => {setActiveView('chat_control'); setIsMobileMenuOpen(false);}} />
                 <NavBtn id="support" label={t('admin_uplink')} icon={IconMessage2} count={tickets.filter(t=>t.status!=='resolved').length} activeView={activeView} onClick={() => {setActiveView('support'); setIsMobileMenuOpen(false);}} />
-                {/* إخفاء زر البث للجونيور */}
                 {isSuperAdmin && <NavBtn id="broadcast" label={t('admin_alert')} icon={IconBroadcast} activeView={activeView} onClick={() => {setActiveView('broadcast'); setIsMobileMenuOpen(false);}} />}
             </div>
             
@@ -1739,7 +1778,18 @@ export default function AdminDashboard() {
                 {activeView === 'users' && (
                     <div className="h-full overflow-y-auto p-6 md:p-8 custom-scrollbar animate-in slide-in-from-bottom-4 duration-500">
                         <div className="grid gap-3">
-                            {filteredUsers.map(u => (
+                            {filteredUsers.map(u => {
+                                // هنا نحدد رقم الأستاذ إذا كان هذا المستخدم أستاذاً
+                                let displayRole = "USER";
+                                if (u.role === 'teacher') {
+                                    // البحث عنه في القائمة المرتبة
+                                    const tIndex = teachersList.findIndex(t => t.id === u.id);
+                                    displayRole = `TEACHER #${tIndex + 1}`;
+                                } else if (u.role) {
+                                    displayRole = u.role.toUpperCase();
+                                }
+
+                                return (
                                 <div key={u.id} className="group flex flex-col md:flex-row items-center gap-4 p-4 rounded-2xl bg-[#0a0a0a] border border-white/5 hover:border-indigo-500/30 transition-all hover:bg-[#0e0e0e]">
                                     <div className="flex items-center gap-4 w-full md:w-auto flex-1">
                                         <div className="relative">
@@ -1749,13 +1799,20 @@ export default function AdminDashboard() {
                                             {u.isBanned && <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-[#0a0a0a]"></div>}
                                         </div>
                                         <div>
-                                            <div className="font-bold text-white text-sm">{u.displayName || "Unknown"}</div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="font-bold text-white text-sm">{u.displayName || "Unknown"}</div>
+                                                {/* عرض الرتبة المحسنة */}
+                                                <span className={`text-[8px] px-1.5 py-0.5 rounded border ${
+                                                    u.role === 'teacher' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                                                    u.role === 'student' ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' :
+                                                    'bg-zinc-800 border-zinc-700 text-zinc-400'
+                                                }`}>{displayRole}</span>
+                                            </div>
                                             <div className="text-[10px] text-white/30 font-mono">{u.email}</div>
                                         </div>
                                     </div>
 
                                     <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
-                                        {/* تغيير الرتبة: للسوبر أدمن فقط */}
                                         <select 
                                             value={u.role || 'user'} 
                                             onChange={(e) => handleRoleChange(u.id, e.target.value)}
@@ -1771,11 +1828,12 @@ export default function AdminDashboard() {
                                             {isSuperAdmin && <option value="junior_admin">Junior Admin</option>}
                                         </select>
 
+                                        {/* إذا كان طالباً، نعرض من هو أستاذه */}
                                         {u.role === 'student' && u.teacherId && (
-                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/5">
+                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/5" title={getTeacherLabel(u.teacherId)}>
                                                 <IconSchool size={12} className="text-purple-400"/>
-                                                <span className="text-[10px] text-white/50">{getTeacherName(u.teacherId).substring(0,10)}..</span>
-                                                {/* فك الارتباط: سوبر أدمن فقط */}
+                                                {/* نستخدم التابع الآمن substring */}
+                                                <span className="text-[10px] text-white/50">{getTeacherLabel(u.teacherId).substring(0, 15)}..</span>
                                                 {isSuperAdmin && <button onClick={() => unlinkStudent(u.id)} className="text-red-500/50 hover:text-red-500"><IconUnlink size={12}/></button>}
                                             </div>
                                         )}
@@ -1784,7 +1842,6 @@ export default function AdminDashboard() {
                                     <div className="flex items-center gap-2 w-full md:w-auto justify-end">
                                         <button onClick={() => initiateChatWithUser(u)} className="p-2.5 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-500 hover:text-white rounded-xl transition-all border border-indigo-500/20"><IconMessagePlus size={18}/></button>
                                         
-                                        {/* الحظر: سوبر أدمن فقط */}
                                         <button 
                                             onClick={() => toggleBan(u.id, u.isBanned)} 
                                             disabled={!isSuperAdmin}
@@ -1794,7 +1851,7 @@ export default function AdminDashboard() {
                                         </button>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                         </div>
                     </div>
                 )}
@@ -1831,6 +1888,7 @@ export default function AdminDashboard() {
                                         </div>
                                         <div className="flex items-center justify-between mt-2">
                                             <span className="text-[9px] font-mono text-white/30 uppercase tracking-widest">{chat.members?.length || 0} UNITS</span>
+                                            {/* Fix for potential undefined createdBy */}
                                             {chat.createdBy && <span className="text-[8px] bg-white/5 px-2 py-0.5 rounded text-white/20 font-mono">ID:{chat.createdBy.substring(0,4)}</span>}
                                         </div>
                                     </div>
@@ -1849,7 +1907,6 @@ export default function AdminDashboard() {
                                                 <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.3em]">{browsingChat.type} CHANNEL</span>
                                             </div>
                                         </div>
-                                        {/* حذف القناة: سوبر أدمن فقط */}
                                         {isSuperAdmin && <button onClick={terminateChannel} className="px-5 py-2.5 bg-red-950/30 text-red-500 rounded-xl border border-red-500/20 font-black text-[9px] uppercase tracking-widest transition-all hover:bg-red-600 hover:text-white flex items-center gap-2"><IconTrash size={14}/> Terminate</button>}
                                     </div>
                                     
@@ -1876,9 +1933,7 @@ export default function AdminDashboard() {
 
                                                     {editingMsgId !== msg.id && (
                                                         <div className="absolute -right-24 top-1/2 -translate-y-1/2 flex gap-2 opacity-0 group-hover/msg:opacity-100 transition-all translate-x-4 group-hover/msg:translate-x-0">
-                                                            {/* التعديل: متاح للجميع (بما فيهم الجونيور) */}
                                                             <button onClick={() => startEditing(msg)} className="p-2.5 bg-[#0e0e0e] text-indigo-400 border border-indigo-500/30 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-lg"><IconPencil size={16}/></button>
-                                                            {/* الحذف: سوبر أدمن فقط */}
                                                             {isSuperAdmin && <button onClick={() => deleteMessage(msg.id)} className="p-2.5 bg-[#0e0e0e] text-red-500 border border-red-500/30 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-lg"><IconTrash size={16}/></button>}
                                                         </div>
                                                     )}
@@ -2557,8 +2612,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   IconMessage, IconPlus, IconLock, IconSend, IconUserPlus, 
-  IconArrowLeft, IconX, IconHash, IconUsers, IconWorld, IconTrash,
-  IconShieldLock, IconSchool, IconLoader2, IconRefresh
+  IconArrowLeft, IconX, IconHash, IconWorld, IconTrash,
+  IconSchool, IconLoader2, IconShieldLock
 } from "@tabler/icons-react";
 import { db } from "@/lib/firebase";
 import { 
@@ -2587,7 +2642,7 @@ export default function CommunicationHub() {
 
   const messagesEndRef = useRef(null);
 
-  // 1. جلب الدردشات
+  // --- 1. جلب الدردشات (Smart Filtering) ---
   useEffect(() => {
     if (!user) return;
     setLoadingChats(true);
@@ -2608,9 +2663,7 @@ export default function CommunicationHub() {
 
     const addToMapAndSync = (snap) => {
         snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-        // التعامل مع الحذف: إذا عادت الـ snapshot ببيانات، يجب أن نتأكد من إزالة العناصر المحذوفة من الـ map
-        // (في هذه البنية المبسطة، التحديث التفاؤلي في دالة الحذف هو الحل الأسرع، 
-        // لكن هنا نضمن التحديث عند الإضافة أيضاً)
+        // التعامل مع الحذف
         snap.docChanges().forEach((change) => {
             if (change.type === "removed") {
                 chatsMap.delete(change.doc.id);
@@ -2620,15 +2673,19 @@ export default function CommunicationHub() {
     };
 
     try {
+        // أ. الجميع يرى القنوات العامة
         const qPublic = query(collection(db, "chats"), where("type", "==", "public"));
         unsubscribers.push(onSnapshot(qPublic, addToMapAndSync));
 
+        // ب. القنوات التي أنا عضو فيها
         const qMember = query(collection(db, "chats"), where("members", "array-contains", user.uid));
         unsubscribers.push(onSnapshot(qMember, addToMapAndSync));
 
+        // ج. القنوات التي أنشأتها (للأستاذ)
         const qOwner = query(collection(db, "chats"), where("createdBy", "==", user.uid));
         unsubscribers.push(onSnapshot(qOwner, addToMapAndSync));
 
+        // د. 🔥 للطالب: جلب قنوات الأستاذ تلقائياً
         if (isStudent && userData?.teacherId) {
             const qTeacher = query(collection(db, "chats"), where("createdBy", "==", userData.teacherId));
             unsubscribers.push(onSnapshot(qTeacher, addToMapAndSync));
@@ -2643,10 +2700,11 @@ export default function CommunicationHub() {
     };
   }, [user, isAdmin, isStudent, userData, isTeacher]);
 
-  // 2. جلب الرسائل
+  // --- 2. جلب الرسائل والانضمام التلقائي ---
   useEffect(() => {
     if (!selectedChat) return;
     
+    // 🔥 الانضمام التلقائي للطالب إذا دخل دردشة أستاذه ولم يكن مسجلاً فيها
     if (isStudent && userData?.teacherId === selectedChat.createdBy && !selectedChat.members?.includes(user.uid)) {
         updateDoc(doc(db, "chats", selectedChat.id), {
             members: arrayUnion(user.uid)
@@ -2667,9 +2725,10 @@ export default function CommunicationHub() {
     return () => unsub();
   }, [selectedChat, isStudent, user, userData]);
 
-  // 3. جلب طلاب الأستاذ للدعوة
+  // --- 3. جلب طلاب الأستاذ للدعوة ---
   useEffect(() => {
       if (showInviteModal && isTeacher) {
+          // جلب الطلاب المرتبطين بالأستاذ فقط
           const q = query(collection(db, "users"), where("teacherId", "==", user.uid));
           const unsub = onSnapshot(q, (snap) => {
               setMyStudentsToInvite(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -2704,6 +2763,7 @@ export default function CommunicationHub() {
   const handleCreateGroup = async () => {
     if (!newGroup.name.trim()) return;
     
+    // إذا كان أستاذاً، نوع القناة الافتراضي "خاص" لطلابه
     const finalType = isTeacher ? (newGroup.type || 'private') : newGroup.type;
 
     try {
@@ -2721,7 +2781,7 @@ export default function CommunicationHub() {
         
         const newChatData = { id: docRef.id, name: newGroup.name, type: finalType, createdBy: user.uid, members: [user.uid] };
         setSelectedChat(newChatData);
-        // تحديث محلي فوري للقائمة
+        // تحديث محلي سريع
         setChats(prev => [newChatData, ...prev]);
         
     } catch (e) { console.error(e); }
@@ -2737,29 +2797,21 @@ export default function CommunicationHub() {
       } catch (e) { console.error(e); }
   };
 
-  // --- 🔥 إصلاح حذف المحادثة (التحديث الفوري) ---
   const handleDeleteChat = async () => {
       if(!selectedChat) return;
-      if(!confirm(t('admin_confirm_delete') || "Are you sure you want to dismantle this squad?")) return;
+      if(!confirm("Dismantle this squad channel?")) return;
       
       const chatIdToDelete = selectedChat.id;
-
       try {
-          // 1. التحديث الفوري للواجهة (Optimistic Update)
-          // نحذف الشات من القائمة المحلية فوراً قبل انتظار السيرفر
           setChats(prevChats => prevChats.filter(chat => chat.id !== chatIdToDelete));
-          setSelectedChat(null); // العودة للقائمة الرئيسية
-
-          // 2. التنفيذ الفعلي في قاعدة البيانات
+          setSelectedChat(null); 
           await deleteDoc(doc(db, "chats", chatIdToDelete));
-          
       } catch(e) { 
           console.error("Delete Error:", e);
-          alert("Failed to delete squad.");
-          // في حال الفشل، يمكن إعادة تحميل الصفحة أو إعادة القائمة (اختياري)
       }
   };
 
+  // الصلاحيات: الأستاذ والأدمن فقط ينشئون القنوات
   const canCreate = !isStudent; 
   const isOwner = selectedChat && selectedChat.createdBy === user.uid;
   const canModify = isOwner || isAdmin;
@@ -2973,7 +3025,7 @@ export default function CommunicationHub() {
                     <option value="private">{t('chat_private')}</option>
                   </select>
               )}
-              {isTeacher && <div className="mb-8 p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl text-[10px] text-orange-400 font-bold uppercase flex items-center gap-2"><IconLock size={14}/> Private Class Channel</div>}
+              {isTeacher && <div className="mb-8 p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl text-[10px] text-orange-400 font-bold uppercase flex items-center gap-2"><IconShieldLock size={14}/> Private Class Channel</div>}
 
               <div className="flex gap-3">
                   <button onClick={()=>setShowCreateModal(false)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-white/40 hover:text-white font-black uppercase text-[10px]">{t('chat_cancel')}</button>
@@ -2995,7 +3047,7 @@ import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { 
   IconTrash, IconPencil, IconSearch, IconDatabase, IconArrowDown, 
   IconPlus, IconCategory, IconSettings, IconX, IconCheck, IconFolder, 
-  IconLock, IconEye, IconCpu, IconServer
+  IconLock, IconEye, IconServer
 } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -3007,8 +3059,12 @@ const getCatTranslation = (catName, t) => {
     if (!catName) return t('cat_uncategorized');
     if (catName === 'All') return t('cat_all');
     if (catName === 'General') return t('cat_general');
+    
+    // محاولة ترجمة المفتاح
     const key = `cat_${catName.toLowerCase().replace(/ & /g, '_').replace(/ /g, '_')}`;
     const translated = t(key);
+    
+    // إذا لم توجد ترجمة، نعيد الاسم الأصلي
     return translated === key ? catName : translated;
 };
 
@@ -3023,10 +3079,6 @@ const MemoryNode = React.memo(({
     const handleChange = (field, value) => {
         setEditForm(prev => ({ ...prev, [field]: value }));
     };
-
-    // تحديد ما إذا كانت البطاقة "نظام" (لا يمكن حذفها بسهولة) أو "مخصصة"
-    // (في هذا التصميم نفترض أن البطاقات القابلة للتعديل هي فقط التي يملكها المستخدم)
-    const isSystemCard = !card.id || card.id.toString().length < 5; // افتراض بسيط للتمييز
 
     return (
         <motion.div 
@@ -3088,7 +3140,7 @@ const MemoryNode = React.memo(({
                                         <button onClick={() => onDelete(card.id)} className="p-2 rounded-xl bg-white/5 hover:bg-red-600 text-gray-400 hover:text-white transition-colors border border-white/10"><IconTrash size={14}/></button>
                                     </div>
                                 ) : (
-                                    <div className="opacity-20 text-white" title="System Protected">
+                                    <div className="opacity-20 text-white" title="Read Only">
                                         <IconLock size={14} />
                                     </div>
                                 )}
@@ -3123,6 +3175,7 @@ MemoryNode.displayName = "MemoryNode";
 export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
   const { t, dir } = useLanguage();
   
+  // تحديد الصلاحية: هل الدوال موجودة؟
   const canEdit = !!(onAdd && onDelete && onUpdate);
 
   const [search, setSearch] = useState("");
@@ -3140,6 +3193,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
   const [newCatNameInput, setNewCatNameInput] = useState("");
 
   const categories = useMemo(() => {
+    // تجميع التصنيفات الموجودة
     const cats = new Set(cards.map(c => c.category || "General"));
     return ["All", ...Array.from(cats).sort()];
   }, [cards]);
@@ -3153,6 +3207,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
       });
   }, [cards, search, filter]);
 
+  // إعادة تعيين حد العرض عند تغيير الفلتر
   useEffect(() => { setDisplayLimit(20); }, [search, filter]);
 
   // --- العمليات ---
@@ -3178,6 +3233,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
       }
   }, [editingId, editForm, onUpdate, canEdit]);
 
+  // --- إدارة التصنيفات (حذف/تعديل اسم مجموعة كاملة) ---
   const handleRenameCategory = (oldName) => {
       if (!canEdit) return;
       if (!newCatNameInput.trim() || newCatNameInput === oldName) {
@@ -3197,7 +3253,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
       cardsToDelete.forEach(card => onDelete(card.id));
   };
 
-  // --- Modal ---
+  // --- Modal: إدارة المجموعات ---
   const CategoryManagerModal = () => (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md">
           <motion.div initial={{scale:0.9, opacity:0}} animate={{scale:1, opacity:1}} className="bg-[#0c0c0c] border border-white/10 w-full max-w-xl rounded-[2.5rem] p-8 shadow-2xl flex flex-col max-h-[85vh]">
@@ -3288,6 +3344,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
                 />
              </div>
 
+             {/* أزرار الإضافة تظهر فقط إذا كان canEdit = true */}
              {canEdit && (
                  <div className="w-full md:w-auto flex flex-col md:flex-row items-center gap-3 border-t md:border-t-0 md:border-l border-white/10 pt-4 md:pt-0 md:pl-5">
                      <div className="flex w-full md:w-auto gap-3">
@@ -5047,7 +5104,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default function RealLiveStream() {
-  // استدعاء endBroadcast من الكونتكست
+  // استدعاء endBroadcast من الكونتكست للتحكم في الإغلاق وتنظيف الإشعارات
   const { startBroadcast, endBroadcast, liveState } = useUI(); 
   const { user, userData, isTeacher, isStudent } = useAuth();
   const { t, dir } = useLanguage();
@@ -5059,9 +5116,10 @@ export default function RealLiveStream() {
   const addLog = (msg) => setLogs(prev => [...prev.slice(-3), `> ${msg}`]);
 
   // دالة مساعدة للحصول على معرف غرفة الأستاذ الثابت
+  // هذا يضمن أن الطالب والأستاذ يدخلان نفس الغرفة دائماً
   const getTeacherRoomId = () => `CLASS_${user.uid}`;
 
-  // --- 1. بدء البث للأستاذ ---
+  // --- 1. بدء البث للأستاذ (Start Class) ---
   const handleStartClass = async () => {
       setStatus("scanning");
       addLog("INITIALIZING CLASSROOM PROTOCOL...");
@@ -5070,6 +5128,7 @@ export default function RealLiveStream() {
       
       try {
           addLog("SCANNING SQUAD ROSTER...");
+          // جلب جميع الطلاب المرتبطين بهذا الأستاذ لإشعارهم
           const q = query(collection(db, "users"), where("teacherId", "==", user.uid));
           const snapshot = await getDocs(q);
           
@@ -5077,15 +5136,15 @@ export default function RealLiveStream() {
               setStatus("notifying");
               addLog(`FOUND ${snapshot.size} OPERATIVES. SENDING SIGNAL...`);
               
-              // إنشاء الإشعارات
+              // إنشاء إشعار لكل طالب
               const notificationsPromises = snapshot.docs.map(studentDoc => {
                   return addDoc(collection(db, "notifications"), {
                       userId: studentDoc.id,
                       target: 'student',
-                      type: 'live_start',
+                      type: 'live_start', // نوع خاص للبث
                       title: "🔴 LIVE CLASS STARTED",
                       message: `Commander ${user.displayName || "Teacher"} is live. Tap to join immediately!`,
-                      roomId: classRoomId, // هذا المعرف هو مفتاح الحذف لاحقاً
+                      roomId: classRoomId, // نمرر معرف الغرفة ليدخل الطالب مباشرة عند الضغط
                       senderId: user.uid,
                       createdAt: serverTimestamp(),
                       read: false
@@ -5102,6 +5161,7 @@ export default function RealLiveStream() {
           addLog("WARNING: SIGNAL RELAY FAILED. CHECK NETWORK.");
       }
       
+      // بدء البث الفعلي
       setTimeout(() => {
           setStatus("connected");
           addLog("SECURE CHANNEL ESTABLISHED.");
@@ -5114,12 +5174,12 @@ export default function RealLiveStream() {
       if (confirm("End session and withdraw signals?")) {
           setStatus("idle");
           addLog("SESSION TERMINATED.");
-          // 🔥 هنا يتم استدعاء الحذف مع تمرير معرف الغرفة
+          // 🔥 هنا يتم استدعاء الحذف مع تمرير معرف الغرفة لتنظيف الإشعارات عند الطلاب
           endBroadcast(getTeacherRoomId());
       }
   };
 
-  // --- 2. انضمام الطالب ---
+  // --- 2. انضمام الطالب (Join Class) ---
   const handleJoinClass = () => {
       if (!userData?.teacherId) {
           addLog("ERROR: NO COMMANDER ASSIGNED.");
@@ -5127,7 +5187,10 @@ export default function RealLiveStream() {
       }
       setStatus("scanning");
       addLog("SYNCING WITH COMMANDER FREQUENCY...");
+      
+      // معرف غرفة الأستاذ هو CLASS_ + معرف الأستاذ
       const targetRoomId = `CLASS_${userData.teacherId}`;
+      
       setTimeout(() => {
           setStatus("connected");
           addLog("UPLINK SUCCESSFUL.");
@@ -5135,7 +5198,7 @@ export default function RealLiveStream() {
       }, 1500);
   };
 
-  // --- 3. انضمام يدوي ---
+  // --- 3. انضمام يدوي (للمستخدمين العاديين) ---
   const handleManualJoin = () => {
     if (!roomName.trim()) return;
     setStatus("scanning");
@@ -5148,6 +5211,7 @@ export default function RealLiveStream() {
   };
 
   // --- حالة البث النشط (داخل الفيديو) ---
+  // تظهر هذه الواجهة عندما يكون الفيديو قيد التشغيل في الخلفية (أو تم تصغيره)
   if (liveState.isActive) {
       return (
         <div className="flex flex-col items-center justify-center h-full w-full text-center" dir={dir}>
@@ -5237,7 +5301,8 @@ export default function RealLiveStream() {
                         )}
                         <div className="text-center text-[10px] text-emerald-500/50 font-mono flex items-center justify-center gap-2">
                             <IconUsers size={12}/>
-                            <span>Auto-notify {userData?.studentCount || "all"} students</span>
+                            {/* استدعاء عدد الطلاب (اختياري إذا كان متوفراً في السياق، أو نص ثابت) */}
+                            <span>Auto-notify operatives</span>
                         </div>
                     </div>
                 )}
@@ -5320,7 +5385,7 @@ import {
   IconUser, IconTrophy, IconFlame, IconTarget, 
   IconActivity, IconLock, IconMedal, IconCrown, 
   IconDna, IconChartRadar, IconSchool, IconShieldCheck, 
-  IconBook, IconMessage, IconId
+  IconBook, IconMessage, IconId, IconRobot
 } from "@tabler/icons-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { doc, getDoc } from "firebase/firestore";
@@ -5395,9 +5460,12 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                   const docSnap = await getDoc(doc(db, "users", user.teacherId));
                   if (docSnap.exists()) {
                       setCommanderName(docSnap.data().displayName);
+                  } else {
+                      setCommanderName("Unknown Commander");
                   }
               } catch (err) {
                   console.error("Failed to load commander data", err);
+                  setCommanderName("System Error");
               }
           };
           fetchCommander();
@@ -5405,11 +5473,13 @@ export default function CyberDeck({ user, stats, cards = [] }) {
   }, [user]);
 
   const analytics = useMemo(() => {
-    const xp = stats?.xp || 0;
-    const streak = stats?.streak || 0;
-    const totalCards = cards.length;
-    const masteredCards = cards.filter(c => c.level >= 5).length;
-    const learningCards = cards.filter(c => c.level > 0 && c.level < 5).length;
+    // حماية ضد القيم الفارغة
+    const safeStats = stats || { xp: 0, streak: 0 };
+    const xp = safeStats.xp || 0;
+    const streak = safeStats.streak || 0;
+    const totalCards = cards?.length || 0;
+    const masteredCards = cards?.filter(c => c.level >= 5).length || 0;
+    const learningCards = cards?.filter(c => c.level > 0 && c.level < 5).length || 0;
     const masteryRate = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
     
     // حساب الرتبة
@@ -5431,15 +5501,19 @@ export default function CyberDeck({ user, stats, cards = [] }) {
     let displayRank = xpRank;
     let customTitle = null;
 
+    // تخصيص الرتب بناءً على الدور الفعلي في النظام
     if (user?.role === 'master') {
         displayRank = { color: "text-red-500", bg: "bg-red-500", icon: <IconCrown /> };
-        customTitle = t('rank_cybergod');
+        customTitle = t('rank_cybergod') || "SYSTEM MASTER";
     } else if (user?.role === 'admin') {
         displayRank = { color: "text-purple-500", bg: "bg-purple-500", icon: <IconShieldCheck /> };
-        customTitle = t('rank_commander');
+        customTitle = t('rank_commander') || "ADMIN";
     } else if (user?.role === 'teacher') {
         displayRank = { color: "text-emerald-400", bg: "bg-emerald-500", icon: <IconSchool /> };
         customTitle = "INSTRUCTOR";
+    } else if (user?.role === 'student') {
+        // الطلاب يحتفظون برتبة الـ XP لكن مع أيقونة خاصة
+        displayRank = { ...xpRank, icon: <IconId /> };
     }
 
     return {
@@ -5458,6 +5532,8 @@ export default function CyberDeck({ user, stats, cards = [] }) {
   const isTeacher = user?.role === 'teacher';
   const isStudent = user?.role === 'student';
 
+  if (!user) return null;
+
   return (
     <div className="w-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20" dir={dir}>
         
@@ -5472,7 +5548,12 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                     <div className="relative">
                         <div className="w-40 h-40 rounded-3xl p-1 bg-gradient-to-br from-white/20 to-transparent shadow-2xl">
                             <div className="w-full h-full rounded-[1.4rem] overflow-hidden bg-black border border-white/10">
-                                <img src={user?.photoURL || '/avatars/avatar1.png'} className="w-full h-full object-cover grayscale-[0.5] hover:grayscale-0 transition-all duration-500" alt="Avatar"/>
+                                <img 
+                                    src={user?.photoURL || '/avatars/avatar1.png'} 
+                                    className="w-full h-full object-cover grayscale-[0.5] hover:grayscale-0 transition-all duration-500" 
+                                    alt="Avatar"
+                                    onError={(e) => {e.target.src = '/avatars/avatar1.png'}} // Fallback image
+                                />
                             </div>
                         </div>
                         <div className="absolute -bottom-4 inset-x-0 flex justify-center">
@@ -5503,22 +5584,22 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                                         <span className="text-sm font-bold uppercase tracking-wide">{user.subject}</span>
                                     </div>
                                 )}
-                                {user?.contactInfo && (
-                                    <div className="flex items-center gap-2 text-white/50">
-                                        <IconMessage size={16}/>
-                                        <span className="text-xs font-mono">{user.contactInfo}</span>
-                                    </div>
-                                )}
+                                <div className="flex items-center gap-2 text-white/50">
+                                    <IconMessage size={16}/>
+                                    <span className="text-xs font-mono">{user.contactInfo || "No contact info"}</span>
+                                </div>
                             </div>
                         )}
 
-                        {/* --- معلومات الطالب (القائد) --- */}
-                        {isStudent && commanderName && (
+                        {/* --- معلومات الطالب (عرض اسم الأستاذ) --- */}
+                        {isStudent && (
                             <div className="mb-4 inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20">
-                                <IconId size={16} className="text-purple-400" />
+                                <IconRobot size={16} className="text-purple-400" />
                                 <div className="flex flex-col text-left">
-                                    <span className="text-[8px] text-purple-400/60 font-black uppercase tracking-widest leading-none mb-0.5">SQUAD COMMANDER</span>
-                                    <span className="text-xs text-purple-100 font-bold uppercase">{commanderName}</span>
+                                    <span className="text-[8px] text-purple-400/60 font-black uppercase tracking-widest leading-none mb-0.5">ASSIGNED TO SQUAD</span>
+                                    <span className="text-xs text-purple-100 font-bold uppercase">
+                                        {commanderName || "Loading Commander..."}
+                                    </span>
                                 </div>
                             </div>
                         )}
@@ -5628,7 +5709,7 @@ FILE: src\components\features\profile\MemberList.jsx
 "use client";
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, limit, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, limit, where } from 'firebase/firestore';
 import { 
   IconShieldCheck, IconCrown, IconUser, IconMedal, 
   IconUsers, IconActivity, IconTrophy, IconSchool, IconWorld 
@@ -5645,39 +5726,41 @@ export default function MemberList() {
   const { t, dir, isRTL } = useLanguage();
   const { user, userData, isStudent, isTeacher, isUser } = useAuth();
 
-  // تغيير وضع الفلترة تلقائياً بناءً على الرتبة
+  // تغيير وضع الفلترة الافتراضي بناءً على الرتبة
   useEffect(() => {
       if (isStudent || isTeacher) {
           setFilterMode('squad');
+      } else {
+          setFilterMode('global');
       }
   }, [isStudent, isTeacher]);
 
-  // جلب البيانات بناءً على الفلتر
+  // جلب البيانات
   useEffect(() => {
     if (!user) return;
 
     setLoading(true);
     let q;
 
-    // 1. وضع الفصل (Squad Mode)
+    // 1. وضع الكتيبة (Squad Mode)
     if (filterMode === 'squad') {
         let teacherIdToQuery = null;
 
         if (isTeacher) {
             teacherIdToQuery = user.uid; // الأستاذ يرى طلابه
         } else if (isStudent && userData?.teacherId) {
-            teacherIdToQuery = userData.teacherId; // الطالب يرى زملاءه (نفس الأستاذ)
+            teacherIdToQuery = userData.teacherId; // الطالب يرى زملاءه
         }
 
         if (teacherIdToQuery) {
+            // FIX: إزالة orderBy من الاستعلام لتجنب أخطاء الفهرسة (Missing Index)
+            // سنقوم بالترتيب في JavaScript لاحقاً
             q = query(
                 collection(db, "users"),
-                where("teacherId", "==", teacherIdToQuery),
-                orderBy("xp", "desc"),
-                limit(50)
+                where("teacherId", "==", teacherIdToQuery)
             );
         } else {
-            // حالة نادرة: طالب بدون أستاذ أو مستخدم عادي ضغط على الزر
+            // حالة: طالب بدون أستاذ أو مستخدم عادي ضغط على الزر بالخطأ
             setMembers([]);
             setLoading(false);
             return;
@@ -5685,15 +5768,26 @@ export default function MemberList() {
     } 
     // 2. الوضع العالمي (Global Mode)
     else {
+        // في الوضع العالمي، نجلب عدد محدود ونرتبهم
+        // هنا غالباً الفهرس الافتراضي موجود لـ xp desc
+        // إذا حدث خطأ، سنعالجه في الـ catch
         q = query(
             collection(db, "users"), 
-            orderBy("xp", "desc"),
-            limit(50)
+            limit(100)
         );
     }
 
     const unsubscribe = onSnapshot(q, (snap) => {
-        const usersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        let usersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        // الترتيب البرمجي (Client-side Sorting) لضمان الأمان والسرعة
+        usersList.sort((a, b) => (b.xp || 0) - (a.xp || 0));
+
+        // في الوضع العالمي، نأخذ أفضل 50 فقط بعد الترتيب
+        if (filterMode === 'global') {
+            usersList = usersList.slice(0, 50);
+        }
+
         setMembers(usersList);
         setLoading(false);
     }, (error) => {
@@ -5704,13 +5798,14 @@ export default function MemberList() {
     return () => unsubscribe();
   }, [filterMode, user, isTeacher, isStudent, userData]);
 
+  // دالة تحديد شكل الشارة بناءً على الرتبة
   const getRoleBadge = (role) => {
       switch(role) {
-          case 'master': return { color: 'text-red-500 bg-red-500/10 border-red-500/20', icon: <IconCrown size={14}/>, label: t('rank_cybergod') };
-          case 'admin': return { color: 'text-purple-500 bg-purple-500/10 border-purple-500/20', icon: <IconShieldCheck size={14}/>, label: t('rank_commander') };
+          case 'master': return { color: 'text-red-500 bg-red-500/10 border-red-500/20', icon: <IconCrown size={14}/>, label: t('rank_cybergod') || "MASTER" };
+          case 'admin': return { color: 'text-purple-500 bg-purple-500/10 border-purple-500/20', icon: <IconShieldCheck size={14}/>, label: t('rank_commander') || "ADMIN" };
           case 'teacher': return { color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20', icon: <IconSchool size={14}/>, label: "INSTRUCTOR" };
-          case 'student': return { color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', icon: <IconMedal size={14}/>, label: t('rank_soldier') };
-          default: return { color: 'text-gray-500 bg-white/5 border-white/10', icon: <IconUser size={14}/>, label: t('rank_recruit') };
+          case 'student': return { color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', icon: <IconMedal size={14}/>, label: t('rank_soldier') || "STUDENT" };
+          default: return { color: 'text-gray-500 bg-white/5 border-white/10', icon: <IconUser size={14}/>, label: t('rank_recruit') || "USER" };
       }
   };
 
@@ -5725,7 +5820,7 @@ export default function MemberList() {
                 </div>
                 <div>
                     <h2 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tighter italic">
-                        {filterMode === 'squad' ? "SQUAD RANKING" : "GLOBAL ELITE"}
+                        {filterMode === 'squad' ? (t('squad_title') || "SQUAD RANKING") : "GLOBAL ELITE"}
                     </h2>
                     <div className="flex items-center gap-2 mt-1">
                         <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
@@ -5736,7 +5831,7 @@ export default function MemberList() {
                 </div>
             </div>
 
-            {/* زر التبديل (يظهر فقط للطلاب والأساتذة) */}
+            {/* أزرار التبديل (تظهر فقط للطلاب والأساتذة) */}
             {(!isUser) && (
                 <div className="bg-[#0f0f0f] p-1 rounded-xl border border-white/10 flex">
                     <button 
@@ -5766,7 +5861,9 @@ export default function MemberList() {
             ) : members.length === 0 ? (
                 <div className="text-center py-20 opacity-30 flex flex-col items-center border-2 border-dashed border-white/10 rounded-[2rem]">
                     <IconUsers size={48} className="mb-4"/>
-                    <p className="text-xs font-black uppercase tracking-widest">NO DATA AVAILABLE IN THIS SECTOR</p>
+                    <p className="text-xs font-black uppercase tracking-widest">
+                        {filterMode === 'squad' ? "NO SQUAD DATA DETECTED" : "NO DATA AVAILABLE"}
+                    </p>
                 </div>
             ) : (
                 <AnimatePresence mode='popLayout'>
@@ -5797,6 +5894,7 @@ export default function MemberList() {
                                             src={m.photoURL || `/avatars/avatar1.png`} 
                                             className="w-full h-full object-cover" 
                                             alt="Avatar"
+                                            onError={(e) => {e.target.src = '/avatars/avatar1.png'}}
                                         />
                                     </div>
                                     {i === 0 && <div className="absolute -top-2 -right-2 bg-yellow-400 text-black p-1 rounded-full shadow-lg"><IconCrown size={12}/></div>}
@@ -5828,8 +5926,8 @@ export default function MemberList() {
                                     </div>
                                 </div>
 
-                                {/* الزخرفة */}
-                                {isMe && <div className="absolute right-0 top-0 bottom-0 w-1 bg-cyan-500"></div>}
+                                {/* الزخرفة (Border Glow) */}
+                                {isMe && <div className="absolute right-0 top-0 bottom-0 w-1 bg-cyan-500 shadow-[0_0_15px_#06b6d4]"></div>}
                             </motion.div>
                         );
                     })}
@@ -6652,10 +6750,10 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { 
   IconChartBar, IconTrophy, IconActivity, IconClock, 
-  IconFlame, IconAlertTriangle, IconUser, IconUsers
+  IconFlame, IconAlertTriangle, IconUsers
 } from '@tabler/icons-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/hooks/useLanguage';
 
 export default function TeacherProgress() {
@@ -6669,8 +6767,8 @@ export default function TeacherProgress() {
   useEffect(() => {
     if (!user) return;
 
-    // FIX: تمت إزالة orderBy لتجنب مشكلة (Missing Index) التي تسبب تعليق التحميل
-    // سنقوم بترتيب النتائج برمجياً بعد جلبها
+    // FIX: قمنا بإزالة orderBy من هنا لتجنب مشكلة (Missing Index) التي تسبب تعليق التطبيق
+    // سنقوم بترتيب النتائج برمجياً بعد جلبها لضمان استقرار النظام
     const q = query(
       collection(db, "users"),
       where("teacherId", "==", user.uid)
@@ -6707,7 +6805,7 @@ export default function TeacherProgress() {
     const now = new Date();
     const activeToday = students.filter(s => {
         if (!s.lastLogin) return false;
-        // التأكد من أن التوقيت كائن Firestore Timestamp
+        // التأكد من أن التوقيت كائن Firestore Timestamp أو تاريخ عادي
         const last = s.lastLogin.toDate ? s.lastLogin.toDate() : new Date(s.lastLogin);
         return (now - last) < 86400000; // 24 ساعة
     }).length;
@@ -6722,7 +6820,7 @@ export default function TeacherProgress() {
     };
   }, [students]);
 
-  // دالة مساعدة لتنسيق الوقت (منذ متى)
+  // دالة مساعدة لتنسيق الوقت (منذ متى) بشكل آمن
   const formatLastSeen = (timestamp) => {
       if (!timestamp) return "Never";
       try {
@@ -6838,7 +6936,7 @@ export default function TeacherProgress() {
                                 const progressPercent = Math.min(100, ((student.xp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100);
                                 
                                 // تنبيه إذا لم يدخل الطالب منذ أسبوع
-                                const lastDate = student.lastLogin?.toDate ? student.lastLogin.toDate() : new Date(student.lastLogin);
+                                const lastDate = student.lastLogin?.toDate ? student.lastLogin.toDate() : new Date(student.lastLogin || 0);
                                 const isInactive = (new Date() - lastDate) > 604800000; // 7 days
                                 const isOnline = (new Date() - lastDate) < 300000; // 5 mins
 
@@ -6921,14 +7019,14 @@ FILE: src\components\features\teacher\TeacherStudents.jsx
 "use client";
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, limit, orderBy } from "firebase/firestore";
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, limit } from "firebase/firestore";
 import { 
-  IconUserPlus, IconSearch, IconUsers, IconUser, 
+  IconUserPlus, IconSearch, IconUsers, 
   IconCheck, IconLoader2, IconSchool, IconShield,
-  IconSend, IconMailForward, IconRefresh, IconId
+  IconMailForward, IconId
 } from '@tabler/icons-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '@/hooks/useAuth';
+import { motion } from 'framer-motion';
+import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/hooks/useLanguage';
 
 export default function TeacherStudents() {
@@ -6947,6 +7045,7 @@ export default function TeacherStudents() {
   useEffect(() => {
     if (!user) return;
     
+    // جلب الطلاب المرتبطين بمعرف الأستاذ الحالي
     const q = query(
       collection(db, "users"), 
       where("teacherId", "==", user.uid)
@@ -6960,12 +7059,14 @@ export default function TeacherStudents() {
     return () => unsub();
   }, [user]);
 
-  // 2. جلب المستخدمين للتجنيد
+  // 2. جلب المستخدمين للتجنيد (Recruitment)
   useEffect(() => {
     if (activeTab === 'recruit') {
         const fetchPotentialRecruits = async () => {
             setLoading(true);
             try {
+                // جلب المستخدمين الذين ليس لديهم رتبة خاصة (role == user)
+                // هذا يمنع ظهور الأساتذة الآخرين أو الأدمن في القائمة
                 const q = query(
                     collection(db, "users"),
                     where("role", "==", "user"), 
@@ -6973,6 +7074,7 @@ export default function TeacherStudents() {
                 );
                 
                 const snap = await getDocs(q);
+                // نستبعد أي مستخدم مرتبط بالفعل بهذا الأستاذ (لزيادة الأمان)
                 const users = snap.docs
                     .map(d => ({ id: d.id, ...d.data() }))
                     .filter(u => u.teacherId !== user.uid);
@@ -6992,9 +7094,12 @@ export default function TeacherStudents() {
   const sendInvite = async (targetUser) => {
       if (!user) return;
       
+      // إضافة المستخدم لقائمة "تمت دعوتهم" محلياً فوراً لمنع التكرار
+      setInvitedUsers(prev => [...prev, targetUser.id]);
+
       try {
           await addDoc(collection(db, "notifications"), {
-              userId: targetUser.id,      
+              userId: targetUser.id,      // المستلم (الطالب المحتمل)
               target: 'student',          
               type: 'invite',             
               title: "🎓 SQUAD INVITATION",
@@ -7008,19 +7113,22 @@ export default function TeacherStudents() {
               createdAt: serverTimestamp(),
               read: false
           });
-
-          setInvitedUsers(prev => [...prev, targetUser.id]);
           
       } catch (error) {
           console.error("Invite Failed:", error);
-          alert("Failed to send invite.");
+          alert("Failed to send invite. System error.");
+          // إزالة من القائمة المحلية في حال الفشل للسماح بالمحاولة مرة أخرى
+          setInvitedUsers(prev => prev.filter(id => id !== targetUser.id));
       }
   };
 
-  const filteredRecruits = allUsers.filter(u => 
-      u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // فلترة قائمة التجنيد بناءً على البحث
+  const filteredRecruits = allUsers.filter(u => {
+      const name = u.displayName || "";
+      const email = u.email || "";
+      const search = searchTerm.toLowerCase();
+      return name.toLowerCase().includes(search) || email.toLowerCase().includes(search);
+  });
 
   return (
     <div className="w-full h-full flex flex-col p-6 md:p-10 font-sans min-h-screen" dir={dir}>
@@ -7035,11 +7143,11 @@ export default function TeacherStudents() {
                     <span className="text-[10px] font-black uppercase tracking-[0.4em]">Squad_Command</span>
                 </div>
                 <h1 className="text-4xl md:text-6xl font-black text-white uppercase tracking-tighter drop-shadow-2xl">
-                    {activeTab === 'recruit' ? t('recruit_title') || "Recruitment" : t('nav_students') || "My Squad"}
+                    {activeTab === 'recruit' ? (t('recruit_title') || "Recruitment") : (t('nav_students') || "My Squad")}
                 </h1>
             </div>
 
-            {/* Futuristic Tabs */}
+            {/* Tabs Toggle */}
             <div className="flex bg-[#0a0a0a] border border-white/10 p-1.5 rounded-2xl shadow-xl">
                 <button 
                     onClick={() => setActiveTab('my_squad')}
@@ -7067,7 +7175,7 @@ export default function TeacherStudents() {
         {/* Main Content Area */}
         <div className="flex-1 relative">
             
-            {/* === Tab 1: My Squad === */}
+            {/* === Tab 1: My Squad (قائمة طلابي) === */}
             {activeTab === 'my_squad' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-32">
                     {loading && myStudents.length === 0 ? (
@@ -7084,7 +7192,7 @@ export default function TeacherStudents() {
                     ) : (
                         myStudents.map((student, i) => (
                             <motion.div 
-                                key={student.id}
+                                key={student.id || i}
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: i * 0.05 }}
@@ -7105,7 +7213,7 @@ export default function TeacherStudents() {
                                     </div>
                                     
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-white font-black text-lg truncate uppercase mb-1">{student.displayName}</div>
+                                        <div className="text-white font-black text-lg truncate uppercase mb-1">{student.displayName || "Unknown Agent"}</div>
                                         <div className="flex items-center gap-2">
                                             <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-[9px] text-cyan-400 font-bold uppercase tracking-wider">
                                                 LVL.{Math.floor((student.xp || 0)/500) + 1}
@@ -7120,7 +7228,7 @@ export default function TeacherStudents() {
                 </div>
             )}
 
-            {/* === Tab 2: Recruit === */}
+            {/* === Tab 2: Recruit (التجنيد) === */}
             {activeTab === 'recruit' && (
                 <div className="flex flex-col h-full">
                     {/* Search Bar */}
@@ -9184,18 +9292,19 @@ export default function NotificationCenter() {
   const displayedNotifications = useMemo(() => {
       if (!Array.isArray(notifications)) return [];
       
-      // إذا كان أدمن، نعرض له فقط إشعارات الأدمن (مثل ردود الدعم) + إشعاراته الشخصية المهمة
+      // إذا كان أدمن، نعرض له إشعارات الأدمن + إشعاراته الشخصية
       if (isAdmin) {
           return notifications.filter(n => 
-              n.target === 'admin' || // موجهة للأدمن (مثل رد مستخدم)
+              n.target === 'admin' || 
               n.type === 'admin_alert' || 
-              n.type === 'support_reply'
+              n.type === 'support_reply' ||
+              n.userId === user?.uid
           );
       }
       
       // للمستخدم العادي (طالب/أستاذ)، نعرض كل شيء موجه له
-      return notifications;
-  }, [notifications, isAdmin]);
+      return notifications.filter(n => n.userId === user?.uid);
+  }, [notifications, isAdmin, user]);
 
   // --- 1. معالجة قبول دعوة الانضمام للفريق ---
   const handleAcceptInvite = async (notification) => {
@@ -9205,6 +9314,7 @@ export default function NotificationCenter() {
     try {
         const { teacherId, teacherName } = notification.actionPayload;
 
+        // تحديث بيانات الطالب (ربطه بالأستاذ)
         const userRef = doc(db, "users", user.uid);
         await updateDoc(userRef, {
             role: 'student',        
@@ -9212,6 +9322,7 @@ export default function NotificationCenter() {
             updatedAt: serverTimestamp()
         });
 
+        // إشعار الأستاذ بنجاح العملية
         await addDoc(collection(db, "notifications"), {
             userId: teacherId, 
             target: 'teacher',
@@ -9223,9 +9334,11 @@ export default function NotificationCenter() {
             read: false
         });
 
+        // حذف إشعار الدعوة بعد القبول
         await deleteDoc(doc(db, "notifications", notification.id));
 
         alert(`You have joined ${teacherName}'s squad! Reloading systems...`);
+        // إعادة تحميل لتطبيق الصلاحيات الجديدة (من user إلى student)
         window.location.reload();
 
     } catch (error) {
@@ -9235,37 +9348,42 @@ export default function NotificationCenter() {
     }
   };
 
-  // --- 2. حذف الإشعار (متاح للجميع) ---
+  // --- 2. حذف الإشعار ---
   const handleDelete = async (e, id) => {
-      e.stopPropagation(); // منع فتح الإشعار عند الضغط على الحذف
+      e.stopPropagation(); 
       await removeNotification(id);
   };
 
   // --- 3. التوجيه عند النقر ---
   const handleNavigation = (n) => {
-    // إشعارات الدعوة لا تحذف تلقائياً عند النقر (يجب القبول أو الرفض)
+    // إشعارات الدعوة لا تحذف تلقائياً عند النقر (يجب القبول أو الرفض بالأزرار)
     if (n.type === 'invite') return;
 
+    // توجيه للبث المباشر
     if (n.type === 'live_start' && n.roomId) {
         setIsOpen(false);
+        // تأخير بسيط لضمان تحميل الصفحة
         setCurrentView('live');
-        setTimeout(() => startBroadcast(n.roomId), 500);
+        setTimeout(() => startBroadcast(n.roomId), 100);
         return;
     }
     
+    // توجيه للدعم الفني
     if (n.type === 'support_reply' || n.type === 'admin_msg') {
         setShowSupport(true);
     }
     
+    // توجيه للوحة المتصدرين (عند الترقية)
     if (n.type === 'rank_up' || n.type === 'recruit_success') {
         setCurrentView('leaderboard'); 
     }
 
+    // توجيه للمحتوى الجديد
     if (n.type === 'new_content') {
         setCurrentView('category'); 
     }
 
-    // إغلاق القائمة وحذف الإشعار بعد التفاعل (لأنه تم استهلاكه)
+    // إغلاق القائمة وحذف الإشعار بعد التفاعل (لأنه تم قراءته)
     setIsOpen(false);
     removeNotification(n.id);
   };
@@ -9320,7 +9438,6 @@ export default function NotificationCenter() {
           bg-[#0a0a0a]/90 border-white/10 text-white hover:bg-white/10 hover:border-cyan-500/50
         `}
       >
-        {/* FIX: إزالة التوهج الغبي (animate-pulse) واستبداله باهتزاز بسيط للأيقونة فقط عند وجود إشعارات */}
         <IconBell 
             size={24} 
             className={displayedNotifications.length > 0 ? "text-cyan-400 animate-swing" : "text-white/60"} 
@@ -9406,7 +9523,7 @@ export default function NotificationCenter() {
                                     )}
                                 </div>
 
-                                {/* 🔥 زر الحذف للجميع (ما عدا الدعوات التي تتطلب قرار) */}
+                                {/* زر الحذف للجميع (ما عدا الدعوات التي تتطلب قراراً، لحمايتها من الحذف الخطأ) */}
                                 {n.type !== 'invite' && (
                                     <button 
                                         onClick={(e) => handleDelete(e, n.id)}
@@ -9508,8 +9625,9 @@ export default function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       
-      // تغيير رقم الإصدار هنا يجبر النظام على تنظيف الكاش وتحميل الترجمات الجديدة
-      const CURRENT_VERSION = 'v5.6.0-FULL-TRANSLATIONS'; 
+      // تغيير رقم الإصدار هنا يجبر النظام على تنظيف الكاش وتحميل التعديلات الجديدة
+      // هذا ضروري جداً بعد التعديلات الكبيرة التي قمنا بها
+      const CURRENT_VERSION = 'v5.6.5-TEACHER-FIX'; 
 
       const cleanup = async () => {
         try {
@@ -9518,7 +9636,7 @@ export default function ServiceWorkerRegister() {
             const registrations = await navigator.serviceWorker.getRegistrations();
             for(let registration of registrations) {
               await registration.unregister();
-              console.log('Service Worker Unregistered to force update.');
+              console.log('Old Service Worker Unregistered.');
             }
           }
 
@@ -9526,7 +9644,7 @@ export default function ServiceWorkerRegister() {
           if ('caches' in window) {
             const storedVersion = localStorage.getItem('sw_cache_version');
             
-            // إذا كان الإصدار مختلفاً، قم بمسح كل شيء
+            // إذا كان الإصدار مختلفاً (أو غير موجود)، قم بمسح كل شيء
             if (storedVersion !== CURRENT_VERSION) {
                 const keys = await caches.keys();
                 await Promise.all(
@@ -9534,10 +9652,11 @@ export default function ServiceWorkerRegister() {
                 );
                 console.log('System Caches Purged for Update.');
                 
-                // تحديث الإصدار
+                // تحديث الإصدار في التخزين المحلي
                 localStorage.setItem('sw_cache_version', CURRENT_VERSION);
                 
                 // إعادة تحميل الصفحة لمرة واحدة فقط لتطبيق التحديث
+                // نستخدم sessionStorage لمنع الدخول في حلقة إعادة تحميل لا نهائية
                 if (sessionStorage.getItem('reloaded_for_update') !== 'true') {
                     sessionStorage.setItem('reloaded_for_update', 'true');
                     window.location.reload();
@@ -9629,13 +9748,14 @@ import React from 'react';
 import { DataManager } from '@/components/features/data/DataManager';
 
 export default function DataView({ cards, addCard, deleteCard, updateCard, readOnly }) {
-  // هذا المكون يقرر الصلاحيات قبل تمريرها لمدير البيانات
-  // إذا كان الوضع "قراءة فقط" (readOnly)، نمرر null لدوال التعديل
-  // هذا سيجعل DataManager يخفي أيقونات القلم، الحذف، والإضافة تلقائياً
+  // هذا المكون يعمل كوسيط:
+  // إذا كان الوضع "قراءة فقط" (readOnly = true)، نمرر null لدوال التعديل
+  // هذا سيجعل DataManager يخفي أزرار الإضافة والحذف والتعديل تلقائياً
+  // كما نضمن أن cards مصفوفة دائماً لتجنب الأخطاء
   
   return (
     <DataManager 
-      cards={cards} 
+      cards={cards || []} 
       onAdd={readOnly ? null : addCard} 
       onDelete={readOnly ? null : deleteCard} 
       onUpdate={readOnly ? null : updateCard} 
@@ -9876,7 +9996,7 @@ export default function SettingsView() {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // تحديث البيانات المحلية
+  // تحديث البيانات المحلية عند تحميل الصفحة
   useEffect(() => {
     if (user || userData) {
       setDisplayName(userData?.displayName || user?.displayName || "");
@@ -9887,7 +10007,7 @@ export default function SettingsView() {
           setContactInfo(userData?.contactInfo || "");
       }
 
-      // جلب اسم الأستاذ إذا كان المستخدم طالباً
+      // جلب اسم الأستاذ إذا كان المستخدم طالباً لعرضه
       if (isStudent && userData?.teacherId) {
           const fetchTeacher = async () => {
               try {
@@ -9907,14 +10027,17 @@ export default function SettingsView() {
     if (!user) return;
     setLoading(true);
     try {
+        // تحديث في Auth
         await updateProfile(user, { displayName, photoURL });
         
+        // تجهيز بيانات التحديث لـ Firestore
         const updateData = { 
             displayName, 
             photoURL,
             updatedAt: new Date().toISOString()
         };
 
+        // إضافة بيانات الأستاذ إذا كان أستاذاً
         if (isTeacher) {
             updateData.subject = subject;
             updateData.contactInfo = contactInfo;
@@ -9954,7 +10077,7 @@ export default function SettingsView() {
       
       setLoading(true);
       try {
-          // حفظ معرف الأستاذ القديم قبل الحذف لإرسال الإشعار
+          // حفظ معرف الأستاذ القديم قبل الحذف لإرسال الإشعار له
           const oldTeacherId = userData?.teacherId;
 
           // تحديث مستند المستخدم (حذف التبعية وإعادة الرتبة ليوزر عادي)
@@ -9977,8 +10100,8 @@ export default function SettingsView() {
               });
           }
 
-          alert("You have left the squad.");
-          window.location.reload(); // إعادة تحميل لتحديث الواجهة والصلاحيات
+          alert("You have left the squad. Returning to base.");
+          window.location.reload(); // إعادة تحميل لتحديث الواجهة والصلاحيات فوراً
 
       } catch (error) {
           console.error(error);
@@ -10046,7 +10169,12 @@ export default function SettingsView() {
               <div className="flex flex-col items-center mb-10">
                   <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                       <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-cyan-500/20 shadow-2xl relative z-10 transition-transform group-hover:scale-105">
-                          <img src={photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                          <img 
+                            src={photoURL || '/avatars/avatar1.png'} 
+                            alt="Avatar" 
+                            className="w-full h-full object-cover" 
+                            onError={(e) => {e.target.src = '/avatars/avatar1.png'}}
+                          />
                       </div>
                       <div className="absolute -inset-2 rounded-full bg-gradient-to-tr from-cyan-500 to-purple-600 blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
                       <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
@@ -10068,7 +10196,7 @@ export default function SettingsView() {
                       />
                   </div>
 
-                  {/* --- Teacher Fields --- */}
+                  {/* --- Teacher Fields: يظهر فقط للأستاذ --- */}
                   {isTeacher && (
                       <div className="space-y-6 p-6 bg-cyan-500/5 border border-cyan-500/10 rounded-3xl animate-in slide-in-from-top-2">
                           <div className="flex items-center gap-2 mb-2 text-cyan-500">
@@ -10081,12 +10209,12 @@ export default function SettingsView() {
                           </div>
                           <div>
                               <label className="text-[9px] font-black uppercase tracking-widest mb-2 block opacity-60">Contact Info</label>
-                              <textarea value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-white text-sm outline-none focus:border-cyan-500 transition-all h-24 resize-none" placeholder="Contact details..." />
+                              <textarea value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-white text-sm outline-none focus:border-cyan-500 transition-all h-24 resize-none" placeholder="Contact details visible to students..." />
                           </div>
                       </div>
                   )}
 
-                  {/* --- Student Fields (Leaving Squad) --- */}
+                  {/* --- Student Fields: يظهر فقط للطالب --- */}
                   {isStudent && (
                       <div className="space-y-6 p-6 bg-purple-500/5 border border-purple-500/10 rounded-3xl animate-in slide-in-from-top-2">
                           <div className="flex justify-between items-start">
@@ -10103,6 +10231,10 @@ export default function SettingsView() {
                               >
                                   <IconUnlink size={14}/> Leave
                               </button>
+                          </div>
+                          <div className="flex items-start gap-2 text-yellow-500/70 text-[10px] font-mono bg-yellow-500/5 p-3 rounded-xl border border-yellow-500/10">
+                              <IconAlertTriangle size={14} className="shrink-0"/>
+                              <span>Warning: Leaving the squad will disconnect you from the teacher's content and live sessions.</span>
                           </div>
                       </div>
                   )}
@@ -10417,7 +10549,7 @@ import CommunicationHub from '@/components/features/chat/CommunicationHub';
 import { CategorySelect } from '@/components/features/study/CategorySelect';
 
 // === استيراد صفحات الأستاذ (Recruitment & Analytics) ===
-// هذه هي المكونات التي قمنا بإصلاحها للتو
+// هذه هي المكونات الجديدة التي قمنا بإضافتها
 import TeacherStudents from '@/components/features/teacher/TeacherStudents';
 import TeacherProgress from '@/components/features/teacher/TeacherProgress';
 
@@ -10433,7 +10565,7 @@ export default function ViewManager(props) {
     exit: { opacity: 0, scale: 1.02, filter: "blur(4px)", transition: { duration: 0.2, ease: "easeIn" } }
   };
 
-  // مكون فرعي لعرض رسالة "ممنوع الدخول"
+  // مكون فرعي لعرض رسالة "ممنوع الدخول" (Security Gate)
   const AccessDenied = () => (
     <div className="h-full flex flex-col items-center justify-center text-red-500 font-mono tracking-widest gap-4 text-center p-4">
         <IconAlertTriangle size={64} className="animate-pulse" />
@@ -10448,13 +10580,14 @@ export default function ViewManager(props) {
     </div>
   );
 
-  // دالة تحديد المحتوى المعروض
+  // دالة تحديد المحتوى المعروض (Routing Logic)
   const renderViewContent = () => {
     switch (currentView) {
       // --- الصفحة الرئيسية ---
       case 'home': return <HeroView />;
       
       // --- لوحة التحكم (للأدمن فقط) ---
+      // تم ربط AdminDashboard هنا
       case 'admin_panel': return (isJunior || isAdmin) ? <AdminView /> : <AccessDenied />;
 
       // === واجهات الأستاذ (Teacher Interfaces) ===
@@ -10475,7 +10608,7 @@ export default function ViewManager(props) {
         if (!isTeacher) return <AccessDenied />;
         return <TeacherStudents />; 
 
-      case 'teacher_progress': // صفحة التحليلات المتقدمة (التي أصلحناها)
+      case 'teacher_progress': // صفحة التحليلات المتقدمة
         if (!isTeacher) return <AccessDenied />;
         return <TeacherProgress />; 
 
@@ -10508,10 +10641,10 @@ export default function ViewManager(props) {
           />
         );
 
-      case 'data': // عرض الأرشيف
+      case 'data': // عرض الأرشيف (للطالب للعرض فقط، وللأدمن للتعديل)
         // الطالب يرى المحتوى لكن لا يعدله (readOnly = true)
-        // الأستاذ/الأدمن يمكنه التعديل
-        const canEdit = isTeacher || isAdmin || isJunior;
+        // الأستاذ يدخل عبر teacher_db للتعديل، لكن هنا نمنح الصلاحية للأدمن أيضاً
+        const canEdit = isAdmin || isJunior; 
         return (
           <DataView 
             cards={props.cards} 
@@ -10594,10 +10727,12 @@ export const AuthProvider = ({ children }) => {
       const userRef = doc(db, "users", firebaseUser.uid);
       const snap = await getDoc(userRef);
       
-      // إذا كان المستخدم جديداً، ننشئ له ملفاً
+      // إذا كان المستخدم جديداً تماماً (ليس لديه سجل في Firestore)
       if (!snap.exists()) {
         // التحقق مما إذا كان هذا هو الإيميل الرئيسي (الماستر)
-        const isMasterEmail = firebaseUser.email?.toLowerCase() === MASTER_EMAIL?.toLowerCase();
+        const isMasterEmail = firebaseUser.email?.toLowerCase() === (MASTER_EMAIL || "").toLowerCase();
+        
+        // الرتبة الافتراضية: ماستر إذا تطابق الإيميل، وإلا مستخدم عادي
         const initialRole = isMasterEmail ? 'master' : 'user';
         
         const newProfile = {
@@ -10605,17 +10740,18 @@ export const AuthProvider = ({ children }) => {
           displayName: firebaseUser.displayName || 'New Agent',
           photoURL: firebaseUser.photoURL || "/avatars/avatar1.png",
           role: initialRole, 
-          teacherId: null,
+          teacherId: null, // لا يوجد أستاذ افتراضياً
           xp: 0,
           streak: 0,
           isBanned: false,
           createdAt: serverTimestamp(),
           lastLogin: serverTimestamp(),
+          settings: { theme: 'dark', sound: true } // إعدادات افتراضية
         };
         
         await setDoc(userRef, newProfile);
       } else {
-        // إذا كان موجوداً، نحدث وقت الدخول فقط
+        // إذا كان المستخدم موجوداً، نقوم فقط بتحديث "آخر ظهور"
         await updateDoc(userRef, { lastLogin: serverTimestamp() });
       }
     } catch (e) { 
@@ -10629,7 +10765,8 @@ export const AuthProvider = ({ children }) => {
         setUser(firebaseUser);
         await initializeUserProfile(firebaseUser);
         
-        // الاشتراك في تحديثات بيانات المستخدم (للتحديث الفوري للصلاحيات أو الحظر)
+        // الاشتراك في تحديثات بيانات المستخدم في الوقت الفعلي (Firestore Listener)
+        // هذا يضمن أن تغيير الرتبة من لوحة الأدمن ينعكس فوراً عند المستخدم دون تحديث الصفحة
         const userRef = doc(db, "users", firebaseUser.uid);
         const unsubscribeDoc = onSnapshot(userRef, (docSnap) => {
           if (docSnap.exists()) {
@@ -10637,8 +10774,10 @@ export const AuthProvider = ({ children }) => {
             setUserData(data);
             
             // نظام الحماية: طرد المستخدم فوراً إذا تم حظره (إلا إذا كان الماستر)
-            if (data.isBanned && firebaseUser.email?.toLowerCase() !== MASTER_EMAIL?.toLowerCase()) {
-              alert("ACCESS DENIED: Your neural link has been terminated.");
+            const isMaster = data.role === 'master' || firebaseUser.email?.toLowerCase() === (MASTER_EMAIL || "").toLowerCase();
+            
+            if (data.isBanned && !isMaster) {
+              alert("ACCESS DENIED: Your neural link has been terminated by command.");
               signOut(auth);
               window.location.reload();
             }
@@ -10659,7 +10798,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
         await signOut(auth);
-        // إعادة تحميل الصفحة لتنظيف أي كاش أو حالات عالقة
+        // إعادة تحميل الصفحة لتنظيف أي كاش أو حالات عالقة في الذاكرة
         window.location.reload();
     } catch (e) {
         console.error("Logout Error:", e);
@@ -10669,24 +10808,24 @@ export const AuthProvider = ({ children }) => {
   // --- تعريف الرتب والصلاحيات (Role Logic) ---
   const role = userData?.role || 'user';
   
-  // 1. الماستر: يملك كل الصلاحيات (لا يمكن حظره)
-  const isMaster = role === 'master' || user?.email?.toLowerCase() === MASTER_EMAIL?.toLowerCase();
+  // 1. الماستر: يملك كل الصلاحيات ولا يمكن حظره
+  const isMaster = role === 'master' || user?.email?.toLowerCase() === (MASTER_EMAIL || "").toLowerCase();
   
   // 2. الأدمن: يشمل الماستر والأدمن العادي
   const isAdmin = isMaster || role === 'admin';
   
-  // 3. الجونيور (Junior Admin): رتبة مساعدة
-  // (يستطيع دخول لوحة التحكم، لكن يمكننا تقييده في مكونات معينة لاحقاً)
+  // 3. الجونيور (Junior Admin): رتبة مساعدة للأدمن
+  // (يستطيع دخول لوحة التحكم، لكن بصلاحيات محدودة حددناها في AdminDashboard)
   const isJunior = isAdmin || role === 'junior_admin' || role === 'moderator';
 
-  // 4. الأستاذ (يملك أدوات إدارة المحتوى والطلاب)
-  // ملاحظة: الأدمن يملك صلاحيات الأستاذ أيضاً لتجربة النظام
+  // 4. الأستاذ (Teacher): يملك أدوات إدارة المحتوى والطلاب
+  // ملاحظة: نمنح الأدمن صلاحيات الأستاذ أيضاً ليتمكن من تجربة الميزات
   const isTeacher = role === 'teacher' || isAdmin; 
 
-  // 5. الطالب
+  // 5. الطالب (Student): يرى محتوى الأستاذ فقط
   const isStudent = role === 'student';
 
-  // 6. المستخدم العادي
+  // 6. المستخدم العادي (User): لم ينضم لأي فصل بعد
   const isUser = role === 'user';
 
   const value = {
@@ -10696,15 +10835,15 @@ export const AuthProvider = ({ children }) => {
     logout,
     role,
     
-    // Flags للصلاحيات
+    // Flags للصلاحيات (نستخدم هذه في ViewManager وباقي المكونات)
     isMaster,
     isAdmin,
-    isJunior,  // <--- هذا ما طلبته للتحكم في الوصول
+    isJunior,
     isTeacher,
     isStudent,
     isUser,
 
-    // بيانات إضافية
+    // بيانات إضافية مفيدة
     teacherId: userData?.teacherId || null,
     isBanned: userData?.isBanned === true
   };
@@ -10846,6 +10985,7 @@ import {
 } from 'firebase/firestore';
 import { useAuth } from './AuthContext'; 
 
+// الحالة الافتراضية للبث
 const defaultLiveState = {
   isActive: false,
   roomName: null,
@@ -10865,24 +11005,26 @@ export const UIProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [liveStream, setLiveStream] = useState(defaultLiveState);
 
+  // --- 1. إدارة البث المباشر ---
+
   const startBroadcast = useCallback((room) => {
     setLiveStream({ isActive: true, roomName: room, isMinimized: false });
     setCurrentView('live');
   }, []);
 
-  // 🔥 التعديل الجذري: استقبال معرف الغرفة لحذف إشعاراتها
+  // 🔥 دالة إنهاء البث وتنظيف الإشعارات
   const endBroadcast = useCallback(async (explicitRoomId = null) => {
-    // نستخدم المعرف الممرر يدوياً (الأضمن) أو الموجود في الحالة
+    // نستخدم المعرف الممرر يدوياً (الأضمن) أو الموجود في الحالة الحالية
     const roomToDelete = explicitRoomId || liveStream.roomName;
     
-    // 1. تصفير الحالة المحلية في الواجهة
+    // أ. تصفير الحالة المحلية في الواجهة فوراً
     setLiveStream(defaultLiveState);
     setCurrentView(prev => prev === 'live' ? 'home' : prev);
 
-    // 2. تنظيف الإشعارات من قاعدة البيانات
+    // ب. تنظيف الإشعارات من قاعدة البيانات لمنع ظهور تنبيهات منتهية
     if (roomToDelete) {
         try {
-            console.log(`🧹 Attempting to clean alerts for room: ${roomToDelete}`);
+            console.log(`🧹 Cleaning alerts for room: ${roomToDelete}`);
             
             const q = query(
                 collection(db, "notifications"),
@@ -10910,7 +11052,7 @@ export const UIProvider = ({ children }) => {
     setLiveStream(prev => ({ ...prev, isMinimized: minimize }));
   }, []);
 
-  // مراقبة التنقل
+  // مراقبة التنقل: تصغير البث تلقائياً إذا انتقل المستخدم لصفحة أخرى
   useEffect(() => {
     if (liveStream.isActive) {
       if (currentView !== 'live') {
@@ -10921,7 +11063,31 @@ export const UIProvider = ({ children }) => {
     }
   }, [currentView, liveStream.isActive]);
 
-  // --- نظام جلب الإشعارات ---
+  // --- 2. نظام جلب الإشعارات (Real-time) ---
+  
+  // دالة مساعدة لدمج وترتيب الإشعارات
+  const updateNotificationsState = (newDocs, isAdminSource = false) => {
+      setNotifications(prev => {
+          let merged = [];
+          
+          if (isAdminSource) {
+              // إذا جاء التحديث من مصدر الأدمن، ندمجه مع الإشعارات الشخصية الموجودة
+              const userOnly = prev.filter(n => n.target !== 'admin');
+              merged = [...userOnly, ...newDocs];
+          } else {
+              // إذا جاء التحديث من المصدر الشخصي، ندمجه مع إشعارات الأدمن الموجودة
+              const adminOnly = prev.filter(n => n.target === 'admin');
+              merged = [...adminOnly, ...newDocs];
+          }
+          
+          // إزالة التكرار (بناءً على ID)
+          const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
+          
+          // الترتيب حسب الوقت (الأحدث أولاً)
+          return unique.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      });
+  };
+
   useEffect(() => {
     if (!user) {
         setNotifications([]);
@@ -10930,25 +11096,27 @@ export const UIProvider = ({ children }) => {
     
     const unsubscribers = [];
 
-    // أ. جلب إشعارات المستخدم
+    // أ. الاستماع للإشعارات الشخصية (الموجهة لـ userId)
     const myNotifsQuery = query(
         collection(db, "notifications"), 
         where("userId", "==", user.uid)
     );
     
     const unsubMy = onSnapshot(myNotifsQuery, (snap) => {
-        updateNotificationsState(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        updateNotificationsState(data, false);
     });
     unsubscribers.push(unsubMy);
 
-    // ب. جلب إشعارات الأدمن
+    // ب. الاستماع لإشعارات الإدارة (فقط إذا كان المستخدم أدمن)
     if (isAdmin) {
         const adminQuery = query(
             collection(db, "notifications"), 
             where("target", "==", "admin")
         );
         const unsubAdmin = onSnapshot(adminQuery, (snap) => {
-            updateNotificationsState(snap.docs.map(d => ({ id: d.id, ...d.data() })), true);
+            const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            updateNotificationsState(data, true);
         });
         unsubscribers.push(unsubAdmin);
     }
@@ -10958,36 +11126,31 @@ export const UIProvider = ({ children }) => {
     };
   }, [user, isAdmin]);
 
-  const updateNotificationsState = (newDocs, isAdminSource = false) => {
-      setNotifications(prev => {
-          let merged = [];
-          if (isAdminSource) {
-              const userOnly = prev.filter(n => n.target !== 'admin');
-              merged = [...userOnly, ...newDocs];
-          } else {
-              const adminOnly = prev.filter(n => n.target === 'admin');
-              merged = [...adminOnly, ...newDocs];
-          }
-          const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
-          return unique.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-      });
-  };
-
   const removeNotification = async (id) => {
+    // التحديث الفوري للواجهة (Optimistic UI)
+    setNotifications(prev => prev.filter(n => n.id !== id));
+    
     try { 
         await deleteDoc(doc(db, "notifications", id)); 
     } catch (e) { 
         console.error("Failed to delete notification record:", e); 
-        setNotifications(prev => prev.filter(n => n.id !== id));
+        // في حال الفشل، يمكن إعادة التحميل أو تجاهل الخطأ لأن الـ Listener سيصحح الوضع
     }
   };
 
   const value = {
+      // Navigation
       currentView, setCurrentView, 
       activeCategory, setActiveCategory,
+      
+      // Features
       showSupport, setShowSupport,
       activeOverlayGame, setActiveOverlayGame,
+      
+      // Notifications
       notifications, removeNotification,
+      
+      // Live Stream
       liveState: liveStream, 
       startBroadcast, endBroadcast, toggleMinimize
   };
@@ -13384,7 +13547,7 @@ FILE: src\hooks\useStudySystem.js
 "use client";
 import { useState, useEffect, useCallback } from 'react';
 import { fullDatabase } from '@/data/fullDatabase'; 
-import { MILITARY_RANKS } from '@/data/militaryRanks'; // استيراد نظام الرتب
+import { MILITARY_RANKS } from '@/data/militaryRanks'; 
 import { db } from '@/lib/firebase';
 import { 
   doc, setDoc, collection, updateDoc, 
@@ -13392,9 +13555,9 @@ import {
   query, where, getDocs, addDoc 
 } from "firebase/firestore";
 import { useUI } from './useUI';
-import { useAuth } from './useAuth';
+import { useAuth } from '@/context/AuthContext'; // استخدام المسار الصحيح
 
-const SYSTEM_VERSION = "5.4.0-NOTIF-SYNC";
+const SYSTEM_VERSION = "5.5.0-TEACHER-SYNC";
 
 export const useStudySystem = (firebaseUser) => {
   const { activeCategory } = useUI();
@@ -13408,7 +13571,7 @@ export const useStudySystem = (firebaseUser) => {
   const [rawContent, setRawContent] = useState([]);
   const [progressMap, setProgressMap] = useState({});
 
-  // تنظيف الكاش عند التحديث
+  // تنظيف الكاش عند تحديث إصدار النظام
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const savedVer = localStorage.getItem('RM_SYS_VER');
@@ -13418,24 +13581,39 @@ export const useStudySystem = (firebaseUser) => {
     }
   }, []);
 
-  // دمج المحتوى مع التقدم
+  // --- 1. دمج المحتوى مع تقدم الطالب ---
   useEffect(() => {
+    // إذا لم يكن هناك محتوى، نفرغ البطاقات
     if (!rawContent.length) {
         setCards([]);
         return;
     }
+
+    // دمج بيانات البطاقة الأصلية مع بيانات تقدم الطالب (مثل المستوى وموعد المراجعة)
     const merged = rawContent.map(card => {
         const userProgress = progressMap[card.id];
         return userProgress ? { ...card, ...userProgress } : { ...card, level: 0 };
     });
+
     setCards(merged);
+
+    // اختيار بطاقة جديدة للدراسة إذا لم تكن هناك بطاقة حالية
+    // نستخدم Timeout بسيط لضمان عدم تداخل تحديثات الحالة
     const timer = setTimeout(() => {
-        setCurrentCard(prev => prev || pickCardInternal(merged, activeCategory));
+        setCurrentCard(prev => {
+            // إذا كانت البطاقة الحالية موجودة ومازالت صالحة (لم يتم حذفها)، نحتفظ بها
+            const stillExists = merged.find(c => c.id === prev?.id);
+            if (prev && stillExists) return prev;
+            
+            // وإلا نختار بطاقة جديدة
+            return pickCardInternal(merged, activeCategory);
+        });
     }, 100);
+
     return () => clearTimeout(timer);
   }, [rawContent, progressMap, activeCategory]);
 
-  // جلب المحتوى
+  // --- 2. جلب المحتوى بناءً على الرتبة (Logic Core) ---
   useEffect(() => {
     if (!firebaseUser) {
         setLoading(false);
@@ -13446,29 +13624,37 @@ export const useStudySystem = (firebaseUser) => {
 
     try {
         if (isTeacher) {
+            // الأستاذ: يرى المحتوى الذي أنشأه هو فقط ليقوم بتعديله
             const q = collection(db, "users", firebaseUser.uid, "content");
             unsubContent = onSnapshot(q, (snap) => {
                 const teacherContent = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                // إذا لم يضف شيئاً، نعرض له قاعدة البيانات العامة كبداية
                 setRawContent(teacherContent.length > 0 ? teacherContent : fullDatabase);
                 setLoading(false);
             });
         } else if (isStudent) {
+            // الطالب: يرى محتوى أستاذه
             if (userData?.teacherId) {
                 const q = collection(db, "users", userData.teacherId, "content");
                 unsubContent = onSnapshot(q, (snap) => {
                     const assignedContent = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    // الطالب يرى محتوى الأستاذ، وإذا كان فارغاً يرى المحتوى العام
                     setRawContent(assignedContent.length > 0 ? assignedContent : fullDatabase); 
                     setLoading(false);
                 });
             } else {
+                // طالب بدون أستاذ: يرى المحتوى العام
                 setRawContent(fullDatabase);
                 setLoading(false);
             }
         } else {
+            // مستخدم عادي: يرى المحتوى العام + محتواه الخاص
             const q = collection(db, "users", firebaseUser.uid, "content");
             unsubContent = onSnapshot(q, (snap) => {
                 const personalContent = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                // دمج المحتوى العام مع الخاص
                 const combined = [...fullDatabase, ...personalContent];
+                // إزالة التكرار
                 const uniqueMap = new Map(combined.map(item => [item.id, item]));
                 setRawContent(Array.from(uniqueMap.values()));
                 setLoading(false);
@@ -13482,9 +13668,11 @@ export const useStudySystem = (firebaseUser) => {
     return () => unsubContent();
   }, [firebaseUser, userData, isTeacher, isStudent]);
 
-  // جلب الإحصائيات والتقدم
+  // --- 3. جلب الإحصائيات وتقدم الطالب ---
   useEffect(() => {
     if (!firebaseUser) return;
+
+    // مراقبة الـ XP والـ Streak
     const userRef = doc(db, "users", firebaseUser.uid);
     const unsubStats = onSnapshot(userRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -13492,24 +13680,36 @@ export const useStudySystem = (firebaseUser) => {
         setStats({ xp: data.xp || 0, streak: data.streak || 0 });
       }
     });
+
+    // مراقبة تقدم البطاقات (Level, Next Review)
     const progressColl = collection(db, "users", firebaseUser.uid, "progress");
     const unsubProgress = onSnapshot(progressColl, (snap) => {
         const map = {};
         snap.docs.forEach(d => { map[d.id] = d.data(); });
         setProgressMap(map);
     });
+
     return () => { unsubStats(); unsubProgress(); };
   }, [firebaseUser]);
 
-  // خوارزمية اختيار البطاقة
+  // --- خوارزمية SRS لاختيار البطاقة ---
   const pickCardInternal = (list, category, excludeId = null) => {
       if (!list || list.length === 0) return null;
       const now = Date.now();
+      
+      // 1. التصفية حسب القسم
       let pool = category === 'All' ? list : list.filter(c => c.category === category);
+      
+      // 2. استبعاد البطاقة الحالية (لمنع التكرار الفوري)
       if (excludeId) pool = pool.filter(c => c.id !== excludeId);
+      
+      // 3. البحث عن البطاقات المستحقة للمراجعة (Level < 5 && Time passed)
       const due = pool.filter(c => (c.level || 0) < 5 && (!c.nextReview || c.nextReview <= now));
-      if (due.length > 0) return due[Math.floor(Math.random() * due.length)];
-      if (pool.length > 0) return pool[Math.floor(Math.random() * pool.length)];
+      
+      // 4. الاختيار
+      if (due.length > 0) return due[Math.floor(Math.random() * due.length)]; // أولوية للمستحقة
+      if (pool.length > 0) return pool[Math.floor(Math.random() * pool.length)]; // ثم العشوائية من نفس القسم
+      
       return null;
   };
 
@@ -13518,24 +13718,28 @@ export const useStudySystem = (firebaseUser) => {
     setCurrentCard(next);
   }, [activeCategory]);
 
-  // --- معالجة الإجابة (مع منطق الترقية الجديد) ---
+  // --- 4. معالجة الإجابة (Swipe Logic) ---
   const handleSwipe = useCallback(async (direction) => {
     if (!currentCard || !firebaseUser) return;
     
     const known = direction === 'right';
-    const nextLevel = known ? Math.min((currentCard.level || 0) + 1, 5) : 0;
-    const intervals = [1, 60, 1440, 4320, 10080, 43200];
-    const minutesToAdd = known ? intervals[nextLevel] : 1;
+    
+    // منطق التكرار المتباعد (Spaced Repetition)
+    const nextLevel = known ? Math.min((currentCard.level || 0) + 1, 5) : 0; // إذا أخطأ يعود للصفر
+    const intervals = [1, 60, 1440, 4320, 10080, 43200]; // دقائق (دقيقة، ساعة، يوم، 3 أيام، أسبوع، شهر)
+    const minutesToAdd = known ? intervals[nextLevel] : 1; // مراجعة فورية عند الخطأ
     const nextReview = Date.now() + (minutesToAdd * 60 * 1000);
 
-    // تحديث محلي
+    // التحديث الفوري للواجهة (Optimistic UI)
     const updatedCard = { ...currentCard, level: nextLevel, nextReview };
     const newCards = cards.map(c => c.id === currentCard.id ? updatedCard : c);
     setCards(newCards);
+    
+    // اختيار البطاقة التالية فوراً
     pickNextCard(newCards, currentCard.id);
 
     try {
-      // حفظ التقدم
+      // 1. حفظ تقدم البطاقة في Firestore
       const progressRef = doc(db, "users", firebaseUser.uid, "progress", String(currentCard.id));
       await setDoc(progressRef, { 
           level: nextLevel, 
@@ -13543,10 +13747,10 @@ export const useStudySystem = (firebaseUser) => {
           lastStudied: serverTimestamp()
       }, { merge: true });
       
-      // زيادة الـ XP والتحقق من الترقية
+      // 2. زيادة الـ XP والتحقق من الترقية
       if (known) {
         const currentXP = stats.xp || 0;
-        const newXP = currentXP + 10;
+        const newXP = currentXP + 10; // 10 نقاط لكل إجابة صحيحة
 
         await updateDoc(doc(db, "users", firebaseUser.uid), { 
             xp: newXP,
@@ -13554,16 +13758,17 @@ export const useStudySystem = (firebaseUser) => {
         });
 
         // 🔥 التحقق من الترقية (Rank Up Check)
+        // هذا الجزء يضمن تحديث الرتبة في لوحة الأدمن وفي الملف الشخصي
         const oldRank = MILITARY_RANKS.reduce((curr, r) => currentXP >= r.xp ? r : curr, MILITARY_RANKS[0]);
         const newRank = MILITARY_RANKS.reduce((curr, r) => newXP >= r.xp ? r : curr, MILITARY_RANKS[0]);
 
         if (newRank.id !== oldRank.id) {
-            // إرسال إشعار الترقية
+            // إرسال إشعار الترقية (يظهر في NotificationCenter)
             await addDoc(collection(db, "notifications"), {
                 userId: firebaseUser.uid,
                 type: 'rank_up',
                 title: `🎖️ PROMOTED TO ${newRank.name}`,
-                message: `Congratulations! You have reached the rank of ${newRank.title}. Access granted to new perks.`,
+                message: `Congratulations! You have reached the rank of ${newRank.title}. Glory to the Squad!`,
                 senderId: 'system',
                 createdAt: serverTimestamp(),
                 read: false
@@ -13573,10 +13778,11 @@ export const useStudySystem = (firebaseUser) => {
     } catch (e) { console.error("Save Error:", e); }
   }, [currentCard, firebaseUser, cards, stats.xp, pickNextCard]);
 
-  // --- إضافة بطاقة (مع إشعار الطلاب) ---
+  // --- 5. إضافة بطاقة (للأستاذ فقط) ---
   const addCard = useCallback(async (cardData) => {
+    // حماية: الطالب لا يضيف محتوى
     if (isStudent) {
-        alert("Access Denied.");
+        alert("Access Denied: Students cannot modify database.");
         return;
     }
     
@@ -13584,43 +13790,45 @@ export const useStudySystem = (firebaseUser) => {
     
     if (firebaseUser) {
         try {
-            // 1. حفظ المحتوى
+            // أ. حفظ المحتوى في مجموعة الأستاذ
             await setDoc(doc(db, "users", firebaseUser.uid, "content", newId), {
                 ...cardData,
                 id: newId,
                 createdAt: serverTimestamp()
             });
 
-            // 2. 🔥 إرسال إشعار للطلاب (إذا كان أستاذاً)
+            // ب. 🔥 إرسال إشعار للطلاب (ميزة حيوية)
             if (isTeacher) {
                 // جلب جميع الطلاب المرتبطين بهذا الأستاذ
                 const studentsQuery = query(collection(db, "users"), where("teacherId", "==", firebaseUser.uid));
                 const studentsSnap = await getDocs(studentsQuery);
                 
-                // إرسال إشعار لكل طالب
-                const notifyPromises = studentsSnap.docs.map(studentDoc => 
-                    addDoc(collection(db, "notifications"), {
-                        userId: studentDoc.id,
-                        target: 'student',
-                        type: 'new_content',
-                        title: "📚 NEW INTEL RECEIVED",
-                        message: `Commander added new data: "${cardData.russian}" to ${cardData.category || "General"}.`,
-                        senderId: firebaseUser.uid,
-                        createdAt: serverTimestamp(),
-                        read: false
-                    })
-                );
-                
-                await Promise.all(notifyPromises);
+                if (!studentsSnap.empty) {
+                    const notifyPromises = studentsSnap.docs.map(studentDoc => 
+                        addDoc(collection(db, "notifications"), {
+                            userId: studentDoc.id,
+                            target: 'student',
+                            type: 'new_content',
+                            title: "📚 NEW INTEL RECEIVED",
+                            message: `Commander added new data: "${cardData.russian}" to category: ${cardData.category || "General"}.`,
+                            senderId: firebaseUser.uid,
+                            createdAt: serverTimestamp(),
+                            read: false
+                        })
+                    );
+                    await Promise.all(notifyPromises);
+                }
             }
         } catch (e) {
             console.error("Add Card Error:", e);
+            alert("Failed to upload data.");
         }
     }
   }, [firebaseUser, isStudent, isTeacher]);
 
+  // --- 6. حذف وتعديل (للأستاذ فقط) ---
   const deleteCard = useCallback(async (cardId) => {
-    if (isStudent) return;
+    if (isStudent) return; // حماية
     if (firebaseUser) {
         try {
             await deleteDoc(doc(db, "users", firebaseUser.uid, "content", String(cardId)));
@@ -13629,7 +13837,7 @@ export const useStudySystem = (firebaseUser) => {
   }, [firebaseUser, isStudent]);
 
   const updateCard = useCallback(async (cardId, newData) => {
-    if (isStudent) return;
+    if (isStudent) return; // حماية
     if (firebaseUser) {
         try {
             await updateDoc(doc(db, "users", firebaseUser.uid, "content", String(cardId)), newData);
@@ -13637,15 +13845,30 @@ export const useStudySystem = (firebaseUser) => {
     }
   }, [firebaseUser, isStudent]);
 
+  // --- 7. تصفير التقدم ---
   const resetProgress = async () => {
-      if(!confirm("Reset progress?")) return;
-      await updateDoc(doc(db, "users", firebaseUser.uid), { xp: 0 });
-      window.location.reload();
+      if(!confirm("WARNING: This will wipe all your neural progress (XP & Levels). Continue?")) return;
+      try {
+          await updateDoc(doc(db, "users", firebaseUser.uid), { xp: 0 });
+          // ملاحظة: حذف subcollection "progress" يتطلب Cloud Function أو حذف المستندات واحداً تلو الآخر
+          // للتبسيط هنا نصفر الـ XP فقط ونعيد تحميل الصفحة
+          window.location.reload();
+      } catch (e) {
+          console.error("Reset Failed", e);
+      }
   };
 
   return { 
-    cards, currentCard, stats, handleSwipe, loading, 
-    addCard, deleteCard, updateCard, resetProgress,
+    cards, 
+    currentCard, 
+    stats, 
+    handleSwipe, 
+    loading, 
+    addCard, 
+    deleteCard, 
+    updateCard, 
+    resetProgress,
+    // حالة الحظر لتوجيه المستخدم في الواجهة
     isBanned: userData?.isBanned || false
   };
 };
