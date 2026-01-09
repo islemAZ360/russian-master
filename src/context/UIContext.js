@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore';
 import { useAuth } from './AuthContext'; 
 
+// الحالة الافتراضية للبث
 const defaultLiveState = {
   isActive: false,
   roomName: null,
@@ -25,24 +26,26 @@ export const UIProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [liveStream, setLiveStream] = useState(defaultLiveState);
 
+  // --- 1. إدارة البث المباشر ---
+
   const startBroadcast = useCallback((room) => {
     setLiveStream({ isActive: true, roomName: room, isMinimized: false });
     setCurrentView('live');
   }, []);
 
-  // 🔥 التعديل الجذري: استقبال معرف الغرفة لحذف إشعاراتها
+  // 🔥 دالة إنهاء البث وتنظيف الإشعارات
   const endBroadcast = useCallback(async (explicitRoomId = null) => {
-    // نستخدم المعرف الممرر يدوياً (الأضمن) أو الموجود في الحالة
+    // نستخدم المعرف الممرر يدوياً (الأضمن) أو الموجود في الحالة الحالية
     const roomToDelete = explicitRoomId || liveStream.roomName;
     
-    // 1. تصفير الحالة المحلية في الواجهة
+    // أ. تصفير الحالة المحلية في الواجهة فوراً
     setLiveStream(defaultLiveState);
     setCurrentView(prev => prev === 'live' ? 'home' : prev);
 
-    // 2. تنظيف الإشعارات من قاعدة البيانات
+    // ب. تنظيف الإشعارات من قاعدة البيانات لمنع ظهور تنبيهات منتهية
     if (roomToDelete) {
         try {
-            console.log(`🧹 Attempting to clean alerts for room: ${roomToDelete}`);
+            console.log(`🧹 Cleaning alerts for room: ${roomToDelete}`);
             
             const q = query(
                 collection(db, "notifications"),
@@ -70,7 +73,7 @@ export const UIProvider = ({ children }) => {
     setLiveStream(prev => ({ ...prev, isMinimized: minimize }));
   }, []);
 
-  // مراقبة التنقل
+  // مراقبة التنقل: تصغير البث تلقائياً إذا انتقل المستخدم لصفحة أخرى
   useEffect(() => {
     if (liveStream.isActive) {
       if (currentView !== 'live') {
@@ -81,7 +84,31 @@ export const UIProvider = ({ children }) => {
     }
   }, [currentView, liveStream.isActive]);
 
-  // --- نظام جلب الإشعارات ---
+  // --- 2. نظام جلب الإشعارات (Real-time) ---
+  
+  // دالة مساعدة لدمج وترتيب الإشعارات
+  const updateNotificationsState = (newDocs, isAdminSource = false) => {
+      setNotifications(prev => {
+          let merged = [];
+          
+          if (isAdminSource) {
+              // إذا جاء التحديث من مصدر الأدمن، ندمجه مع الإشعارات الشخصية الموجودة
+              const userOnly = prev.filter(n => n.target !== 'admin');
+              merged = [...userOnly, ...newDocs];
+          } else {
+              // إذا جاء التحديث من المصدر الشخصي، ندمجه مع إشعارات الأدمن الموجودة
+              const adminOnly = prev.filter(n => n.target === 'admin');
+              merged = [...adminOnly, ...newDocs];
+          }
+          
+          // إزالة التكرار (بناءً على ID)
+          const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
+          
+          // الترتيب حسب الوقت (الأحدث أولاً)
+          return unique.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+      });
+  };
+
   useEffect(() => {
     if (!user) {
         setNotifications([]);
@@ -90,25 +117,27 @@ export const UIProvider = ({ children }) => {
     
     const unsubscribers = [];
 
-    // أ. جلب إشعارات المستخدم
+    // أ. الاستماع للإشعارات الشخصية (الموجهة لـ userId)
     const myNotifsQuery = query(
         collection(db, "notifications"), 
         where("userId", "==", user.uid)
     );
     
     const unsubMy = onSnapshot(myNotifsQuery, (snap) => {
-        updateNotificationsState(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        updateNotificationsState(data, false);
     });
     unsubscribers.push(unsubMy);
 
-    // ب. جلب إشعارات الأدمن
+    // ب. الاستماع لإشعارات الإدارة (فقط إذا كان المستخدم أدمن)
     if (isAdmin) {
         const adminQuery = query(
             collection(db, "notifications"), 
             where("target", "==", "admin")
         );
         const unsubAdmin = onSnapshot(adminQuery, (snap) => {
-            updateNotificationsState(snap.docs.map(d => ({ id: d.id, ...d.data() })), true);
+            const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            updateNotificationsState(data, true);
         });
         unsubscribers.push(unsubAdmin);
     }
@@ -118,36 +147,31 @@ export const UIProvider = ({ children }) => {
     };
   }, [user, isAdmin]);
 
-  const updateNotificationsState = (newDocs, isAdminSource = false) => {
-      setNotifications(prev => {
-          let merged = [];
-          if (isAdminSource) {
-              const userOnly = prev.filter(n => n.target !== 'admin');
-              merged = [...userOnly, ...newDocs];
-          } else {
-              const adminOnly = prev.filter(n => n.target === 'admin');
-              merged = [...adminOnly, ...newDocs];
-          }
-          const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
-          return unique.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-      });
-  };
-
   const removeNotification = async (id) => {
+    // التحديث الفوري للواجهة (Optimistic UI)
+    setNotifications(prev => prev.filter(n => n.id !== id));
+    
     try { 
         await deleteDoc(doc(db, "notifications", id)); 
     } catch (e) { 
         console.error("Failed to delete notification record:", e); 
-        setNotifications(prev => prev.filter(n => n.id !== id));
+        // في حال الفشل، يمكن إعادة التحميل أو تجاهل الخطأ لأن الـ Listener سيصحح الوضع
     }
   };
 
   const value = {
+      // Navigation
       currentView, setCurrentView, 
       activeCategory, setActiveCategory,
+      
+      // Features
       showSupport, setShowSupport,
       activeOverlayGame, setActiveOverlayGame,
+      
+      // Notifications
       notifications, removeNotification,
+      
+      // Live Stream
       liveState: liveStream, 
       startBroadcast, endBroadcast, toggleMinimize
   };

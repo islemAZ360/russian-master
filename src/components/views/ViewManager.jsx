@@ -23,7 +23,7 @@ import CommunicationHub from '@/components/features/chat/CommunicationHub';
 import { CategorySelect } from '@/components/features/study/CategorySelect';
 
 // === استيراد صفحات الأستاذ (Recruitment & Analytics) ===
-// هذه هي المكونات التي قمنا بإصلاحها للتو
+// هذه هي المكونات الجديدة التي قمنا بإضافتها
 import TeacherStudents from '@/components/features/teacher/TeacherStudents';
 import TeacherProgress from '@/components/features/teacher/TeacherProgress';
 
@@ -39,7 +39,7 @@ export default function ViewManager(props) {
     exit: { opacity: 0, scale: 1.02, filter: "blur(4px)", transition: { duration: 0.2, ease: "easeIn" } }
   };
 
-  // مكون فرعي لعرض رسالة "ممنوع الدخول"
+  // مكون فرعي لعرض رسالة "ممنوع الدخول" (Security Gate)
   const AccessDenied = () => (
     <div className="h-full flex flex-col items-center justify-center text-red-500 font-mono tracking-widest gap-4 text-center p-4">
         <IconAlertTriangle size={64} className="animate-pulse" />
@@ -54,13 +54,14 @@ export default function ViewManager(props) {
     </div>
   );
 
-  // دالة تحديد المحتوى المعروض
+  // دالة تحديد المحتوى المعروض (Routing Logic)
   const renderViewContent = () => {
     switch (currentView) {
       // --- الصفحة الرئيسية ---
       case 'home': return <HeroView />;
       
       // --- لوحة التحكم (للأدمن فقط) ---
+      // تم ربط AdminDashboard هنا
       case 'admin_panel': return (isJunior || isAdmin) ? <AdminView /> : <AccessDenied />;
 
       // === واجهات الأستاذ (Teacher Interfaces) ===
@@ -81,7 +82,7 @@ export default function ViewManager(props) {
         if (!isTeacher) return <AccessDenied />;
         return <TeacherStudents />; 
 
-      case 'teacher_progress': // صفحة التحليلات المتقدمة (التي أصلحناها)
+      case 'teacher_progress': // صفحة التحليلات المتقدمة
         if (!isTeacher) return <AccessDenied />;
         return <TeacherProgress />; 
 
@@ -114,10 +115,10 @@ export default function ViewManager(props) {
           />
         );
 
-      case 'data': // عرض الأرشيف
+      case 'data': // عرض الأرشيف (للطالب للعرض فقط، وللأدمن للتعديل)
         // الطالب يرى المحتوى لكن لا يعدله (readOnly = true)
-        // الأستاذ/الأدمن يمكنه التعديل
-        const canEdit = isTeacher || isAdmin || isJunior;
+        // الأستاذ يدخل عبر teacher_db للتعديل، لكن هنا نمنح الصلاحية للأدمن أيضاً
+        const canEdit = isAdmin || isJunior; 
         return (
           <DataView 
             cards={props.cards} 

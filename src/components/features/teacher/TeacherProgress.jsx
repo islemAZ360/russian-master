@@ -4,10 +4,10 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { 
   IconChartBar, IconTrophy, IconActivity, IconClock, 
-  IconFlame, IconAlertTriangle, IconUser, IconUsers
+  IconFlame, IconAlertTriangle, IconUsers
 } from '@tabler/icons-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/hooks/useLanguage';
 
 export default function TeacherProgress() {
@@ -21,8 +21,8 @@ export default function TeacherProgress() {
   useEffect(() => {
     if (!user) return;
 
-    // FIX: تمت إزالة orderBy لتجنب مشكلة (Missing Index) التي تسبب تعليق التحميل
-    // سنقوم بترتيب النتائج برمجياً بعد جلبها
+    // FIX: قمنا بإزالة orderBy من هنا لتجنب مشكلة (Missing Index) التي تسبب تعليق التطبيق
+    // سنقوم بترتيب النتائج برمجياً بعد جلبها لضمان استقرار النظام
     const q = query(
       collection(db, "users"),
       where("teacherId", "==", user.uid)
@@ -59,7 +59,7 @@ export default function TeacherProgress() {
     const now = new Date();
     const activeToday = students.filter(s => {
         if (!s.lastLogin) return false;
-        // التأكد من أن التوقيت كائن Firestore Timestamp
+        // التأكد من أن التوقيت كائن Firestore Timestamp أو تاريخ عادي
         const last = s.lastLogin.toDate ? s.lastLogin.toDate() : new Date(s.lastLogin);
         return (now - last) < 86400000; // 24 ساعة
     }).length;
@@ -74,7 +74,7 @@ export default function TeacherProgress() {
     };
   }, [students]);
 
-  // دالة مساعدة لتنسيق الوقت (منذ متى)
+  // دالة مساعدة لتنسيق الوقت (منذ متى) بشكل آمن
   const formatLastSeen = (timestamp) => {
       if (!timestamp) return "Never";
       try {
@@ -190,7 +190,7 @@ export default function TeacherProgress() {
                                 const progressPercent = Math.min(100, ((student.xp - currentLevelBaseXp) / (nextLevelXp - currentLevelBaseXp)) * 100);
                                 
                                 // تنبيه إذا لم يدخل الطالب منذ أسبوع
-                                const lastDate = student.lastLogin?.toDate ? student.lastLogin.toDate() : new Date(student.lastLogin);
+                                const lastDate = student.lastLogin?.toDate ? student.lastLogin.toDate() : new Date(student.lastLogin || 0);
                                 const isInactive = (new Date() - lastDate) > 604800000; // 7 days
                                 const isOnline = (new Date() - lastDate) < 300000; // 5 mins
 

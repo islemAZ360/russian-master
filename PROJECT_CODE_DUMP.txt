@@ -1,6 +1,6 @@
 ==================================================================
 PROJECT STRUCTURE (هيكل الملفات)
-Generated on: 9/1/2026, 00:50:04
+Generated on: 9/1/2026, 01:53:28
 ==================================================================
 
 (ROOT)
@@ -1260,7 +1260,6 @@ export default function Page() {
     let links = [];
 
     // --- واجهة الأستاذ (فقط إذا لم يكن أدمن) ---
-    // التعديل: (isTeacher && !isAdmin) يضمن أن الأدمن لا يعامل كأستاذ هنا
     if (isTeacher && !isAdmin) {
       links = [
         { 
@@ -1295,11 +1294,12 @@ export default function Page() {
         },
       ];
     } 
-    // --- واجهة الطالب ---
+    // --- واجهة الطالب (تمت إضافة الرئيسية والألعاب) ---
     else if (isStudent) {
       links = [
+        { title: t('nav_home'), icon: <IconHome className={`${iconClass} text-white/70`} />, onClick: () => setCurrentView('home') },
         { title: t('nav_study') || "Mission", icon: <IconCpu className={`${iconClass} text-purple-400`} />, onClick: () => setCurrentView('category') },
-        { title: t('nav_data') || "Intel", icon: <IconDatabase className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('data') },
+        { title: t('nav_games'), icon: <IconDeviceGamepad className={`${iconClass} text-emerald-400`} />, onClick: () => setCurrentView('games') },
         { title: t('nav_chat') || "Squad", icon: <IconMessageCircle className={`${iconClass} text-cyan-400`} />, onClick: () => setCurrentView('chat') },
         { title: t('nav_live') || "Live", icon: <IconSchool className={`${iconClass} text-red-500`} />, onClick: () => setCurrentView('live') },
         { title: t('nav_rewards') || "Rank", icon: <IconTrophy className={`${iconClass} text-yellow-400`} />, onClick: () => setCurrentView('leaderboard') },
@@ -2582,15 +2582,12 @@ export default function CommunicationHub() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   
-  // للمجموعة الجديدة
   const [newGroup, setNewGroup] = useState({ name: "", type: "public" });
-  
-  // قائمة الطلاب المتاحين للدعوة (للأستاذ)
   const [myStudentsToInvite, setMyStudentsToInvite] = useState([]);
 
   const messagesEndRef = useRef(null);
 
-  // 1. جلب الدردشات (نظام متعدد الاستعلامات لحل مشكلة الاختفاء)
+  // 1. جلب الدردشات
   useEffect(() => {
     if (!user) return;
     setLoadingChats(true);
@@ -2598,11 +2595,9 @@ export default function CommunicationHub() {
     const chatsMap = new Map();
     const unsubscribers = [];
 
-    // دالة لتحديث الحالة عند وصول بيانات جديدة من أي استعلام
     const updateLocalChats = () => {
         const uniqueChats = Array.from(chatsMap.values())
             .sort((a, b) => {
-                // ترتيب حسب آخر نشاط
                 const timeA = a.lastActivity?.seconds || 0;
                 const timeB = b.lastActivity?.seconds || 0;
                 return timeB - timeA;
@@ -2611,36 +2606,32 @@ export default function CommunicationHub() {
         setLoadingChats(false);
     };
 
+    const addToMapAndSync = (snap) => {
+        snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
+        // التعامل مع الحذف: إذا عادت الـ snapshot ببيانات، يجب أن نتأكد من إزالة العناصر المحذوفة من الـ map
+        // (في هذه البنية المبسطة، التحديث التفاؤلي في دالة الحذف هو الحل الأسرع، 
+        // لكن هنا نضمن التحديث عند الإضافة أيضاً)
+        snap.docChanges().forEach((change) => {
+            if (change.type === "removed") {
+                chatsMap.delete(change.doc.id);
+            }
+        });
+        updateLocalChats();
+    };
+
     try {
-        // الاستعلام 1: المجموعات العامة (Public)
         const qPublic = query(collection(db, "chats"), where("type", "==", "public"));
-        unsubscribers.push(onSnapshot(qPublic, (snap) => {
-            snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-            updateLocalChats();
-        }));
+        unsubscribers.push(onSnapshot(qPublic, addToMapAndSync));
 
-        // الاستعلام 2: المجموعات التي أنا عضو فيها
         const qMember = query(collection(db, "chats"), where("members", "array-contains", user.uid));
-        unsubscribers.push(onSnapshot(qMember, (snap) => {
-            snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-            updateLocalChats();
-        }));
+        unsubscribers.push(onSnapshot(qMember, addToMapAndSync));
 
-        // الاستعلام 3: المجموعات التي أنشأتها أنا (هام للأستاذ ليرى مجموعاته الخاصة ويحذفها)
-        // هذا الاستعلام يضمن ظهور المجموعات التي أنشأها المعلم حتى لو لم يكن في قائمة الأعضاء لسبب ما
         const qOwner = query(collection(db, "chats"), where("createdBy", "==", user.uid));
-        unsubscribers.push(onSnapshot(qOwner, (snap) => {
-            snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-            updateLocalChats();
-        }));
+        unsubscribers.push(onSnapshot(qOwner, addToMapAndSync));
 
-        // الاستعلام 4: للطالب - مجموعات أستاذه (للانضمام التلقائي أو الرؤية)
         if (isStudent && userData?.teacherId) {
             const qTeacher = query(collection(db, "chats"), where("createdBy", "==", userData.teacherId));
-            unsubscribers.push(onSnapshot(qTeacher, (snap) => {
-                snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-                updateLocalChats();
-            }));
+            unsubscribers.push(onSnapshot(qTeacher, addToMapAndSync));
         }
     } catch (err) {
         console.error("Chat Query Error:", err);
@@ -2656,7 +2647,6 @@ export default function CommunicationHub() {
   useEffect(() => {
     if (!selectedChat) return;
     
-    // الانضمام التلقائي للطالب لغرف أستاذه إذا لم يكن عضواً
     if (isStudent && userData?.teacherId === selectedChat.createdBy && !selectedChat.members?.includes(user.uid)) {
         updateDoc(doc(db, "chats", selectedChat.id), {
             members: arrayUnion(user.uid)
@@ -2677,7 +2667,7 @@ export default function CommunicationHub() {
     return () => unsub();
   }, [selectedChat, isStudent, user, userData]);
 
-  // 3. جلب طلاب الأستاذ للدعوة (عند فتح المودال)
+  // 3. جلب طلاب الأستاذ للدعوة
   useEffect(() => {
       if (showInviteModal && isTeacher) {
           const q = query(collection(db, "users"), where("teacherId", "==", user.uid));
@@ -2714,8 +2704,6 @@ export default function CommunicationHub() {
   const handleCreateGroup = async () => {
     if (!newGroup.name.trim()) return;
     
-    // الأستاذ ينشئ مجموعات خاصة افتراضياً (للفصل)
-    // إذا كان المستخدم "user" عادي، ينشئ عامة. الأستاذ يمكنه اختيار النوع.
     const finalType = isTeacher ? (newGroup.type || 'private') : newGroup.type;
 
     try {
@@ -2731,10 +2719,10 @@ export default function CommunicationHub() {
         setShowCreateModal(false);
         setNewGroup({ name: "", type: "public" });
         
-        // الانتقال للمحادثة الجديدة فوراً
         const newChatData = { id: docRef.id, name: newGroup.name, type: finalType, createdBy: user.uid, members: [user.uid] };
         setSelectedChat(newChatData);
-        // التحديث المحلي سيحدث تلقائياً عبر onSnapshot
+        // تحديث محلي فوري للقائمة
+        setChats(prev => [newChatData, ...prev]);
         
     } catch (e) { console.error(e); }
   };
@@ -2749,35 +2737,30 @@ export default function CommunicationHub() {
       } catch (e) { console.error(e); }
   };
 
-  // --- إصلاح حذف المحادثة ---
+  // --- 🔥 إصلاح حذف المحادثة (التحديث الفوري) ---
   const handleDeleteChat = async () => {
       if(!selectedChat) return;
-      
-      // رسالة تأكيد
       if(!confirm(t('admin_confirm_delete') || "Are you sure you want to dismantle this squad?")) return;
       
+      const chatIdToDelete = selectedChat.id;
+
       try {
-          // 1. حذف وثيقة المحادثة
-          await deleteDoc(doc(db, "chats", selectedChat.id));
+          // 1. التحديث الفوري للواجهة (Optimistic Update)
+          // نحذف الشات من القائمة المحلية فوراً قبل انتظار السيرفر
+          setChats(prevChats => prevChats.filter(chat => chat.id !== chatIdToDelete));
+          setSelectedChat(null); // العودة للقائمة الرئيسية
+
+          // 2. التنفيذ الفعلي في قاعدة البيانات
+          await deleteDoc(doc(db, "chats", chatIdToDelete));
           
-          // 2. تصفير المحادثة المختارة
-          setSelectedChat(null);
-          
-          // ملاحظة: الرسائل الفرعية (Subcollection) ستبقى في فايربيس كـ "Orphaned Documents"
-          // ولكنها لن تظهر في التطبيق لأن الأب حذف. لحذفها بالكامل يحتاج Cloud Function،
-          // ولكن هذا يكفي للواجهة الأمامية.
       } catch(e) { 
           console.error("Delete Error:", e);
           alert("Failed to delete squad.");
+          // في حال الفشل، يمكن إعادة تحميل الصفحة أو إعادة القائمة (اختياري)
       }
   };
 
-  // --- التحقق من الصلاحيات ---
-  const canCreate = !isStudent; // الطلاب لا ينشئون مجموعات
-  
-  // صلاحية الحذف والدعوة:
-  // 1. إذا كان المستخدم هو المنشئ (createdBy == user.uid)
-  // 2. أو إذا كان المستخدم أدمن
+  const canCreate = !isStudent; 
   const isOwner = selectedChat && selectedChat.createdBy === user.uid;
   const canModify = isOwner || isAdmin;
 
@@ -2812,40 +2795,45 @@ export default function CommunicationHub() {
               </div>
           )}
           
-          {chats.map(chat => {
-            const isTeacherChat = isStudent && chat.createdBy === userData?.teacherId;
-            const isMyChat = chat.createdBy === user.uid;
+          <AnimatePresence>
+            {chats.map(chat => {
+                const isTeacherChat = isStudent && chat.createdBy === userData?.teacherId;
+                const isMyChat = chat.createdBy === user.uid;
 
-            return (
-              <motion.div 
-                  key={chat.id} 
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setSelectedChat(chat)} 
-                  className={`p-4 rounded-2xl cursor-pointer transition-all border group flex justify-between items-center ${
-                      selectedChat?.id === chat.id 
-                      ? 'bg-cyan-600/10 border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.1)]' 
-                      : 'bg-white/5 border-transparent hover:bg-white/10 hover:border-white/10'
-                  }`}
-              >
-                <div className="overflow-hidden flex-1 mr-2">
-                  <div className={`font-black text-sm transition-colors truncate uppercase tracking-tight flex items-center gap-2 ${selectedChat?.id === chat.id ? 'text-cyan-400' : 'text-zinc-300'}`}>
-                      {chat.name}
-                      {isTeacherChat && <span className="bg-emerald-500/20 text-emerald-500 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30">COMMAND</span>}
-                      {isMyChat && <span className="bg-purple-500/20 text-purple-400 text-[8px] px-1.5 py-0.5 rounded border border-purple-500/30">OWNER</span>}
-                  </div>
-                  <div className="text-[9px] text-white/20 truncate mt-1 font-mono uppercase tracking-widest">
-                      {chat.lastMessage || "..."}
-                  </div>
-                </div>
-                
-                {chat.type === 'private' ? (
-                    isTeacherChat ? <IconSchool size={14} className="text-emerald-500 shrink-0"/> : <IconLock size={14} className="text-orange-500 shrink-0" />
-                ) : (
-                    <IconWorld size={14} className="text-cyan-500 shrink-0" />
-                )}
-              </motion.div>
-            );
-          })}
+                return (
+                <motion.div 
+                    key={chat.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setSelectedChat(chat)} 
+                    className={`p-4 rounded-2xl cursor-pointer transition-all border group flex justify-between items-center ${
+                        selectedChat?.id === chat.id 
+                        ? 'bg-cyan-600/10 border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.1)]' 
+                        : 'bg-white/5 border-transparent hover:bg-white/10 hover:border-white/10'
+                    }`}
+                >
+                    <div className="overflow-hidden flex-1 mr-2">
+                    <div className={`font-black text-sm transition-colors truncate uppercase tracking-tight flex items-center gap-2 ${selectedChat?.id === chat.id ? 'text-cyan-400' : 'text-zinc-300'}`}>
+                        {chat.name}
+                        {isTeacherChat && <span className="bg-emerald-500/20 text-emerald-500 text-[8px] px-1.5 py-0.5 rounded border border-emerald-500/30">COMMAND</span>}
+                        {isMyChat && <span className="bg-purple-500/20 text-purple-400 text-[8px] px-1.5 py-0.5 rounded border border-purple-500/30">OWNER</span>}
+                    </div>
+                    <div className="text-[9px] text-white/20 truncate mt-1 font-mono uppercase tracking-widest">
+                        {chat.lastMessage || "..."}
+                    </div>
+                    </div>
+                    
+                    {chat.type === 'private' ? (
+                        isTeacherChat ? <IconSchool size={14} className="text-emerald-500 shrink-0"/> : <IconLock size={14} className="text-orange-500 shrink-0" />
+                    ) : (
+                        <IconWorld size={14} className="text-cyan-500 shrink-0" />
+                    )}
+                </motion.div>
+                );
+            })}
+          </AnimatePresence>
         </div>
       </aside>
 
@@ -2876,26 +2864,23 @@ export default function CommunicationHub() {
               </div>
               
               <div className="flex items-center gap-2">
-                  {/* زر الدعوة: يظهر للمالك أو الأدمن */}
                   {canModify && (
-                    <button 
-                        onClick={() => setShowInviteModal(true)} 
-                        className="p-2.5 bg-white/5 hover:bg-white/10 text-cyan-400 border border-white/10 rounded-xl transition-all shadow-lg" 
-                        title="Invite Operatives"
-                    >
-                        <IconUserPlus size={20} />
-                    </button>
-                  )}
-                  
-                  {/* زر الحذف: يظهر للمالك أو الأدمن */}
-                  {canModify && (
-                    <button 
-                        onClick={handleDeleteChat} 
-                        className="p-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-xl transition-all shadow-lg" 
-                        title="Delete Squad"
-                    >
-                        <IconTrash size={20} />
-                    </button>
+                    <>
+                        <button 
+                            onClick={() => setShowInviteModal(true)} 
+                            className="p-2.5 bg-white/5 hover:bg-white/10 text-cyan-400 border border-white/10 rounded-xl transition-all shadow-lg" 
+                            title="Invite Operatives"
+                        >
+                            <IconUserPlus size={20} />
+                        </button>
+                        <button 
+                            onClick={handleDeleteChat} 
+                            className="p-2.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-xl transition-all shadow-lg" 
+                            title="Delete Squad"
+                        >
+                            <IconTrash size={20} />
+                        </button>
+                    </>
                   )}
               </div>
             </header>
@@ -2940,7 +2925,7 @@ export default function CommunicationHub() {
         )}
       </main>
 
-      {/* Invite Modal (خاص للأستاذ أو المالك) */}
+      {/* Invite Modal */}
       <AnimatePresence>
         {showInviteModal && (
           <div className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
@@ -3010,7 +2995,7 @@ import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { 
   IconTrash, IconPencil, IconSearch, IconDatabase, IconArrowDown, 
   IconPlus, IconCategory, IconSettings, IconX, IconCheck, IconFolder, 
-  IconLock, IconEye
+  IconLock, IconEye, IconCpu, IconServer
 } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -3029,7 +3014,7 @@ const getCatTranslation = (catName, t) => {
 
 // --- 1. مكون بطاقة الذاكرة الفردية (MemoryNode) ---
 const MemoryNode = React.memo(({ 
-    card, index, canEdit, // نستلم canEdit بدلاً من isJunior
+    card, index, canEdit, 
     editingId, editForm, 
     startEdit, saveEdit, cancelEdit, onDelete, setEditForm, 
     categories, t 
@@ -3039,74 +3024,88 @@ const MemoryNode = React.memo(({
         setEditForm(prev => ({ ...prev, [field]: value }));
     };
 
+    // تحديد ما إذا كانت البطاقة "نظام" (لا يمكن حذفها بسهولة) أو "مخصصة"
+    // (في هذا التصميم نفترض أن البطاقات القابلة للتعديل هي فقط التي يملكها المستخدم)
+    const isSystemCard = !card.id || card.id.toString().length < 5; // افتراض بسيط للتمييز
+
     return (
         <motion.div 
             layout
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
+            transition={{ delay: index * 0.05 }}
             className="group relative h-full w-full"
         >
-            <div className={`relative h-full w-full bg-[#0a0a0a] rounded-3xl border border-white/10 overflow-hidden transition-all duration-300 ${canEdit ? 'hover:border-cyan-500/30 hover:shadow-2xl' : 'hover:border-white/20'}`}>
+            <div className={`relative h-full w-full bg-[#0a0a0a] rounded-3xl border border-white/5 overflow-hidden transition-all duration-300 hover:border-cyan-500/30 hover:shadow-[0_0_30px_rgba(6,182,212,0.1)] group-hover:-translate-y-1`}>
+                
+                {/* خلفية متوهجة خفيفة */}
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+
                 <div className="relative z-10 p-6 flex flex-col h-full justify-between min-h-[220px]">
                     
                     {editingId === card.id ? (
-                        /* وضع التعديل (Edit Mode) - يظهر فقط إذا كان canEdit true */
+                        /* وضع التعديل (Edit Mode) */
                         <div className="flex flex-col gap-3 h-full justify-center animate-in fade-in zoom-in-95">
                             <input 
                                 value={editForm.russian} 
                                 onChange={(e) => handleChange('russian', e.target.value)} 
-                                className="bg-black border border-cyan-500 rounded-xl p-3 text-center text-white outline-none font-bold" 
+                                className="bg-black/50 border border-cyan-500 rounded-xl p-3 text-center text-white outline-none font-bold text-sm" 
                                 placeholder="Russian" 
                             />
                             <input 
                                 value={editForm.arabic} 
                                 onChange={(e) => handleChange('arabic', e.target.value)} 
-                                className="bg-black border border-white/20 rounded-xl p-3 text-center text-white outline-none font-bold" 
+                                className="bg-black/50 border border-white/20 rounded-xl p-3 text-center text-white outline-none font-bold text-sm" 
                                 placeholder="Arabic" 
                                 dir="auto"
                             />
                             <select 
                                 value={editForm.category} 
                                 onChange={(e) => handleChange('category', e.target.value)}
-                                className="bg-black border border-white/10 rounded-xl p-2 text-[10px] font-black text-cyan-500 outline-none uppercase"
+                                className="bg-black/50 border border-white/10 rounded-xl p-2 text-[10px] font-black text-cyan-500 outline-none uppercase"
                             >
                                 {categories.filter(c => c !== "All").map(c => (
                                     <option key={c} value={c}>{getCatTranslation(c, t)}</option>
                                 ))}
                             </select>
                             <div className="flex gap-2 mt-2">
-                                <button onClick={saveEdit} className="flex-1 bg-green-600 text-white py-3 rounded-xl font-black text-xs shadow-lg hover:bg-green-500 transition-colors"><IconCheck size={20} className="mx-auto"/></button>
-                                <button onClick={cancelEdit} className="flex-1 bg-zinc-800 text-white py-3 rounded-xl font-black text-xs hover:bg-zinc-700 transition-colors"><IconX size={20} className="mx-auto"/></button>
+                                <button onClick={saveEdit} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl font-black text-xs shadow-lg transition-colors"><IconCheck size={18} className="mx-auto"/></button>
+                                <button onClick={cancelEdit} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white py-2 rounded-xl font-black text-xs transition-colors"><IconX size={18} className="mx-auto"/></button>
                             </div>
                         </div>
                     ) : (
                         /* وضع العرض (View Mode) */
                         <>
                             <div className="flex justify-between items-start">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-cyan-950/40 text-cyan-400 text-[9px] font-black uppercase tracking-widest border border-cyan-500/20">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 text-cyan-400 text-[9px] font-black uppercase tracking-widest border border-white/10 group-hover:border-cyan-500/30 transition-colors">
                                     <IconCategory size={12} /> {getCatTranslation(card.category, t)}
                                 </span>
                                 
                                 {canEdit ? (
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all scale-90 translate-x-2 group-hover:translate-x-0">
-                                        <button onClick={() => startEdit(card)} className="p-2 rounded-xl bg-white/5 hover:bg-cyan-600 text-gray-400 hover:text-white transition-colors border border-white/10"><IconPencil size={14}/></button>
+                                        <button onClick={() => startEdit(card)} className="p-2 rounded-xl bg-white/5 hover:bg-indigo-600 text-gray-400 hover:text-white transition-colors border border-white/10"><IconPencil size={14}/></button>
                                         <button onClick={() => onDelete(card.id)} className="p-2 rounded-xl bg-white/5 hover:bg-red-600 text-gray-400 hover:text-white transition-colors border border-white/10"><IconTrash size={14}/></button>
                                     </div>
                                 ) : (
-                                    <div className="opacity-20 text-white">
+                                    <div className="opacity-20 text-white" title="System Protected">
                                         <IconLock size={14} />
                                     </div>
                                 )}
                             </div>
 
-                            <div className="py-6 text-center flex-1 flex flex-col justify-center">
-                                <h3 className="text-2xl font-black text-white group-hover:text-cyan-400 transition-colors tracking-tight select-text">
+                            <div className="py-6 text-center flex-1 flex flex-col justify-center relative">
+                                <h3 className="text-2xl font-black text-white group-hover:text-cyan-400 transition-colors tracking-tight select-text drop-shadow-md">
                                     {card.russian}
                                 </h3>
+                                {/* زخرفة خلفية للنص */}
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-cyan-500/10 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                             </div>
 
-                            <div className="mt-auto pt-4 border-t border-white/5">
+                            <div className="mt-auto pt-4 border-t border-white/5 flex justify-between items-end">
+                                <span className="text-[8px] font-mono text-white/20 uppercase tracking-widest">
+                                    ID: {card.id?.toString().substring(0,4) || "SYS"}
+                                </span>
                                 <p className="text-sm text-white/40 group-hover:text-white text-right font-bold transition-colors select-text" dir="auto">
                                     {card.arabic}
                                 </p>
@@ -3124,35 +3123,27 @@ MemoryNode.displayName = "MemoryNode";
 export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
   const { t, dir } = useLanguage();
   
-  // تحديد الصلاحية بناءً على وجود الدوال
-  // إذا مررنا null في onAdd (كما فعلنا في ViewManager)، فهذا يعني وضع القراءة فقط
   const canEdit = !!(onAdd && onDelete && onUpdate);
 
-  // حالات البحث والفلترة والتحميل
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
   const [displayLimit, setDisplayLimit] = useState(20);
   
-  // حالة الإضافة
   const [newCard, setNewCard] = useState({ russian: "", arabic: "", category: "" });
   const [isNewCategoryMode, setIsNewCategoryMode] = useState(false);
 
-  // حالة التعديل
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ russian: "", arabic: "", category: "" });
 
-  // حالة مدير المجموعات
   const [showCatManager, setShowCatManager] = useState(false);
   const [editingCatName, setEditingCatName] = useState(null);
   const [newCatNameInput, setNewCatNameInput] = useState("");
 
-  // استخراج المجموعات الفريدة
   const categories = useMemo(() => {
     const cats = new Set(cards.map(c => c.category || "General"));
     return ["All", ...Array.from(cats).sort()];
   }, [cards]);
 
-  // منطق البحث والفلترة الذكي
   const filteredCards = useMemo(() => {
       const s = search.toLowerCase();
       return cards.filter(c => {
@@ -3164,7 +3155,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
 
   useEffect(() => { setDisplayLimit(20); }, [search, filter]);
 
-  // --- العمليات الأساسية ---
+  // --- العمليات ---
 
   const handleAddSubmit = () => {
       if(newCard.russian && newCard.arabic && newCard.category && canEdit) {
@@ -3187,8 +3178,6 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
       }
   }, [editingId, editForm, onUpdate, canEdit]);
 
-  // --- وظائف إدارة المجموعات الجماعية ---
-  
   const handleRenameCategory = (oldName) => {
       if (!canEdit) return;
       if (!newCatNameInput.trim() || newCatNameInput === oldName) {
@@ -3203,12 +3192,12 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
 
   const handleDeleteCategory = (catName) => {
       if (!canEdit) return;
-      if (!confirm(`WARNING: This will permanently delete group "${catName}" and ALL ${cards.filter(c=>c.category===catName).length} records inside it.`)) return;
+      if (!confirm(`WARNING: Delete group "${catName}" and ALL its records?`)) return;
       const cardsToDelete = cards.filter(c => c.category === catName);
       cardsToDelete.forEach(card => onDelete(card.id));
   };
 
-  // --- واجهة مدير المجموعات (Category Manager Modal) ---
+  // --- Modal ---
   const CategoryManagerModal = () => (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md">
           <motion.div initial={{scale:0.9, opacity:0}} animate={{scale:1, opacity:1}} className="bg-[#0c0c0c] border border-white/10 w-full max-w-xl rounded-[2.5rem] p-8 shadow-2xl flex flex-col max-h-[85vh]">
@@ -3257,67 +3246,65 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
   return (
     <div className="w-full flex flex-col p-4 md:p-10 font-sans min-h-screen" dir={dir}>
       
-      {/* 1. رأس الصفحة (Header) */}
+      {/* 1. Header */}
       <div className="flex flex-col items-center justify-center mb-12 text-center animate-in fade-in duration-700">
-          <span className="text-[10px] font-black tracking-[0.5em] text-cyan-500 uppercase mb-3 block">
-              {canEdit ? t('archive_header') : 'READ_ONLY_ACCESS'}
-          </span>
-          <h1 className="text-5xl md:text-8xl font-black text-white tracking-tighter mb-6 uppercase">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-[9px] font-black uppercase tracking-[0.3em] mb-4">
+               <IconServer size={12} /> {canEdit ? "WRITE ACCESS GRANTED" : "READ ONLY MODE"}
+          </div>
+          <h1 className="text-5xl md:text-8xl font-black text-white tracking-tighter mb-6 uppercase drop-shadow-2xl">
               {t('nav_archive')}
           </h1>
           <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3 text-[10px] font-bold text-gray-500 bg-white/5 px-6 py-2 rounded-full border border-white/10 backdrop-blur-md uppercase tracking-widest">
+              <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400 bg-[#0a0a0a] px-6 py-3 rounded-2xl border border-white/10 backdrop-blur-md uppercase tracking-widest shadow-lg">
                   <IconDatabase size={16} className="text-cyan-500"/> <span>{filteredCards.length} {t('archive_items')}</span>
               </div>
               {canEdit ? (
                   <button 
                     onClick={() => setShowCatManager(true)} 
-                    className="flex items-center gap-2 text-[10px] font-black text-cyan-400 bg-cyan-500/10 px-6 py-2 rounded-full hover:bg-cyan-500 hover:text-white transition-all border border-cyan-500/20 uppercase tracking-widest"
+                    className="flex items-center gap-2 text-[10px] font-black text-white bg-indigo-600 px-6 py-3 rounded-2xl hover:bg-indigo-500 transition-all border border-indigo-400/20 uppercase tracking-widest shadow-lg shadow-indigo-900/20"
                   >
                       <IconSettings size={14}/> {t('archive_manage_groups')}
                   </button>
               ) : (
-                  <div className="flex items-center gap-2 text-[10px] font-black text-white/30 bg-white/5 px-6 py-2 rounded-full border border-white/5 uppercase tracking-widest cursor-not-allowed">
+                  <div className="flex items-center gap-2 text-[10px] font-black text-white/30 bg-white/5 px-6 py-3 rounded-2xl border border-white/5 uppercase tracking-widest cursor-not-allowed">
                       <IconEye size={14}/> Viewer Mode
                   </div>
               )}
           </div>
       </div>
 
-      {/* 2. شريط التحكم العائم (البحث + الإضافة) */}
+      {/* 2. Control Bar */}
       <div className="sticky top-6 z-40 mb-12 flex justify-center">
-         <div className="w-full max-w-6xl bg-[#111]/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col md:flex-row gap-5 items-center">
+         <div className="w-full max-w-6xl bg-[#0a0a0a]/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-4 shadow-[0_20px_50px_rgba(0,0,0,0.7)] flex flex-col md:flex-row gap-5 items-center">
              
-             {/* البحث - متاح للجميع */}
              <div className="flex-1 flex items-center gap-4 w-full px-4 group">
-                <IconSearch className="text-gray-600 group-focus-within:text-cyan-500 transition-colors" size={22} />
+                <IconSearch className="text-gray-500 group-focus-within:text-cyan-500 transition-colors" size={22} />
                 <input 
                     type="text" 
                     value={search} 
                     onChange={(e) => setSearch(e.target.value)} 
                     placeholder={t('archive_search_placeholder')} 
-                    className="flex-1 bg-transparent text-white outline-none text-sm font-black h-12 uppercase font-mono tracking-wider"
+                    className="flex-1 bg-transparent text-white outline-none text-sm font-black h-12 uppercase font-mono tracking-wider placeholder:text-gray-700"
                 />
              </div>
 
-             {/* الإضافة الذكية - مخفية للطلاب */}
              {canEdit && (
                  <div className="w-full md:w-auto flex flex-col md:flex-row items-center gap-3 border-t md:border-t-0 md:border-l border-white/10 pt-4 md:pt-0 md:pl-5">
                      <div className="flex w-full md:w-auto gap-3">
-                         <input value={newCard.russian} onChange={e => setNewCard({...newCard, russian: e.target.value})} placeholder={t('archive_rus_ph')} className="flex-1 md:w-32 bg-black border border-white/10 rounded-2xl px-5 py-3 text-xs font-bold text-white focus:border-cyan-500 transition-all" />
-                         <input value={newCard.arabic} onChange={e => setNewCard({...newCard, arabic: e.target.value})} placeholder={t('archive_ara_ph')} className="flex-1 md:w-32 bg-black border border-white/10 rounded-2xl px-5 py-3 text-xs font-bold text-white text-right focus:border-cyan-500 transition-all" />
+                         <input value={newCard.russian} onChange={e => setNewCard({...newCard, russian: e.target.value})} placeholder={t('archive_rus_ph')} className="flex-1 md:w-32 bg-black/50 border border-white/10 rounded-2xl px-5 py-3 text-xs font-bold text-white focus:border-cyan-500 transition-all outline-none" />
+                         <input value={newCard.arabic} onChange={e => setNewCard({...newCard, arabic: e.target.value})} placeholder={t('archive_ara_ph')} className="flex-1 md:w-32 bg-black/50 border border-white/10 rounded-2xl px-5 py-3 text-xs font-bold text-white text-right focus:border-cyan-500 transition-all outline-none" />
                      </div>
                      <div className="flex w-full md:w-auto gap-3">
                         {isNewCategoryMode ? (
                             <div className="flex items-center gap-2 flex-1">
-                                <input autoFocus value={newCard.category} onChange={e => setNewCard({...newCard, category: e.target.value})} placeholder={t('archive_new_group_ph')} className="flex-1 bg-black border border-cyan-500 rounded-2xl px-4 py-3 text-xs font-black text-white" />
+                                <input autoFocus value={newCard.category} onChange={e => setNewCard({...newCard, category: e.target.value})} placeholder={t('archive_new_group_ph')} className="flex-1 bg-black/50 border border-cyan-500 rounded-2xl px-4 py-3 text-xs font-black text-white outline-none" />
                                 <button onClick={() => setIsNewCategoryMode(false)} className="text-red-500 hover:scale-110 transition-transform"><IconX size={20}/></button>
                             </div>
                         ) : (
                             <select 
                                 value={newCard.category} 
                                 onChange={(e) => { if (e.target.value === 'NEW') setIsNewCategoryMode(true); else setNewCard({...newCard, category: e.target.value}); }} 
-                                className="flex-1 md:w-40 bg-black border border-white/10 rounded-2xl px-4 py-3 text-[10px] font-black uppercase text-white outline-none cursor-pointer hover:border-white/30 transition-colors"
+                                className="flex-1 md:w-40 bg-black/50 border border-white/10 rounded-2xl px-4 py-3 text-[10px] font-black uppercase text-white outline-none cursor-pointer hover:border-white/30 transition-colors"
                             >
                                 <option value="" disabled>{t('archive_group_label')}</option>
                                 {categories.filter(c => c !== "All").map(c => (
@@ -3327,7 +3314,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
                             </select>
                         )}
                         <button onClick={handleAddSubmit} className="h-12 w-12 bg-cyan-600 hover:bg-cyan-500 text-white rounded-2xl flex items-center justify-center transition-all shadow-xl shadow-cyan-900/20 active:scale-95">
-                            <IconPlus size={28}/>
+                            <IconPlus size={24}/>
                         </button>
                      </div>
                  </div>
@@ -3335,28 +3322,28 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
          </div>
       </div>
 
-      {/* 3. فلاتر التصنيف */}
-      <div className="flex flex-wrap justify-center gap-3 mb-12 animate-in slide-in-from-bottom-2 duration-700">
+      {/* 3. Filters */}
+      <div className="flex flex-wrap justify-center gap-2 mb-12 animate-in slide-in-from-bottom-2 duration-700 max-w-5xl mx-auto">
           {categories.map(cat => (
               <button 
                 key={cat} 
                 onClick={() => { setFilter(cat); setDisplayLimit(20); }} 
-                className={`px-6 py-2.5 text-[9px] font-black uppercase rounded-full transition-all border tracking-widest
+                className={`px-5 py-2 text-[9px] font-black uppercase rounded-xl transition-all border tracking-widest
                 ${filter === cat 
-                    ? "bg-cyan-600 text-white border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)] scale-105" 
-                    : "bg-white/5 text-gray-500 border-transparent hover:border-white/20 hover:text-white"}`}
+                    ? "bg-cyan-950 text-cyan-400 border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.2)]" 
+                    : "bg-[#0a0a0a] text-gray-500 border-white/5 hover:border-white/20 hover:text-white"}`}
               >
                   {getCatTranslation(cat, t)}
               </button>
           ))}
       </div>
 
-      {/* 4. شبكة السجلات */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 pb-32 w-full max-w-7xl mx-auto">
+      {/* 4. Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-32 w-full max-w-7xl mx-auto">
             {filteredCards.slice(0, displayLimit).map((card, index) => (
                 <MemoryNode 
-                    key={card.id} card={card} index={index} 
-                    canEdit={canEdit} // تمرير الصلاحية للبطاقة
+                    key={card.id || index} card={card} index={index} 
+                    canEdit={canEdit}
                     editingId={editingId} editForm={editForm} startEdit={startEdit}
                     saveEdit={saveEdit} cancelEdit={() => setEditingId(null)}
                     onDelete={onDelete} setEditForm={setEditForm} t={t}
@@ -3365,7 +3352,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
             ))}
       </div>
 
-      {/* 5. زر تحميل المزيد */}
+      {/* 5. Load More */}
       {displayLimit < filteredCards.length && (
             <div className="flex flex-col items-center justify-center pb-32">
                 <button onClick={() => setDisplayLimit(p => p + 20)} className="group flex flex-col items-center gap-4 text-gray-600 hover:text-cyan-400 transition-all">
@@ -3377,7 +3364,6 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
             </div>
       )}
 
-      {/* مودال إدارة المجموعات - يظهر فقط إذا كان هناك صلاحية */}
       <AnimatePresence>
           {showCatManager && canEdit && <CategoryManagerModal />}
       </AnimatePresence>
@@ -4567,39 +4553,47 @@ FILE: src\components\features\home\HeroSection.jsx
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
-import { IconRocket, IconTerminal, IconSparkles, IconActivity, IconSchool, IconShieldLock } from "@tabler/icons-react";
+import { 
+  IconRocket, IconTerminal, IconSparkles, IconActivity, 
+  IconSchool, IconShieldLock, IconBook 
+} from "@tabler/icons-react";
 import { BorderBeam } from "@/components/ui/BorderBeam";
 import { DecryptText } from "@/components/ui/DecryptText";
 import { MagneticButton } from "@/components/ui/MagneticButton";
 import { useSettings } from "@/context/SettingsContext";
 import { useLanguage } from "@/hooks/useLanguage";
-import { useAuth } from "@/context/AuthContext"; // استدعاء هوك المصادقة
+import { useAuth } from "@/context/AuthContext";
 
 export function HeroSection({ onStart, onOpenGame }) {
   const { isDark } = useSettings();
   const { t, dir, isRTL } = useLanguage();
-  const { user, userData, isTeacher, isStudent, isAdmin } = useAuth(); // جلب الرتب
+  const { user, userData, isTeacher, isStudent, isAdmin } = useAuth();
 
-  // تحديد النصوص والأيقونات بناءً على الرتبة
+  // تخصيص الواجهة بناءً على الرتبة
   let roleTitle = "OPERATIVE";
   let mainActionText = t('btn_start');
   let statusText = t('hero_status');
   let RoleIcon = IconRocket;
+  let subMessage = t('hero_line2');
 
   if (isAdmin) {
       roleTitle = "COMMANDER";
       mainActionText = "SYSTEM CONTROL";
       statusText = "SYSTEM: ROOT ACCESS";
       RoleIcon = IconShieldLock;
+      subMessage = "> Full command privileges active.";
   } else if (isTeacher) {
       roleTitle = "INSTRUCTOR";
-      mainActionText = "MANAGE CLASS";
+      mainActionText = "MANAGE CLASS"; // الأستاذ يذهب لإدارة المحتوى/الطلاب
       statusText = "SYSTEM: CLASSROOM ACTIVE";
       RoleIcon = IconSchool;
+      subMessage = "> Monitoring student progress.";
   } else if (isStudent) {
       roleTitle = "STUDENT";
-      mainActionText = "CONTINUE STUDY";
+      mainActionText = "CONTINUE MISSION"; // الطالب يذهب للدراسة
       statusText = "SYSTEM: LEARNING MODE";
+      RoleIcon = IconBook;
+      subMessage = "> Neural link established with teacher.";
   }
 
   // تحديد الاسم الذي سيظهر في التأثير المشفر
@@ -4610,7 +4604,7 @@ export function HeroSection({ onStart, onOpenGame }) {
       className="w-full h-full flex flex-col md:flex-row items-center justify-between p-6 md:p-12 relative z-10 gap-12" 
       dir={dir}
     >
-      {/* القسم الأيسر: نصوص الترحيب والحالة */}
+      {/* القسم الأيسر: الترحيب والحالة */}
       <motion.div 
         initial={{ opacity: 0, x: isRTL ? 50 : -50 }} 
         animate={{ opacity: 1, x: 0 }} 
@@ -4647,11 +4641,11 @@ export function HeroSection({ onStart, onOpenGame }) {
                 : 'text-zinc-500 border-indigo-400 bg-black/[0.02]'
             }`}>
                 <p className="mb-1">{t('hero_line1')}</p>
-                <p>{t('hero_line2')}</p>
+                <p>{subMessage}</p>
             </div>
         </div>
 
-        {/* كروت الإحصائيات الصغيرة */}
+        {/* كروت الإحصائيات المصغرة */}
         <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -4664,28 +4658,31 @@ export function HeroSection({ onStart, onOpenGame }) {
         </motion.div>
       </motion.div>
 
-      {/* القسم الأيمن: أزرار العمليات الكبيرة */}
+      {/* القسم الأيمن: الأزرار الرئيسية */}
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }} 
         animate={{ opacity: 1, scale: 1 }} 
         transition={{ duration: 0.8, delay: 0.3 }}
         className="flex-1 flex flex-col items-center justify-center gap-10 relative"
       >
-        {/* زر الإجراء الرئيسي (المغناطيسي) */}
+        {/* الزر الرئيسي (المغناطيسي) */}
         <MagneticButton 
             onClick={() => {
-                // توجيه ذكي حسب الرتبة
-                if (isTeacher) {
-                    // الأستاذ يذهب لصفحة الطلاب أو المحتوى (هنا اخترنا المحتوى)
-                    // يمكنك تغييرها لـ onStart() التي توجه لـ category في page.js
-                    // ولكن بما أننا في ViewManager وجهنا الـ links، فزر الهيرو يفضل أن يذهب لأهم صفحة
-                    // سنستخدم onStart الافتراضي وسيعالج page.js التوجيه
+                // تنفيذ الإجراء المناسب عند الضغط
+                if (isTeacher && !isAdmin) {
+                    // الأستاذ يذهب لإدارة المحتوى (Teacher DB)
+                    // ملاحظة: يتم تمرير onStart من ViewManager أو Page، وسيقوم Page.js بالتعامل مع التوجيه
+                    // ولكن لضمان التوجيه الصحيح يمكننا استخدام الدالة الممررة
                     onStart(); 
                 } else if (isAdmin) {
-                    // الأدمن يذهب للوحة التحكم (عبر onOpenAdmin لو كانت ممررة، أو onStart)
-                    onStart(); // حالياً يذهب للدراسة، يمكن تعديله في page.js
+                    // الأدمن يذهب للوحة التحكم (إذا كانت الدالة ممررة)
+                     // في Page.js قمنا بتمرير onOpenAdmin للأدمن
+                     // ولكن هنا نستخدم onStart العامة التي توجه للـ Category/Study
+                     // يمكن للأدمن استخدام الشريط السفلي للوصول للوحة التحكم
+                    onStart();
                 } else {
-                    onStart(); // الطالب والمستخدم يذهبون للدراسة
+                    // الطالب يذهب للدراسة
+                    onStart(); 
                 }
             }} 
             className="group relative w-64 h-64 md:w-72 md:h-72 flex items-center justify-center focus:outline-none"
@@ -4715,6 +4712,7 @@ export function HeroSection({ onStart, onOpenGame }) {
         </MagneticButton>
 
         {/* زر التسلل العصبي (الألعاب) */}
+        {/* يظهر للجميع، بما فيهم الطالب الآن */}
         <MagneticButton 
           onClick={onOpenGame} 
           className={`relative group w-full max-w-sm overflow-hidden rounded-[1.5rem] border p-6 transition-all active:scale-95 ${
@@ -4751,9 +4749,6 @@ export function HeroSection({ onStart, onOpenGame }) {
   );
 }
 
-/**
- * مكون فرعي للإحصائيات (Stat Pill)
- */
 function StatPill({ value, label, color, isDark }) {
     return (
         <div className={`px-5 py-3 rounded-2xl border backdrop-blur-md flex items-center gap-3 transition-all hover:-translate-y-1 ${
@@ -6930,9 +6925,9 @@ import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs,
 import { 
   IconUserPlus, IconSearch, IconUsers, IconUser, 
   IconCheck, IconLoader2, IconSchool, IconShield,
-  IconSend, IconMailForward, IconRefresh
+  IconSend, IconMailForward, IconRefresh, IconId
 } from '@tabler/icons-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/hooks/useLanguage';
 
@@ -6943,41 +6938,34 @@ export default function TeacherStudents() {
   // --- الحالات (States) ---
   const [activeTab, setActiveTab] = useState('my_squad'); // 'my_squad' or 'recruit'
   const [myStudents, setMyStudents] = useState([]);
-  const [allUsers, setAllUsers] = useState([]); // المستخدمون المحتملون للتجنيد
+  const [allUsers, setAllUsers] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [invitedUsers, setInvitedUsers] = useState([]); 
 
-  // 1. جلب طلابي الحاليين (My Squad) - مع معالجة الأخطاء
+  // 1. جلب طلابي الحاليين (My Squad)
   useEffect(() => {
     if (!user) return;
     
-    // استعلام بسيط ومباشر لجلب الطلاب المرتبطين بهذا الأستاذ
     const q = query(
       collection(db, "users"), 
       where("teacherId", "==", user.uid)
     );
     
     const unsub = onSnapshot(q, (snap) => {
-      const studentsList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      console.log("My Students Found:", studentsList.length); // للتأكد في الكونسول
-      setMyStudents(studentsList);
+      setMyStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    }, (error) => {
-        console.error("Error fetching students:", error);
-        setLoading(false);
     });
     
     return () => unsub();
   }, [user]);
 
-  // 2. جلب المستخدمين للتجنيد (Recruitment Pool)
+  // 2. جلب المستخدمين للتجنيد
   useEffect(() => {
     if (activeTab === 'recruit') {
         const fetchPotentialRecruits = async () => {
             setLoading(true);
             try {
-                // جلب المستخدمين العاديين فقط
                 const q = query(
                     collection(db, "users"),
                     where("role", "==", "user"), 
@@ -6985,7 +6973,6 @@ export default function TeacherStudents() {
                 );
                 
                 const snap = await getDocs(q);
-                // استبعاد الطلاب الذين يتبعون لي بالفعل
                 const users = snap.docs
                     .map(d => ({ id: d.id, ...d.data() }))
                     .filter(u => u.teacherId !== user.uid);
@@ -7012,13 +6999,11 @@ export default function TeacherStudents() {
               type: 'invite',             
               title: "🎓 SQUAD INVITATION",
               message: `Commander ${user.displayName || "Teacher"} invited you to join their squad.`,
-              
               actionPayload: {
                   teacherId: user.uid,
                   teacherName: user.displayName || "Teacher",
                   newRole: 'student'
               },
-              
               senderId: user.uid,
               createdAt: serverTimestamp(),
               read: false
@@ -7038,83 +7023,99 @@ export default function TeacherStudents() {
   );
 
   return (
-    <div className="w-full h-full flex flex-col p-6 md:p-10 font-sans pb-32" dir={dir}>
+    <div className="w-full h-full flex flex-col p-6 md:p-10 font-sans min-h-screen" dir={dir}>
         
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-6">
+        {/* Header & Tabs */}
+        <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6 animate-in fade-in slide-in-from-top-4 duration-700">
             <div>
                 <div className="flex items-center gap-3 mb-2 text-cyan-500">
-                    <IconShield size={32}/>
+                    <div className="p-2 bg-cyan-500/10 rounded-lg border border-cyan-500/20">
+                        <IconShield size={28}/>
+                    </div>
                     <span className="text-[10px] font-black uppercase tracking-[0.4em]">Squad_Command</span>
                 </div>
-                <h1 className="text-4xl md:text-5xl font-black text-white uppercase tracking-tighter">
+                <h1 className="text-4xl md:text-6xl font-black text-white uppercase tracking-tighter drop-shadow-2xl">
                     {activeTab === 'recruit' ? t('recruit_title') || "Recruitment" : t('nav_students') || "My Squad"}
                 </h1>
             </div>
 
-            {/* Tabs */}
-            <div className="flex bg-[#0a0a0a] border border-white/10 p-1 rounded-2xl">
+            {/* Futuristic Tabs */}
+            <div className="flex bg-[#0a0a0a] border border-white/10 p-1.5 rounded-2xl shadow-xl">
                 <button 
                     onClick={() => setActiveTab('my_squad')}
-                    className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2
-                    ${activeTab === 'my_squad' ? 'bg-cyan-600 text-white shadow-lg' : 'text-white/40 hover:text-white'}`}
+                    className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 relative overflow-hidden
+                    ${activeTab === 'my_squad' ? 'text-white' : 'text-white/40 hover:text-white'}`}
                 >
-                    <IconUsers size={16}/> {t('squad_active') || "Active Agents"}
+                    {activeTab === 'my_squad' && (
+                        <motion.div layoutId="tab-bg" className="absolute inset-0 bg-cyan-600 rounded-xl shadow-[0_0_20px_rgba(8,145,178,0.4)]" />
+                    )}
+                    <span className="relative z-10 flex items-center gap-2"><IconUsers size={16}/> {t('squad_active') || "Active"}</span>
                 </button>
                 <button 
                     onClick={() => setActiveTab('recruit')}
-                    className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2
-                    ${activeTab === 'recruit' ? 'bg-purple-600 text-white shadow-lg' : 'text-white/40 hover:text-white'}`}
+                    className={`px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 relative overflow-hidden
+                    ${activeTab === 'recruit' ? 'text-white' : 'text-white/40 hover:text-white'}`}
                 >
-                    <IconUserPlus size={16}/> {t('recruit_invite_btn') || "Recruit"}
+                    {activeTab === 'recruit' && (
+                        <motion.div layoutId="tab-bg" className="absolute inset-0 bg-purple-600 rounded-xl shadow-[0_0_20px_rgba(147,51,234,0.4)]" />
+                    )}
+                    <span className="relative z-10 flex items-center gap-2"><IconUserPlus size={16}/> {t('recruit_invite_btn') || "Recruit"}</span>
                 </button>
             </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 bg-[#0a0a0a] border border-white/10 rounded-[2.5rem] p-6 shadow-2xl relative overflow-hidden flex flex-col">
+        {/* Main Content Area */}
+        <div className="flex-1 relative">
             
             {/* === Tab 1: My Squad === */}
             {activeTab === 'my_squad' && (
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-32">
                     {loading && myStudents.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center gap-4 text-cyan-500/50">
-                            <IconLoader2 className="animate-spin" size={32}/>
+                        <div className="col-span-full h-64 flex flex-col items-center justify-center gap-4 text-cyan-500/50">
+                            <IconLoader2 className="animate-spin" size={40}/>
                             <span className="text-xs font-black uppercase tracking-widest">Syncing Squad Data...</span>
                         </div>
                     ) : myStudents.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center opacity-30 text-center">
-                            <IconSchool size={64} className="mb-4 text-cyan-500"/>
-                            <h3 className="text-lg font-black uppercase tracking-widest">Squad Empty</h3>
-                            <p className="text-xs font-mono mt-2">Go to "Recruit" tab to add students.</p>
+                        <div className="col-span-full h-96 flex flex-col items-center justify-center text-center opacity-30 border-2 border-dashed border-white/5 rounded-[3rem]">
+                            <IconSchool size={80} className="mb-6 text-cyan-500"/>
+                            <h3 className="text-2xl font-black uppercase tracking-widest">Squad Empty</h3>
+                            <p className="text-sm font-mono mt-2 text-white/50">Go to "Recruit" tab to add students.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {myStudents.map((student, i) => (
-                                <motion.div 
-                                    key={student.id}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: i * 0.05 }}
-                                    className="p-5 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center gap-4 hover:border-cyan-500/30 transition-all group"
-                                >
-                                    <div className="w-12 h-12 rounded-xl bg-zinc-800 overflow-hidden border border-white/10 shrink-0">
-                                        <img src={student.photoURL || "/avatars/avatar1.png"} className="w-full h-full object-cover"/>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-white font-bold truncate uppercase">{student.displayName || "Unknown Agent"}</div>
-                                        <div className="text-[10px] text-emerald-500 font-mono flex items-center gap-1">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                            OPERATIVE
+                        myStudents.map((student, i) => (
+                            <motion.div 
+                                key={student.id}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.05 }}
+                                className="group relative p-6 rounded-[2rem] bg-[#0a0a0a] border border-white/5 hover:border-cyan-500/30 transition-all hover:bg-[#0f0f0f] hover:shadow-2xl overflow-hidden"
+                            >
+                                {/* Decorative Glow */}
+                                <div className="absolute -right-10 -top-10 w-32 h-32 bg-cyan-500/5 blur-[50px] group-hover:bg-cyan-500/10 transition-all rounded-full pointer-events-none"></div>
+
+                                <div className="relative z-10 flex items-center gap-5">
+                                    <div className="relative">
+                                        <div className="w-16 h-16 rounded-2xl bg-zinc-800 overflow-hidden border-2 border-white/5 group-hover:border-cyan-500/50 transition-all shadow-lg">
+                                            <img src={student.photoURL || "/avatars/avatar1.png"} className="w-full h-full object-cover"/>
+                                        </div>
+                                        {/* Online Indicator */}
+                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#0a0a0a] rounded-full flex items-center justify-center">
+                                            <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_5px_#10b981]"></div>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="text-cyan-400 font-black text-sm">{student.xp || 0}</div>
-                                        <div className="text-[8px] text-white/30 uppercase">XP</div>
+                                    
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-white font-black text-lg truncate uppercase mb-1">{student.displayName}</div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-[9px] text-cyan-400 font-bold uppercase tracking-wider">
+                                                LVL.{Math.floor((student.xp || 0)/500) + 1}
+                                            </span>
+                                            <span className="text-[9px] text-white/30 font-mono">{student.xp || 0} XP</span>
+                                        </div>
                                     </div>
-                                </motion.div>
-                            ))}
-                        </div>
+                                </div>
+                            </motion.div>
+                        ))
                     )}
                 </div>
             )}
@@ -7122,29 +7123,30 @@ export default function TeacherStudents() {
             {/* === Tab 2: Recruit === */}
             {activeTab === 'recruit' && (
                 <div className="flex flex-col h-full">
-                    {/* Search */}
-                    <div className="relative mb-6">
-                        <IconSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" size={20}/>
+                    {/* Search Bar */}
+                    <div className="relative mb-8 group">
+                        <IconSearch className="absolute left-6 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-purple-500 transition-colors" size={24}/>
                         <input 
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder={t('recruit_search_ph') || "Search by codename or email..."}
-                            className="w-full bg-black/40 border border-white/10 rounded-xl py-4 pl-12 pr-4 text-white outline-none focus:border-purple-500 transition-all font-mono text-sm placeholder:text-white/20"
+                            className="w-full bg-[#0a0a0a] border border-white/10 rounded-[2rem] py-5 pl-16 pr-6 text-white outline-none focus:border-purple-500 focus:bg-purple-900/5 transition-all font-mono text-sm placeholder:text-white/20 shadow-xl"
                         />
                     </div>
 
-                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pb-32">
                         {loading ? (
-                            <div className="h-full flex flex-col items-center justify-center gap-4 text-purple-500/50">
-                                <IconLoader2 className="animate-spin" size={32}/>
+                            <div className="h-64 flex flex-col items-center justify-center gap-4 text-purple-500/50">
+                                <IconLoader2 className="animate-spin" size={40}/>
                                 <span className="text-xs font-black uppercase tracking-widest">Scanning Global Network...</span>
                             </div>
                         ) : filteredRecruits.length === 0 ? (
                             <div className="text-center py-20 opacity-30">
+                                <IconId size={64} className="mx-auto mb-4"/>
                                 <p className="text-xs font-black uppercase tracking-widest">{t('recruit_no_results') || "No candidates found"}</p>
                             </div>
                         ) : (
-                            <div className="space-y-3">
+                            <div className="grid gap-3">
                                 {filteredRecruits.map((candidate, i) => {
                                     const isInvited = invitedUsers.includes(candidate.id);
                                     
@@ -7154,14 +7156,14 @@ export default function TeacherStudents() {
                                             initial={{ opacity: 0, x: -10 }}
                                             animate={{ opacity: 1, x: 0 }}
                                             transition={{ delay: i * 0.05 }}
-                                            className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-between hover:bg-white/[0.04] transition-all"
+                                            className="p-4 rounded-3xl bg-white/[0.02] border border-white/5 flex items-center justify-between hover:bg-white/[0.04] hover:border-white/10 transition-all group"
                                         >
-                                            <div className="flex items-center gap-4 overflow-hidden">
-                                                <div className="w-10 h-10 rounded-xl bg-zinc-800 overflow-hidden border border-white/10 shrink-0">
+                                            <div className="flex items-center gap-5 overflow-hidden">
+                                                <div className="w-12 h-12 rounded-2xl bg-zinc-800 overflow-hidden border border-white/10 shrink-0 group-hover:scale-105 transition-transform">
                                                     <img src={candidate.photoURL || "/avatars/avatar1.png"} className="w-full h-full object-cover"/>
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <div className="text-white font-bold text-sm truncate uppercase">{candidate.displayName || "Unknown"}</div>
+                                                    <div className="text-white font-bold text-sm truncate uppercase">{candidate.displayName || "Unknown User"}</div>
                                                     <div className="text-[10px] text-white/30 font-mono truncate">{candidate.email}</div>
                                                 </div>
                                             </div>
@@ -7169,10 +7171,10 @@ export default function TeacherStudents() {
                                             <button 
                                                 onClick={() => !isInvited && sendInvite(candidate)}
                                                 disabled={isInvited}
-                                                className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2
+                                                className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg
                                                 ${isInvited 
                                                     ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 cursor-default' 
-                                                    : 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg active:scale-95'}`}
+                                                    : 'bg-purple-600 hover:bg-purple-500 text-white active:scale-95'}`}
                                             >
                                                 {isInvited ? (
                                                     <><IconCheck size={14}/> {t('recruit_sent') || "Sent"}</>
@@ -7480,36 +7482,75 @@ export const BorderBeam = ({
 ------------------------------------------------------------------
 FILE: src\components\ui\CommandMenu.jsx
 ------------------------------------------------------------------
-// FILE: components/CommandMenu.jsx
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   IconSearch, IconHome, IconSettings, IconUser, IconCpu, 
-  IconMessage, IconDeviceGamepad, IconLogout, IconTerminal 
+  IconMessage, IconDeviceGamepad, IconLogout, IconTerminal,
+  IconSchool, IconChartBar, IconUsers, IconBroadcast, IconShield
 } from '@tabler/icons-react';
+import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/hooks/useLanguage';
 
 export default function CommandMenu({ isOpen, onClose, onNavigate, onAction }) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  
+  const { user, isTeacher, isStudent, isAdmin, logout } = useAuth();
+  const { t } = useLanguage();
 
-  const actions = [
-    { id: 'home', label: 'Go to Base', icon: IconHome, group: 'Navigation' },
-    { id: 'study', label: 'Start Training', icon: IconCpu, group: 'Navigation' },
-    { id: 'games', label: 'Cyber Arcade', icon: IconDeviceGamepad, group: 'Navigation' },
-    { id: 'profile', label: 'User ID', icon: IconUser, group: 'Navigation' },
-    { id: 'settings', label: 'System Config', icon: IconSettings, group: 'System' },
-    { id: 'logout', label: 'Terminate Session', icon: IconLogout, group: 'System', color: 'text-red-500' },
-  ];
+  // بناء القائمة ديناميكياً بناءً على الرتبة
+  const actions = useMemo(() => {
+    const baseActions = [
+      { id: 'home', label: t('nav_home') || 'Base', icon: IconHome, group: 'Navigation' },
+      { id: 'profile', label: t('nav_rank') || 'Profile', icon: IconUser, group: 'Navigation' },
+      { id: 'settings', label: t('nav_settings') || 'System Config', icon: IconSettings, group: 'System' },
+    ];
+
+    if (isTeacher) {
+      baseActions.push(
+        { id: 'teacher_students', label: t('nav_students') || 'Squad Management', icon: IconUsers, group: 'Command' },
+        { id: 'teacher_progress', label: t('nav_progress') || 'Analytics', icon: IconChartBar, group: 'Command' },
+        { id: 'teacher_db', label: t('nav_create_db') || 'Content Database', icon: IconCpu, group: 'Command' },
+        { id: 'live', label: t('nav_live') || 'Live Stream', icon: IconBroadcast, group: 'Command' },
+      );
+    }
+
+    if (isStudent) {
+      baseActions.push(
+        { id: 'category', label: t('nav_study') || 'Start Mission', icon: IconCpu, group: 'Mission' },
+        { id: 'leaderboard', label: t('nav_rewards') || 'Rankings', icon: IconUser, group: 'Mission' },
+        { id: 'live', label: t('nav_live') || 'Join Uplink', icon: IconSchool, group: 'Mission' },
+      );
+    }
+
+    if (isAdmin) {
+      baseActions.push(
+        { id: 'admin_panel', label: t('nav_admin') || 'Admin Terminal', icon: IconShield, group: 'Root' },
+      );
+    }
+
+    // إضافة الخيارات العامة والألعاب
+    baseActions.push(
+        { id: 'games', label: t('nav_games') || 'Arcade', icon: IconDeviceGamepad, group: 'Extras' },
+        { id: 'chat', label: t('nav_chat') || 'Comms', icon: IconMessage, group: 'Extras' },
+        { id: 'logout', label: t('logout_btn') || 'Terminate Session', icon: IconLogout, group: 'System', color: 'text-red-500' }
+    );
+
+    return baseActions;
+  }, [isTeacher, isStudent, isAdmin, t]);
 
   const filtered = actions.filter(a => a.label.toLowerCase().includes(query.toLowerCase()));
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // فتح القائمة بـ Ctrl+K
       if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         isOpen ? onClose() : onAction('open_cmd');
       }
+      
       if (!isOpen) return;
 
       if (e.key === 'ArrowDown') {
@@ -7521,7 +7562,11 @@ export default function CommandMenu({ isOpen, onClose, onNavigate, onAction }) {
       } else if (e.key === 'Enter') {
         const item = filtered[selectedIndex];
         if (item) {
-          onNavigate(item.id === 'logout' || item.id === 'settings' ? item.id : item.id); // معالجة خاصة
+          if (item.id === 'logout') {
+              logout();
+          } else {
+              onNavigate(item.id);
+          }
           onClose();
         }
       } else if (e.key === 'Escape') {
@@ -7531,7 +7576,10 @@ export default function CommandMenu({ isOpen, onClose, onNavigate, onAction }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, selectedIndex, filtered, onClose, onAction]);
+  }, [isOpen, selectedIndex, filtered, onClose, onAction, onNavigate, logout]);
+
+  // تصفير التحديد عند تغيير البحث
+  useEffect(() => setSelectedIndex(0), [query]);
 
   if (!isOpen) return null;
 
@@ -7542,44 +7590,56 @@ export default function CommandMenu({ isOpen, onClose, onNavigate, onAction }) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95 }}
         onClick={e => e.stopPropagation()}
-        className="w-full max-w-xl bg-[#09090b] border border-white/10 rounded-xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden"
+        className="w-full max-w-xl bg-[#09090b] border border-white/10 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col"
       >
-        <div className="flex items-center px-4 py-4 border-b border-white/10">
-          <IconSearch className="text-white/40 mr-3" size={20} />
+        <div className="flex items-center px-4 py-4 border-b border-white/10 bg-white/[0.02]">
+          <IconSearch className="text-cyan-500 mr-3 animate-pulse" size={20} />
           <input 
             autoFocus
             value={query}
-            onChange={e => { setQuery(e.target.value); setSelectedIndex(0); }}
-            placeholder="Type a command..."
-            className="flex-1 bg-transparent border-none outline-none text-white placeholder-white/30 font-mono"
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Run command..."
+            className="flex-1 bg-transparent border-none outline-none text-white placeholder-white/30 font-mono text-sm uppercase tracking-widest"
           />
-          <div className="text-xs text-white/20 bg-white/5 px-2 py-1 rounded">ESC</div>
+          <div className="text-[10px] text-white/20 bg-white/5 px-2 py-1 rounded font-bold">ESC</div>
         </div>
         
-        <div className="py-2 max-h-[300px] overflow-y-auto">
+        <div className="py-2 max-h-[300px] overflow-y-auto custom-scrollbar">
           {filtered.length === 0 ? (
-            <div className="px-4 py-8 text-center text-white/30 text-sm">No commands found.</div>
+            <div className="px-4 py-8 text-center text-white/30 text-xs font-mono uppercase tracking-widest">No matching protocols.</div>
           ) : (
             filtered.map((action, i) => (
               <div
-                key={action.id}
-                onClick={() => { onNavigate(action.id); onClose(); }}
-                className={`px-4 py-3 flex items-center gap-3 cursor-pointer transition-colors ${
-                  i === selectedIndex ? 'bg-white/10 border-l-2 border-cyan-500' : 'text-white/60 hover:bg-white/5'
-                }`}
+                key={`${action.group}-${action.id}`}
+                onClick={() => { 
+                    if(action.id === 'logout') logout();
+                    else onNavigate(action.id); 
+                    onClose(); 
+                }}
+                className={`px-4 py-3 flex items-center gap-3 cursor-pointer transition-all border-l-2
+                  ${i === selectedIndex 
+                    ? 'bg-white/10 border-cyan-500 text-white' 
+                    : 'border-transparent text-white/50 hover:bg-white/5'
+                  }`}
               >
-                <action.icon size={18} className={action.color || "text-white"} />
-                <span className={`text-sm ${i === selectedIndex ? 'text-white font-bold' : ''}`}>{action.label}</span>
+                <action.icon size={18} className={action.color || (i === selectedIndex ? "text-cyan-400" : "text-white/40")} />
+                <div className="flex flex-col">
+                    <span className={`text-sm font-bold ${i === selectedIndex ? 'text-white' : ''}`}>{action.label}</span>
+                    {i === selectedIndex && <span className="text-[8px] font-mono text-white/30 uppercase tracking-widest">{action.group}</span>}
+                </div>
                 {i === selectedIndex && <IconTerminal size={14} className="ml-auto text-cyan-500 animate-pulse" />}
               </div>
             ))
           )}
         </div>
         
-        <div className="px-4 py-2 bg-black/50 border-t border-white/5 flex justify-between text-[10px] text-white/30 uppercase tracking-wider">
-            <span>Nexus OS v3.0</span>
+        <div className="px-4 py-2 bg-black/50 border-t border-white/5 flex justify-between items-center text-[9px] text-white/30 uppercase tracking-wider font-mono">
             <span className="flex items-center gap-2">
-                Use <kbd className="bg-white/10 px-1 rounded">↑</kbd> <kbd className="bg-white/10 px-1 rounded">↓</kbd> to navigate
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                System Operational
+            </span>
+            <span className="flex items-center gap-2">
+                Select <kbd className="bg-white/10 px-1.5 py-0.5 rounded text-white">↵</kbd>
             </span>
         </div>
       </motion.div>
@@ -7609,16 +7669,21 @@ FILE: src\components\ui\CyberHUD.jsx
 ------------------------------------------------------------------
 "use client";
 import React from "react";
+import { useAuth } from "@/context/AuthContext";
 
 export const CyberHUD = () => {
+  const { user, role } = useAuth();
+
   return (
     <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden h-full w-full">
       {/* Top Left Corner */}
       <div className="absolute top-8 left-8 w-64 h-64 border-l-2 border-t-2 border-cyan-500/30 rounded-tl-3xl opacity-50">
         <div className="absolute top-0 left-0 w-20 h-[2px] bg-cyan-400 shadow-[0_0_10px_#00f2ff]"></div>
         <div className="absolute top-0 left-0 h-20 w-[2px] bg-cyan-400 shadow-[0_0_10px_#00f2ff]"></div>
-        <div className="absolute top-4 left-4 text-[10px] font-mono text-cyan-500/60">
-            SYS.OP.READY <br/> V.2.0.77
+        <div className="absolute top-4 left-4 text-[10px] font-mono text-cyan-500/60 uppercase">
+            SYS.OP.READY <br/> 
+            VER. 5.4.0-STABLE <br/>
+            ID: {user ? user.uid.substring(0, 8) : "GUEST"}
         </div>
       </div>
 
@@ -7626,9 +7691,12 @@ export const CyberHUD = () => {
       <div className="absolute top-8 right-8 w-64 h-64 border-r-2 border-t-2 border-purple-500/30 rounded-tr-3xl opacity-50">
          <div className="absolute top-0 right-0 w-20 h-[2px] bg-purple-400 shadow-[0_0_10px_#7000ff]"></div>
          <div className="absolute top-0 right-0 h-20 w-[2px] bg-purple-400 shadow-[0_0_10px_#7000ff]"></div>
-         <div className="absolute top-4 right-4 flex gap-1">
-             <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
-             <span className="text-[10px] font-mono text-purple-500/60">LIVE FEED</span>
+         <div className="absolute top-4 right-4 flex flex-col items-end gap-1">
+             <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+                <span className="text-[10px] font-mono text-purple-500/60 font-bold">NET: SECURE</span>
+             </div>
+             <span className="text-[9px] font-mono text-purple-500/40 uppercase">{role} ACCESS</span>
          </div>
       </div>
 
@@ -7638,6 +7706,7 @@ export const CyberHUD = () => {
          <div className="absolute bottom-0 left-0 h-20 w-[2px] bg-cyan-400 shadow-[0_0_10px_#00f2ff]"></div>
          {/* Decorative Lines */}
          <div className="absolute bottom-4 left-4 w-32 h-[1px] bg-gradient-to-r from-cyan-500/50 to-transparent"></div>
+         <div className="absolute bottom-6 left-4 w-16 h-[1px] bg-gradient-to-r from-cyan-500/30 to-transparent"></div>
       </div>
 
       {/* Bottom Right Corner */}
@@ -7645,14 +7714,14 @@ export const CyberHUD = () => {
          <div className="absolute bottom-0 right-0 w-20 h-[2px] bg-purple-400 shadow-[0_0_10px_#7000ff]"></div>
          <div className="absolute bottom-0 right-0 h-20 w-[2px] bg-purple-400 shadow-[0_0_10px_#7000ff]"></div>
          <div className="absolute bottom-4 right-4 text-right text-[10px] font-mono text-purple-500/60">
-             MEM: 64TB <br/> NET: SECURE
+             MEM: 64TB <br/> UPLINK: ACTIVE
          </div>
       </div>
 
       {/* Center Crosshair (Optional - Very subtle) */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 border border-white/5 rounded-full flex items-center justify-center">
-          <div className="w-[1px] h-full bg-white/10"></div>
-          <div className="h-[1px] w-full bg-white/10 absolute"></div>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 border border-white/5 rounded-full flex items-center justify-center opacity-30 pointer-events-none">
+          <div className="w-[1px] h-3 bg-white/20"></div>
+          <div className="h-[1px] w-3 bg-white/20 absolute"></div>
       </div>
     </div>
   );
@@ -9439,35 +9508,36 @@ export default function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       
-      const CURRENT_VERSION = 'v5.2.2-force-clean'; // تغيير هذا الرقم يجبر النظام على التنظيف
+      // تغيير رقم الإصدار هنا يجبر النظام على تنظيف الكاش وتحميل الترجمات الجديدة
+      const CURRENT_VERSION = 'v5.6.0-FULL-TRANSLATIONS'; 
 
       const cleanup = async () => {
         try {
-          // 1. إلغاء تسجيل أي Service Workers نشطة قد تسبب المشكلة
+          // 1. إلغاء تسجيل أي Service Workers قديمة لمنع المشاكل
           if ('serviceWorker' in navigator) {
             const registrations = await navigator.serviceWorker.getRegistrations();
             for(let registration of registrations) {
               await registration.unregister();
-              console.log('Service Worker Unregistered to fix cache issues.');
+              console.log('Service Worker Unregistered to force update.');
             }
           }
 
-          // 2. تنظيف مخزن الكاش (Cache Storage)
+          // 2. تنظيف مخزن الكاش (Cache Storage) لضمان تحميل الملفات الجديدة
           if ('caches' in window) {
             const storedVersion = localStorage.getItem('sw_cache_version');
             
-            // إذا كان الإصدار مختلفاً أو غير موجود، قم بمسح كل شيء
+            // إذا كان الإصدار مختلفاً، قم بمسح كل شيء
             if (storedVersion !== CURRENT_VERSION) {
                 const keys = await caches.keys();
                 await Promise.all(
                     keys.map(key => caches.delete(key))
                 );
-                console.log('System Caches Purged Successfully.');
+                console.log('System Caches Purged for Update.');
                 
-                // تحديث الإصدار لمنع المسح في المرات القادمة (للحفاظ على الأداء)
+                // تحديث الإصدار
                 localStorage.setItem('sw_cache_version', CURRENT_VERSION);
                 
-                // إعادة تحميل الصفحة لمرة واحدة لضمان جلب الملفات الجديدة
+                // إعادة تحميل الصفحة لمرة واحدة فقط لتطبيق التحديث
                 if (sessionStorage.getItem('reloaded_for_update') !== 'true') {
                     sessionStorage.setItem('reloaded_for_update', 'true');
                     window.location.reload();
@@ -11983,20 +12053,10 @@ export const translations = {
     recruit_success_msg: "تم إرسال إشارة التجنيد بنجاح",
     
     squad_title: "أداء الكتيبة",
-    squad_analytics: "التحليل العصبي V2.0",
-    squad_total_ops: "إجمالي العملاء",
-    squad_active: "نشط",
+    squad_active: "العملاء النشطون",
     squad_dormant: "خامل",
-    squad_critical: "حرج",
-    squad_engagement: "معدل التفاعل",
-    squad_retention: "الاحتفاظ",
-    squad_velocity: "سرعة التعلم",
-    squad_risk: "حالة الخطر",
     squad_no_data: "لا توجد بيانات للتحليل",
-    squad_btn_recruit: "تجنيد طلاب جدد",
-    squad_last_seen: "آخر ظهور",
-    squad_words_count: "كلمات",
-
+    
     // --- واجهة الدخول والتسجيل (Auth System) ---
     auth_welcome: "مرحباً بك في الواجهة",
     auth_step_name: "تحديد الهوية",
@@ -12008,16 +12068,12 @@ export const translations = {
     auth_btn_next: "التالي",
     auth_btn_finish: "تنشيط الحساب",
     auth_error_name: "الاسم الرمزي مطلوب للاستمرار",
-    auth_sync_msg: "جاري مزامنة البيانات العصبية...",
 
     // --- القسم الرئيسي (Hero Section) ---
     hero_status: "حالة النظام: متصل",
     hero_welcome: "أهلاً بعودتك،",
     hero_line1: "> الواجهة العصبية جاهزة.",
     hero_line2: "> الأهداف تم تحميلها.",
-    hero_stat_words: "كلمة",
-    hero_stat_games: "ألعاب",
-    hero_stat_practice: "تمرين",
     btn_start: "ابدأ المهمة",
     btn_hacking: "اختراق عصبي",
     hacking_sub: "بروتوكول الهجوم: جاهز",
@@ -12026,22 +12082,21 @@ export const translations = {
     games_title: "مركز المحاكاة",
     games_subtitle: "تطوير المهارات اللغوية عبر البيئة الافتراضية",
     game_chrono_title: "مسافر الزمن",
-    game_chrono_desc: "تحدى الوقت وأتقن قراءة الساعة باللغة الروسية بدقة متناهية.",
+    game_chrono_desc: "تحدى الوقت وأتقن قراءة الساعة باللغة الروسية.",
     game_gravity_title: "بروتوكول الجاذبية",
-    game_gravity_desc: "استخدم الجاذبية لوضع الكلمات في سياقها الصحيح داخل الجمل.",
+    game_gravity_desc: "استخدم الجاذبية لوضع الكلمات في سياقها الصحيح.",
     game_magnet_title: "الحقل المغناطيسي",
-    game_magnet_desc: "جذب الكلمات التي تنتمي لنفس الجذر اللغوي لبناء ترابط عصبي.",
+    game_magnet_desc: "جذب الكلمات التي تنتمي لنفس الجذر اللغوي.",
     game_scale_title: "ميزان الكلمات",
-    game_scale_desc: "حقق التوازن اللغوي عبر تصنيف الكلمات حسب وزنها المرجعي.",
+    game_scale_desc: "حقق التوازن اللغوي عبر تصنيف الكلمات.",
 
-    // --- وحدات الدراسة (Data Modules) ---
+    // --- وحدات الدراسة (Category Select) ---
     modules_system_ready: "النظام جاهز",
     modules_available: "وحدة متاحة",
     modules_title_1: "أرشيف",
     modules_title_2: "البيانات",
     modules_search_placeholder: "بحث في السجلات العصبية...",
     modules_no_data: "لا توجد بيانات مطابقة للبحث",
-    modules_esc: "خروج",
 
     // --- تصنيفات البيانات (Categories) ---
     cat_all: "كافة السجلات",
@@ -12065,9 +12120,8 @@ export const translations = {
     archive_items: "سجل",
     archive_search_placeholder: "البحث في قاعدة البيانات...",
     archive_add_btn: "إضافة سجل",
-    archive_load_more: "تحميل المزيد من السجلات",
+    archive_load_more: "تحميل المزيد",
     archive_manage_groups: "إدارة المجموعات",
-    archive_edit: "تعديل",
     archive_delete: "حذف السجل",
     archive_rus_ph: "روسي",
     archive_ara_ph: "عربي",
@@ -12080,13 +12134,10 @@ export const translations = {
     chat_no_freq: "لم يتم تحديد تردد اتصال",
     chat_type_msg: "اكتب رسالة مشفرة...",
     chat_invite: "دعوة عملاء",
-    chat_squad_invite: "طلب تعزيزات",
     chat_create_squad: "تأسيس كتيبة جديدة",
-    chat_squad_name: "اسم الكتيبة",
-    chat_security: "بروتوكول الأمان",
     chat_public: "تردد عام (مفتوح)",
     chat_private: "تردد مشفر (خاص)",
-    chat_cancel: "إلغاء العملية",
+    chat_cancel: "إلغاء",
     chat_init: "بدء التهيئة",
     chat_server_public: "خادم اتصالات عام",
     chat_server_private: "خادم اتصالات خاص",
@@ -12094,7 +12145,6 @@ export const translations = {
     // --- الإشعارات (Notifications) ---
     notif_title: "مركز التنبيهات",
     notif_empty: "لا توجد إشارات جديدة",
-    notif_now: "الآن",
     notif_type_invite: "دعوة تجنيد",
     notif_type_rank: "ترقية عسكرية",
     notif_type_support: "رد من الدعم",
@@ -12119,10 +12169,9 @@ export const translations = {
     profile_stats_cards: "إجمالي السجلات",
     profile_stats_mastered: "سجلات متقنة",
     profile_stats_streak: "تتابع الخدمة",
-    profile_rank_title: "سجل الترقيات",
-    profile_metrics: "تحليل الأداء العصبي",
-    profile_efficiency: "معدل الكفاءة القتالية",
-    profile_badges: "أوسمة الخدمة الميدانية",
+    profile_metrics: "تحليل الأداء",
+    profile_efficiency: "معدل الكفاءة",
+    profile_badges: "الأوسمة",
     profile_unlocked: "تم فتح القفل",
     profile_requires: "يتطلب",
 
@@ -12131,40 +12180,25 @@ export const translations = {
     admin_overview: "نظرة عامة",
     admin_operatives: "إدارة العملاء",
     admin_squads: "إدارة الفرق",
-    admin_signals: "إشارات الدعم",
     admin_uplink: "اتصال الدعم",
     admin_alert: "تنبيه عالمي",
-    admin_exit: "خروج من المحطة",
+    admin_exit: "خروج",
     admin_total_ops: "إجمالي العملاء",
     admin_threats: "تهديدات محظورة",
     admin_tickets: "طلبات الدعم",
-    admin_role: "رتبة الوصول",
-    admin_status: "الحالة الأمنية",
-    admin_actions: "إجراءات التحكم",
     admin_ban: "تجميد الحساب",
     admin_unban: "إلغاء التجميد",
     admin_broadcast_title: "بث إشارة نظام عالمية",
-    admin_broadcast_ph: "أدخل نص الرسالة العاجلة هنا...",
-    admin_broadcast_exec: "تنفيذ البث الشامل",
     admin_chat_control: "رقابة الكتائب",
-    admin_enter_chat: "دخول التردد",
-    admin_delete_msg: "تدمير الرسالة",
-    admin_kick_user: "طرد من التردد",
     admin_ban_user: "تجميد العميل",
-    admin_msg_deleted: "تم تدمير الرسالة بواسطة الرقابة المركزية",
     admin_confirm_delete: "تأكيد تدمير هذا السجل؟",
-    admin_chat_members: "العملاء المتصلون",
 
-    // --- البث المباشر (Live Signals) ---
-    live_header: "الارتباط العصبي الحي",
-    live_version: "بروتوكول بث آمن V.4.0",
-    live_enter_id: "أدخل معرف القناة الآمنة...",
+    // --- البث المباشر (Live) ---
+    live_enter_id: "أدخل معرف القناة...",
     live_connect_btn: "بدء الاتصال",
-    live_connecting: "جاري تشفير النفق...",
     live_secure_channel: "قناة مشفرة آمنة",
     live_active_msg: "الإشارة نشطة ومستقرة",
     live_active_desc: "الاتصال مؤمن بالكامل. سيتم تصغير الواجهة تلقائياً عند التنقل.",
-    live_log_ready: "نظام الاستقبال جاهز",
     live_log_waiting: "في انتظار إدخال المعرف",
     live_log_encrypt: "جاري تشفير البيانات...",
     live_log_established: "تم إنشاء الارتباط بنجاح",
@@ -12173,18 +12207,15 @@ export const translations = {
     settings_title: "تكوين النظام",
     settings_subtitle: "وحدة التفضيلات الشخصية",
     identity_title: "هوية العميل",
-    identity_upload: "تحميل بصمة وجه جديدة",
-    identity_name_label: "الاسم الرمزي المعتمد",
+    identity_name_label: "الاسم الرمزي",
     identity_name_placeholder: "تغيير الاسم الرمزي...",
     identity_avatar_label: "بروتوكول الأفاتار",
     identity_save_btn: "تحديث الهوية",
     identity_saving: "جاري الحفظ...",
-    system_lang_title: "اللغة والموقع الميداني",
-    lang_system_label: "لغة واجهة النظام",
-    lang_target_label: "لغة الهدف الدراسي",
+    system_lang_title: "اللغة والموقع",
     theme_title: "نمط الرؤية",
-    theme_dark: "النمط الليلي (Cyber)",
-    theme_light: "النمط النهاري (Pro)",
+    theme_dark: "ليلي (Cyber)",
+    theme_light: "نهاري (Pro)",
     theme_auto: "مزامنة تلقائية",
     logout_btn: "إنهاء الجلسة الأمنية",
     alert_saved: "تم تحديث الهوية بنجاح",
@@ -12218,64 +12249,48 @@ export const translations = {
     recruit_invite_btn: "Invite",
     recruit_sent: "Sent",
     recruit_assigned: "Assigned",
-    recruit_success_msg: "Recruitment signal broadcasted successfully",
+    recruit_success_msg: "Recruitment signal sent",
 
     squad_title: "Squad Performance",
-    squad_analytics: "Neural Analytics V2.0",
-    squad_total_ops: "Total Operatives",
-    squad_active: "Active",
+    squad_active: "Active Agents",
     squad_dormant: "Dormant",
-    squad_critical: "Critical",
-    squad_engagement: "Engagement",
-    squad_retention: "Retention",
-    squad_velocity: "Learning Velocity",
-    squad_risk: "Risk Status",
-    squad_no_data: "No Data to Analyze",
-    squad_btn_recruit: "Recruit Students",
-    squad_last_seen: "Last Seen",
-    squad_words_count: "Words",
+    squad_no_data: "No Data",
 
     auth_welcome: "Welcome to Interface",
     auth_step_name: "Identification",
-    auth_step_creds: "Credentials",
-    auth_name_label: "Codename (Username)",
-    auth_name_placeholder: "Enter combat name...",
-    auth_email_label: "Email Address",
+    auth_name_label: "Codename",
+    auth_name_placeholder: "Enter codename...",
+    auth_email_label: "Email",
     auth_pass_label: "Password",
     auth_btn_next: "Next",
-    auth_btn_finish: "Activate Account",
+    auth_btn_finish: "Activate",
     auth_error_name: "Codename required",
-    auth_sync_msg: "Syncing data...",
 
     hero_status: "SYSTEM STATUS: ONLINE",
     hero_welcome: "WELCOME BACK,",
     hero_line1: "> Neural Interface Ready.",
     hero_line2: "> Objectives Loaded.",
-    hero_stat_words: "Words",
-    hero_stat_games: "Games",
-    hero_stat_practice: "Practice",
     btn_start: "START MISSION",
     btn_hacking: "NEURAL BREACH",
-    hacking_sub: "HACKING PROTOCOL: READY",
+    hacking_sub: "PROTOCOL READY",
 
     games_title: "Simulation Hub",
-    games_subtitle: "Enhance linguistic skills in a virtual environment",
+    games_subtitle: "Enhance skills in virtual environment",
     game_chrono_title: "Time Traveler",
-    game_chrono_desc: "Challenge time and master reading the clock in Russian.",
+    game_chrono_desc: "Master reading the clock.",
     game_gravity_title: "Gravity Protocol",
-    game_gravity_desc: "Place words in correct context within sentences.",
+    game_gravity_desc: "Place words in context.",
     game_magnet_title: "Magnetic Field",
-    game_magnet_desc: "Attract words belonging to the same linguistic root.",
+    game_magnet_desc: "Attract related words.",
     game_scale_title: "Word Scale",
-    game_scale_desc: "Achieve balance by classifying words by weight.",
+    game_scale_desc: "Balance words by weight.",
 
-    modules_system_ready: "SYSTEM_READY",
+    modules_system_ready: "SYSTEM READY",
     modules_available: "AVAILABLE",
     modules_title_1: "DATA",
     modules_title_2: "ARCHIVE",
     modules_search_placeholder: "SEARCH PROTOCOLS...",
-    modules_no_data: "NO MATCHING DATA",
-    modules_esc: "ESC",
+    modules_no_data: "NO DATA",
 
     cat_all: "All Records",
     cat_concepts_phrases: "Concepts & Phrases",
@@ -12295,11 +12310,10 @@ export const translations = {
 
     archive_header: "NEURAL ARCHIVE",
     archive_items: "RECORDS",
-    archive_search_placeholder: "SEARCHING DATABASE...",
+    archive_search_placeholder: "SEARCH DB...",
     archive_add_btn: "ADD",
     archive_load_more: "LOAD MORE",
     archive_manage_groups: "GROUPS",
-    archive_edit: "EDIT",
     archive_delete: "DELETE",
     archive_rus_ph: "Rus",
     archive_ara_ph: "Ara",
@@ -12308,29 +12322,25 @@ export const translations = {
     archive_new_group_ph: "New Group",
 
     chat_title: "SQUADS",
-    chat_no_freq: "NO FREQUENCY SELECTED",
-    chat_type_msg: "Type encrypted message...",
+    chat_no_freq: "NO FREQUENCY",
+    chat_type_msg: "Type message...",
     chat_invite: "Invite",
-    chat_squad_invite: "Reinforcements",
-    chat_create_squad: "Forge Squad",
-    chat_squad_name: "Squad Name",
-    chat_security: "Security Protocol",
-    chat_public: "Public (Open)",
-    chat_private: "Encrypted (Private)",
+    chat_create_squad: "Create Squad",
+    chat_public: "Public",
+    chat_private: "Private",
     chat_cancel: "Cancel",
-    chat_init: "Initialize",
+    chat_init: "Init",
     chat_server_public: "PUBLIC SERVER",
     chat_server_private: "PRIVATE SERVER",
 
-    notif_title: "NOTIFICATION CENTER",
-    notif_empty: "NO NEW SIGNALS",
-    notif_now: "NOW",
+    notif_title: "ALERTS",
+    notif_empty: "NO SIGNALS",
     notif_type_invite: "SQUAD INVITE",
-    notif_type_rank: "RANK PROMOTION",
+    notif_type_rank: "PROMOTION",
     notif_type_support: "SUPPORT REPLY",
     notif_type_admin: "ADMIN ALERT",
     notif_live_start: "LIVE STREAM",
-    notif_recruit_success: "RECRUITMENT SUCCESS",
+    notif_recruit_success: "RECRUIT SUCCESS",
 
     rank_recruit: "RECRUIT",
     rank_soldier: "SOLDIER",
@@ -12346,74 +12356,56 @@ export const translations = {
     profile_next: "NEXT",
     profile_stats_cards: "Total Cards",
     profile_stats_mastered: "Mastered",
-    profile_stats_streak: "Day Streak",
-    profile_rank_title: "RANK PROGRESS",
-    profile_metrics: "NEURAL ANALYSIS",
-    profile_efficiency: "Efficiency Rating",
-    profile_badges: "SERVICE BADGES",
+    profile_stats_streak: "Streak",
+    profile_metrics: "ANALYSIS",
+    profile_efficiency: "Efficiency",
+    profile_badges: "BADGES",
     profile_unlocked: "UNLOCKED",
     profile_requires: "REQUIRES",
 
     admin_title: "NEXUS ADMIN",
     admin_overview: "Overview",
     admin_operatives: "Operatives",
-    admin_squads: "Squad Control",
-    admin_signals: "Signals",
-    admin_uplink: "Support Uplink",
-    admin_alert: "Global Alert",
-    admin_exit: "Exit Terminal",
+    admin_squads: "Squads",
+    admin_uplink: "Support",
+    admin_alert: "Alert",
+    admin_exit: "Exit",
     admin_total_ops: "Total Ops",
     admin_threats: "Threats",
     admin_tickets: "Tickets",
-    admin_role: "Role",
-    admin_status: "Status",
-    admin_actions: "Actions",
     admin_ban: "Ban",
     admin_unban: "Unban",
     admin_broadcast_title: "Global Alert",
-    admin_broadcast_ph: "MESSAGE...",
-    admin_broadcast_exec: "Execute",
-    admin_chat_control: "SQUAD SUPERVISION",
-    admin_enter_chat: "ENTER FREQUENCY",
-    admin_delete_msg: "DESTROY RECORD",
-    admin_kick_user: "KICK FROM SQUAD",
-    admin_ban_user: "TERMINATE AGENT",
-    admin_msg_deleted: "Record destroyed",
+    admin_chat_control: "Chat Control",
+    admin_ban_user: "Ban Agent",
     admin_confirm_delete: "Destroy record?",
-    admin_chat_members: "CONNECTED AGENTS",
 
-    live_header: "NEURAL LINK",
-    live_version: "BROADCAST V.4.0",
     live_enter_id: "ENTER ID...",
     live_connect_btn: "UPLINK",
-    live_connecting: "ENCRYPTING...",
     live_secure_channel: "CHANNEL",
     live_active_msg: "SIGNAL ACTIVE",
-    live_active_desc: "FULLY SECURED. AUTO-MINIMIZE ACTIVE.",
-    live_log_ready: "Receiver ready",
-    live_log_waiting: "Waiting for ID",
+    live_active_desc: "SECURED. AUTO-MINIMIZE ACTIVE.",
+    live_log_waiting: "Waiting...",
     live_log_encrypt: "Encrypting...",
-    live_log_established: "Link established",
+    live_log_established: "Linked",
 
-    settings_title: "SYSTEM CONFIG",
+    settings_title: "CONFIG",
     settings_subtitle: "PREFERENCES",
-    identity_title: "OPERATIVE IDENTITY",
+    identity_title: "IDENTITY",
     identity_name_label: "CODENAME",
-    identity_name_placeholder: "UPDATE NAME...",
-    identity_avatar_label: "AVATAR PROTOCOL",
-    identity_save_btn: "SAVE IDENTITY",
-    identity_saving: "PROCESSING...",
-    system_lang_title: "LOCALIZATION",
-    lang_system_label: "SYSTEM LANGUAGE",
-    lang_target_label: "TARGET LANGUAGE",
-    theme_title: "INTERFACE THEME",
-    theme_dark: "DARK MODE",
-    theme_light: "LIGHT MODE",
-    theme_auto: "AUTO SYNC",
-    logout_btn: "TERMINATE SESSION",
-    alert_saved: "UPDATED",
-    alert_error: "FAILED",
-    support_placeholder: "Enter support request..."
+    identity_name_placeholder: "Update Name...",
+    identity_avatar_label: "AVATAR",
+    identity_save_btn: "SAVE",
+    identity_saving: "SAVING...",
+    system_lang_title: "LANGUAGE",
+    theme_title: "THEME",
+    theme_dark: "DARK",
+    theme_light: "LIGHT",
+    theme_auto: "AUTO",
+    logout_btn: "LOGOUT",
+    alert_saved: "SAVED",
+    alert_error: "ERROR",
+    support_placeholder: "Type request..."
   },
 
   ru: {
@@ -12432,129 +12424,96 @@ export const translations = {
     nav_students: "Студенты",
     nav_test_cards: "Тест",
     nav_progress: "Прогресс",
-    nav_data: "База Знаний",
+    nav_data: "База",
     nav_rewards: "Награды",
 
-    recruit_protocol: "Протокол Вербовки",
-    recruit_title: "Поиск Агентов",
-    recruit_search_ph: "Поиск по имени или email...",
-    recruit_no_results: "Агенты не найдены",
+    recruit_protocol: "Вербовка",
+    recruit_title: "Поиск",
+    recruit_search_ph: "Поиск...",
+    recruit_no_results: "Нет агентов",
     recruit_invite_btn: "Пригласить",
     recruit_sent: "Отправлено",
     recruit_assigned: "Назначен",
-    recruit_success_msg: "Сигнал вербовки отправлен",
+    recruit_success_msg: "Сигнал отправлен",
 
-    squad_title: "Эффективность Отряда",
-    squad_analytics: "Нейро Аналитика V2.0",
-    squad_total_ops: "Всего Агентов",
+    squad_title: "Отряд",
     squad_active: "Активен",
     squad_dormant: "Спящий",
-    squad_critical: "Критический",
-    squad_engagement: "Вовлеченность",
-    squad_retention: "Удержание",
-    squad_velocity: "Скорость Обучения",
-    squad_risk: "Риск",
-    squad_no_data: "Нет данных для анализа",
-    squad_btn_recruit: "Нанять Студентов",
-    squad_last_seen: "Был в сети",
-    squad_words_count: "Слов",
+    squad_no_data: "Нет данных",
 
     auth_welcome: "Добро пожаловать",
     auth_step_name: "Личность",
-    auth_step_creds: "Данные",
     auth_name_label: "Позывной",
     auth_name_placeholder: "Введите позывной...",
     auth_email_label: "Email",
     auth_pass_label: "Пароль",
     auth_btn_next: "Далее",
-    auth_btn_finish: "Активировать",
+    auth_btn_finish: "Готово",
     auth_error_name: "Позывной обязателен",
-    auth_sync_msg: "Синхронизация...",
 
     hero_status: "СТАТУС: ОНЛАЙН",
     hero_welcome: "С ВОЗВРАЩЕНИЕМ,",
-    hero_line1: "> Нейроинтерфейс готов.",
+    hero_line1: "> Интерфейс готов.",
     hero_line2: "> Цели загружены.",
-    hero_stat_words: "Слов",
-    hero_stat_games: "Игры",
-    hero_stat_practice: "Практика",
-    btn_start: "НАЧАТЬ МИССИЮ",
+    btn_start: "НАЧАТЬ",
     btn_hacking: "ВЗЛОМ",
-    hacking_sub: "ПРОТОКОЛ АТАКИ: ГОТОВ",
+    hacking_sub: "ГОТОВ",
 
-    games_title: "Центр симуляции",
-    games_subtitle: "Улучшение навыков в виртуальной среде",
+    games_title: "Симуляция",
+    games_subtitle: "Тренировка навыков",
     game_chrono_title: "Время",
-    game_chrono_desc: "Освойте время на русском языке.",
+    game_chrono_desc: "Читаем часы.",
     game_gravity_title: "Гравитация",
-    game_gravity_desc: "Правильно расставляйте слова.",
+    game_gravity_desc: "Контекст слов.",
     game_magnet_title: "Магнит",
-    game_magnet_desc: "Притягивайте родственные слова.",
+    game_magnet_desc: "Родственные слова.",
     game_scale_title: "Весы",
-    game_scale_desc: "Классифицируйте слова по весу.",
+    game_scale_desc: "Вес слов.",
 
-    modules_system_ready: "СИСТЕМА ГОТОВА",
+    modules_system_ready: "ГОТОВО",
     modules_available: "ДОСТУПНО",
     modules_title_1: "АРХИВ",
     modules_title_2: "ДАННЫХ",
-    modules_search_placeholder: "ПОИСК ПРОТОКОЛОВ...",
+    modules_search_placeholder: "ПОИСК...",
     modules_no_data: "НЕТ ДАННЫХ",
-    modules_esc: "ESC",
 
-    cat_all: "Все записи",
-    cat_concepts_phrases: "Концепции и фразы",
-    cat_conversation_uni: "Разговор и Уни",
-    cat_society_ethics: "Общество и этика",
-    cat_science_nature: "Наука и природа",
-    cat_personality_feelings: "Личность и чувства",
-    cat_daily_life: "Повседневная жизнь",
-    cat_gov_history: "Гос. и история",
-    cat_slang_common: "Сленг и общее",
-    cat_tech_innovation: "Тех. и инновации",
-    cat_personality_traits: "Черты характера",
-    cat_professions: "Профессии",
-    cat_ai_future: "ИИ и будущее",
+    cat_all: "Все",
     cat_general: "Общий",
     cat_uncategorized: "Без категории",
 
-    archive_header: "НЕЙРО АРХИВ",
+    archive_header: "АРХИВ",
     archive_items: "ЗАПИСЕЙ",
-    archive_search_placeholder: "ПОИСК В БАЗЕ...",
+    archive_search_placeholder: "ПОИСК...",
     archive_add_btn: "ДОБАВИТЬ",
-    archive_load_more: "ЗАГРУЗИТЬ ЕЩЕ",
+    archive_load_more: "ЕЩЕ",
     archive_manage_groups: "ГРУППЫ",
-    archive_edit: "РЕД.",
     archive_delete: "УДАЛИТЬ",
     archive_rus_ph: "Рус",
     archive_ara_ph: "Араб",
     archive_group_label: "Группа",
     archive_new_group: "+ НОВАЯ",
-    archive_new_group_ph: "Новая группа",
+    archive_new_group_ph: "Группа",
 
     chat_title: "ОТРЯДЫ",
     chat_no_freq: "ЧАСТОТА НЕ ВЫБРАНА",
-    chat_type_msg: "Введите сообщение...",
+    chat_type_msg: "Сообщение...",
     chat_invite: "Пригласить",
-    chat_squad_invite: "Подкрепление",
-    chat_create_squad: "Создать отряд",
-    chat_squad_name: "Название отряда",
-    chat_security: "Безопасность",
+    chat_create_squad: "Создать",
     chat_public: "Публичный",
     chat_private: "Приватный",
     chat_cancel: "Отмена",
-    chat_init: "Инициализация",
-    chat_server_public: "ОБЩИЙ СЕРВЕР",
-    chat_server_private: "ПРИВАТНЫЙ СЕРВЕР",
+    chat_init: "Старт",
+    chat_server_public: "ОБЩИЙ",
+    chat_server_private: "ПРИВАТНЫЙ",
 
     notif_title: "УВЕДОМЛЕНИЯ",
     notif_empty: "НЕТ СИГНАЛОВ",
-    notif_now: "СЕЙЧАС",
     notif_type_invite: "ВЕРБОВКА",
     notif_type_rank: "ПОВЫШЕНИЕ",
-    notif_type_support: "ОТВЕТ ПОДДЕРЖКИ",
+    notif_type_support: "ОТВЕТ",
     notif_type_admin: "ТРЕВОГА",
-    notif_live_start: "ПРЯМОЙ ЭФИР",
-    notif_recruit_success: "ВЕРБОВКА УСПЕШНА",
+    notif_live_start: "ЭФИР",
+    notif_recruit_success: "УСПЕХ",
 
     rank_recruit: "НОВОБРАНЕЦ",
     rank_soldier: "СОЛДАТ",
@@ -12568,65 +12527,50 @@ export const translations = {
     profile_class: "КЛАСС",
     profile_exp: "ОПЫТ",
     profile_next: "СЛЕД.",
-    profile_stats_cards: "Всего карт",
+    profile_stats_cards: "Карты",
     profile_stats_mastered: "Изучено",
     profile_stats_streak: "Серия",
-    profile_rank_title: "ПРОГРЕСС РАНГА",
     profile_metrics: "АНАЛИЗ",
     profile_efficiency: "Эффективность",
-    profile_badges: "ЗНАКИ ОТЛИЧИЯ",
+    profile_badges: "ЗНАКИ",
     profile_unlocked: "ОТКРЫТО",
-    profile_requires: "ТРЕБУЕТСЯ",
+    profile_requires: "НАДО",
 
     admin_title: "ТЕРМИНАЛ",
     admin_overview: "Обзор",
-    admin_operatives: "Оперативники",
+    admin_operatives: "Агенты",
     admin_squads: "Отряды",
-    admin_signals: "Сигналы",
     admin_uplink: "Поддержка",
     admin_alert: "Тревога",
     admin_exit: "Выход",
     admin_total_ops: "Всего",
     admin_threats: "Угрозы",
     admin_tickets: "Тикеты",
-    admin_role: "Роль",
-    admin_status: "Статус",
-    admin_actions: "Действия",
-    admin_ban: "Забанить",
-    admin_unban: "Разбанить",
-    admin_chat_control: "КОНТРОЛЬ",
-    admin_enter_chat: "ВОЙТИ",
-    admin_delete_msg: "УДАЛИТЬ",
-    admin_kick_user: "ВЫГНАТЬ",
-    admin_ban_user: "ЗАБЛОК.",
-    admin_msg_deleted: "УДАЛЕНО",
+    admin_ban: "Бан",
+    admin_unban: "Разбан",
+    admin_broadcast_title: "Тревога",
+    admin_chat_control: "Контроль",
+    admin_ban_user: "Блок",
     admin_confirm_delete: "Удалить?",
-    admin_chat_members: "УЧАСТНИКИ",
 
-    live_header: "НЕЙРО СВЯЗЬ",
-    live_version: "ПРОТОКОЛ V.4.0",
-    live_enter_id: "ВВЕДИТЕ ID...",
-    live_connect_btn: "СОЕДИНЕНИЕ",
-    live_connecting: "ШИФРОВАНИЕ...",
-    live_secure_channel: "ЗАЩИЩЕННЫЙ КАНАЛ",
-    live_active_msg: "СИГНАЛ АКТИВЕН",
-    live_active_desc: "СВОБОДНАЯ НАВИГАЦИЯ. АВТО-СВЕРТЫВАНИЕ.",
-    live_log_ready: "Готов",
-    live_log_waiting: "Ожидание ID",
+    live_enter_id: "ID...",
+    live_connect_btn: "ВХОД",
+    live_secure_channel: "КАНАЛ",
+    live_active_msg: "АКТИВЕН",
+    live_active_desc: "ЗАЩИЩЕНО.",
+    live_log_waiting: "Ожидание",
     live_log_encrypt: "Шифрование...",
-    live_log_established: "Связь установлена",
+    live_log_established: "Связь есть",
 
     settings_title: "НАСТРОЙКИ",
     settings_subtitle: "ПРОФИЛЬ",
     identity_title: "ЛИЧНОСТЬ",
     identity_name_label: "ПОЗЫВНОЙ",
-    identity_name_placeholder: "ИЗМЕНИТЬ ИМЯ...",
+    identity_name_placeholder: "Имя...",
     identity_avatar_label: "АВАТАР",
     identity_save_btn: "СОХРАНИТЬ",
-    identity_saving: "СОХРАНЕНИЕ...",
+    identity_saving: "...",
     system_lang_title: "ЯЗЫК",
-    lang_system_label: "ЯЗЫК СИСТЕМЫ",
-    lang_target_label: "ЯЗЫК ОБУЧЕНИЯ",
     theme_title: "ТЕМА",
     theme_dark: "ТЕМНАЯ",
     theme_light: "СВЕТЛАЯ",
@@ -12634,7 +12578,7 @@ export const translations = {
     logout_btn: "ВЫХОД",
     alert_saved: "СОХРАНЕНО",
     alert_error: "ОШИБКА",
-    support_placeholder: "Ваше сообщение..."
+    support_placeholder: "Сообщение..."
   }
 };
 

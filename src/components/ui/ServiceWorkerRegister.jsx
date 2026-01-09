@@ -5,8 +5,9 @@ export default function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       
-      // تغيير رقم الإصدار هنا يجبر النظام على تنظيف الكاش وتحميل الترجمات الجديدة
-      const CURRENT_VERSION = 'v5.6.0-FULL-TRANSLATIONS'; 
+      // تغيير رقم الإصدار هنا يجبر النظام على تنظيف الكاش وتحميل التعديلات الجديدة
+      // هذا ضروري جداً بعد التعديلات الكبيرة التي قمنا بها
+      const CURRENT_VERSION = 'v5.6.5-TEACHER-FIX'; 
 
       const cleanup = async () => {
         try {
@@ -15,7 +16,7 @@ export default function ServiceWorkerRegister() {
             const registrations = await navigator.serviceWorker.getRegistrations();
             for(let registration of registrations) {
               await registration.unregister();
-              console.log('Service Worker Unregistered to force update.');
+              console.log('Old Service Worker Unregistered.');
             }
           }
 
@@ -23,7 +24,7 @@ export default function ServiceWorkerRegister() {
           if ('caches' in window) {
             const storedVersion = localStorage.getItem('sw_cache_version');
             
-            // إذا كان الإصدار مختلفاً، قم بمسح كل شيء
+            // إذا كان الإصدار مختلفاً (أو غير موجود)، قم بمسح كل شيء
             if (storedVersion !== CURRENT_VERSION) {
                 const keys = await caches.keys();
                 await Promise.all(
@@ -31,10 +32,11 @@ export default function ServiceWorkerRegister() {
                 );
                 console.log('System Caches Purged for Update.');
                 
-                // تحديث الإصدار
+                // تحديث الإصدار في التخزين المحلي
                 localStorage.setItem('sw_cache_version', CURRENT_VERSION);
                 
                 // إعادة تحميل الصفحة لمرة واحدة فقط لتطبيق التحديث
+                // نستخدم sessionStorage لمنع الدخول في حلقة إعادة تحميل لا نهائية
                 if (sessionStorage.getItem('reloaded_for_update') !== 'true') {
                     sessionStorage.setItem('reloaded_for_update', 'true');
                     window.location.reload();

@@ -1,14 +1,14 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, limit, orderBy } from "firebase/firestore";
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, getDocs, limit } from "firebase/firestore";
 import { 
-  IconUserPlus, IconSearch, IconUsers, IconUser, 
+  IconUserPlus, IconSearch, IconUsers, 
   IconCheck, IconLoader2, IconSchool, IconShield,
-  IconSend, IconMailForward, IconRefresh, IconId
+  IconMailForward, IconId
 } from '@tabler/icons-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '@/hooks/useAuth';
+import { motion } from 'framer-motion';
+import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/hooks/useLanguage';
 
 export default function TeacherStudents() {
@@ -27,6 +27,7 @@ export default function TeacherStudents() {
   useEffect(() => {
     if (!user) return;
     
+    // جلب الطلاب المرتبطين بمعرف الأستاذ الحالي
     const q = query(
       collection(db, "users"), 
       where("teacherId", "==", user.uid)
@@ -40,12 +41,14 @@ export default function TeacherStudents() {
     return () => unsub();
   }, [user]);
 
-  // 2. جلب المستخدمين للتجنيد
+  // 2. جلب المستخدمين للتجنيد (Recruitment)
   useEffect(() => {
     if (activeTab === 'recruit') {
         const fetchPotentialRecruits = async () => {
             setLoading(true);
             try {
+                // جلب المستخدمين الذين ليس لديهم رتبة خاصة (role == user)
+                // هذا يمنع ظهور الأساتذة الآخرين أو الأدمن في القائمة
                 const q = query(
                     collection(db, "users"),
                     where("role", "==", "user"), 
@@ -53,6 +56,7 @@ export default function TeacherStudents() {
                 );
                 
                 const snap = await getDocs(q);
+                // نستبعد أي مستخدم مرتبط بالفعل بهذا الأستاذ (لزيادة الأمان)
                 const users = snap.docs
                     .map(d => ({ id: d.id, ...d.data() }))
                     .filter(u => u.teacherId !== user.uid);
@@ -72,9 +76,12 @@ export default function TeacherStudents() {
   const sendInvite = async (targetUser) => {
       if (!user) return;
       
+      // إضافة المستخدم لقائمة "تمت دعوتهم" محلياً فوراً لمنع التكرار
+      setInvitedUsers(prev => [...prev, targetUser.id]);
+
       try {
           await addDoc(collection(db, "notifications"), {
-              userId: targetUser.id,      
+              userId: targetUser.id,      // المستلم (الطالب المحتمل)
               target: 'student',          
               type: 'invite',             
               title: "🎓 SQUAD INVITATION",
@@ -88,19 +95,22 @@ export default function TeacherStudents() {
               createdAt: serverTimestamp(),
               read: false
           });
-
-          setInvitedUsers(prev => [...prev, targetUser.id]);
           
       } catch (error) {
           console.error("Invite Failed:", error);
-          alert("Failed to send invite.");
+          alert("Failed to send invite. System error.");
+          // إزالة من القائمة المحلية في حال الفشل للسماح بالمحاولة مرة أخرى
+          setInvitedUsers(prev => prev.filter(id => id !== targetUser.id));
       }
   };
 
-  const filteredRecruits = allUsers.filter(u => 
-      u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // فلترة قائمة التجنيد بناءً على البحث
+  const filteredRecruits = allUsers.filter(u => {
+      const name = u.displayName || "";
+      const email = u.email || "";
+      const search = searchTerm.toLowerCase();
+      return name.toLowerCase().includes(search) || email.toLowerCase().includes(search);
+  });
 
   return (
     <div className="w-full h-full flex flex-col p-6 md:p-10 font-sans min-h-screen" dir={dir}>
@@ -115,11 +125,11 @@ export default function TeacherStudents() {
                     <span className="text-[10px] font-black uppercase tracking-[0.4em]">Squad_Command</span>
                 </div>
                 <h1 className="text-4xl md:text-6xl font-black text-white uppercase tracking-tighter drop-shadow-2xl">
-                    {activeTab === 'recruit' ? t('recruit_title') || "Recruitment" : t('nav_students') || "My Squad"}
+                    {activeTab === 'recruit' ? (t('recruit_title') || "Recruitment") : (t('nav_students') || "My Squad")}
                 </h1>
             </div>
 
-            {/* Futuristic Tabs */}
+            {/* Tabs Toggle */}
             <div className="flex bg-[#0a0a0a] border border-white/10 p-1.5 rounded-2xl shadow-xl">
                 <button 
                     onClick={() => setActiveTab('my_squad')}
@@ -147,7 +157,7 @@ export default function TeacherStudents() {
         {/* Main Content Area */}
         <div className="flex-1 relative">
             
-            {/* === Tab 1: My Squad === */}
+            {/* === Tab 1: My Squad (قائمة طلابي) === */}
             {activeTab === 'my_squad' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-32">
                     {loading && myStudents.length === 0 ? (
@@ -164,7 +174,7 @@ export default function TeacherStudents() {
                     ) : (
                         myStudents.map((student, i) => (
                             <motion.div 
-                                key={student.id}
+                                key={student.id || i}
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: i * 0.05 }}
@@ -185,7 +195,7 @@ export default function TeacherStudents() {
                                     </div>
                                     
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-white font-black text-lg truncate uppercase mb-1">{student.displayName}</div>
+                                        <div className="text-white font-black text-lg truncate uppercase mb-1">{student.displayName || "Unknown Agent"}</div>
                                         <div className="flex items-center gap-2">
                                             <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-[9px] text-cyan-400 font-bold uppercase tracking-wider">
                                                 LVL.{Math.floor((student.xp || 0)/500) + 1}
@@ -200,7 +210,7 @@ export default function TeacherStudents() {
                 </div>
             )}
 
-            {/* === Tab 2: Recruit === */}
+            {/* === Tab 2: Recruit (التجنيد) === */}
             {activeTab === 'recruit' && (
                 <div className="flex flex-col h-full">
                     {/* Search Bar */}

@@ -12,7 +12,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default function RealLiveStream() {
-  // استدعاء endBroadcast من الكونتكست
+  // استدعاء endBroadcast من الكونتكست للتحكم في الإغلاق وتنظيف الإشعارات
   const { startBroadcast, endBroadcast, liveState } = useUI(); 
   const { user, userData, isTeacher, isStudent } = useAuth();
   const { t, dir } = useLanguage();
@@ -24,9 +24,10 @@ export default function RealLiveStream() {
   const addLog = (msg) => setLogs(prev => [...prev.slice(-3), `> ${msg}`]);
 
   // دالة مساعدة للحصول على معرف غرفة الأستاذ الثابت
+  // هذا يضمن أن الطالب والأستاذ يدخلان نفس الغرفة دائماً
   const getTeacherRoomId = () => `CLASS_${user.uid}`;
 
-  // --- 1. بدء البث للأستاذ ---
+  // --- 1. بدء البث للأستاذ (Start Class) ---
   const handleStartClass = async () => {
       setStatus("scanning");
       addLog("INITIALIZING CLASSROOM PROTOCOL...");
@@ -35,6 +36,7 @@ export default function RealLiveStream() {
       
       try {
           addLog("SCANNING SQUAD ROSTER...");
+          // جلب جميع الطلاب المرتبطين بهذا الأستاذ لإشعارهم
           const q = query(collection(db, "users"), where("teacherId", "==", user.uid));
           const snapshot = await getDocs(q);
           
@@ -42,15 +44,15 @@ export default function RealLiveStream() {
               setStatus("notifying");
               addLog(`FOUND ${snapshot.size} OPERATIVES. SENDING SIGNAL...`);
               
-              // إنشاء الإشعارات
+              // إنشاء إشعار لكل طالب
               const notificationsPromises = snapshot.docs.map(studentDoc => {
                   return addDoc(collection(db, "notifications"), {
                       userId: studentDoc.id,
                       target: 'student',
-                      type: 'live_start',
+                      type: 'live_start', // نوع خاص للبث
                       title: "🔴 LIVE CLASS STARTED",
                       message: `Commander ${user.displayName || "Teacher"} is live. Tap to join immediately!`,
-                      roomId: classRoomId, // هذا المعرف هو مفتاح الحذف لاحقاً
+                      roomId: classRoomId, // نمرر معرف الغرفة ليدخل الطالب مباشرة عند الضغط
                       senderId: user.uid,
                       createdAt: serverTimestamp(),
                       read: false
@@ -67,6 +69,7 @@ export default function RealLiveStream() {
           addLog("WARNING: SIGNAL RELAY FAILED. CHECK NETWORK.");
       }
       
+      // بدء البث الفعلي
       setTimeout(() => {
           setStatus("connected");
           addLog("SECURE CHANNEL ESTABLISHED.");
@@ -79,12 +82,12 @@ export default function RealLiveStream() {
       if (confirm("End session and withdraw signals?")) {
           setStatus("idle");
           addLog("SESSION TERMINATED.");
-          // 🔥 هنا يتم استدعاء الحذف مع تمرير معرف الغرفة
+          // 🔥 هنا يتم استدعاء الحذف مع تمرير معرف الغرفة لتنظيف الإشعارات عند الطلاب
           endBroadcast(getTeacherRoomId());
       }
   };
 
-  // --- 2. انضمام الطالب ---
+  // --- 2. انضمام الطالب (Join Class) ---
   const handleJoinClass = () => {
       if (!userData?.teacherId) {
           addLog("ERROR: NO COMMANDER ASSIGNED.");
@@ -92,7 +95,10 @@ export default function RealLiveStream() {
       }
       setStatus("scanning");
       addLog("SYNCING WITH COMMANDER FREQUENCY...");
+      
+      // معرف غرفة الأستاذ هو CLASS_ + معرف الأستاذ
       const targetRoomId = `CLASS_${userData.teacherId}`;
+      
       setTimeout(() => {
           setStatus("connected");
           addLog("UPLINK SUCCESSFUL.");
@@ -100,7 +106,7 @@ export default function RealLiveStream() {
       }, 1500);
   };
 
-  // --- 3. انضمام يدوي ---
+  // --- 3. انضمام يدوي (للمستخدمين العاديين) ---
   const handleManualJoin = () => {
     if (!roomName.trim()) return;
     setStatus("scanning");
@@ -113,6 +119,7 @@ export default function RealLiveStream() {
   };
 
   // --- حالة البث النشط (داخل الفيديو) ---
+  // تظهر هذه الواجهة عندما يكون الفيديو قيد التشغيل في الخلفية (أو تم تصغيره)
   if (liveState.isActive) {
       return (
         <div className="flex flex-col items-center justify-center h-full w-full text-center" dir={dir}>
@@ -202,7 +209,8 @@ export default function RealLiveStream() {
                         )}
                         <div className="text-center text-[10px] text-emerald-500/50 font-mono flex items-center justify-center gap-2">
                             <IconUsers size={12}/>
-                            <span>Auto-notify {userData?.studentCount || "all"} students</span>
+                            {/* استدعاء عدد الطلاب (اختياري إذا كان متوفراً في السياق، أو نص ثابت) */}
+                            <span>Auto-notify operatives</span>
                         </div>
                     </div>
                 )}

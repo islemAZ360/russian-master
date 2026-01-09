@@ -1,22 +1,21 @@
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { 
   collection, onSnapshot, doc, updateDoc, query, orderBy, 
-  deleteDoc, setDoc, serverTimestamp, arrayUnion, arrayRemove, limit, 
-  deleteField, where, addDoc, getDoc 
+  deleteDoc, setDoc, serverTimestamp, arrayUnion, deleteField, limit, addDoc 
 } from "firebase/firestore";
 import { 
   IconShield, IconUsers, IconLayoutDashboard, 
   IconBroadcast, IconMessage2, IconBan, IconTrash, 
   IconMenu2, IconSend, IconDeviceGamepad, IconHome, 
-  IconUserMinus, IconMessages, IconMessagePlus, IconSearch,
+  IconMessagePlus, IconSearch,
   IconSchool, IconUnlink, IconActivity, IconLock, IconWorld, IconPencil, IconCheck, IconX,
   IconCpu, IconTerminal2, IconLockAccess
 } from '@tabler/icons-react';
 import { useUI } from '@/context/UIContext';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useAuth } from '@/context/AuthContext'; // استدعاء هوك المصادقة للتحقق من الرتبة
+import { useAuth } from '@/context/AuthContext';
 
 // --- مكونات التصميم الفرعية ---
 
@@ -66,12 +65,9 @@ const NavBtn = ({ id, label, icon: Icon, count, activeView, onClick }) => {
 
 export default function AdminDashboard() {
   const { setCurrentView } = useUI();
-  const { user: currentUser, isMaster, role } = useAuth(); // استخدام الرتب من الكونتكست
+  const { user: currentUser, isMaster, role } = useAuth();
   const { t, dir } = useLanguage();
   
-  // تحديد هل المستخدم "سوبر أدمن" (يملك كل الصلاحيات)
-  // إذا كان ماستر أو أدمن "كامل"، فهو سوبر.
-  // إذا كان "junior_admin" أو غيره، فهو محدود.
   const isSuperAdmin = isMaster || role === 'admin'; 
 
   const [activeView, setActiveView] = useState('overview');
@@ -95,15 +91,19 @@ export default function AdminDashboard() {
 
   // --- جلب البيانات ---
   useEffect(() => {
-    const unsubUsers = onSnapshot(query(collection(db, "users"), orderBy("createdAt", "desc"), limit(100)), (snap) => {
+    // جلب المستخدمين وترتيبهم حسب تاريخ الإنشاء لضمان ثبات أرقام الأساتذة
+    const unsubUsers = onSnapshot(query(collection(db, "users"), orderBy("createdAt", "asc")), (snap) => {
         setUsers(snap.docs.map(d => ({id: d.id, ...d.data()})));
     });
+    
     const unsubTickets = onSnapshot(query(collection(db, "support_tickets"), orderBy("lastUpdate", "desc")), (snap) => {
         setTickets(snap.docs.map(d => ({id: d.id, ...d.data()})));
     });
+    
     const unsubChats = onSnapshot(collection(db, "chats"), (snap) => {
         setChats(snap.docs.map(d => ({id: d.id, ...d.data()})));
     });
+    
     return () => { unsubUsers(); unsubTickets(); unsubChats(); };
   }, []);
 
@@ -118,16 +118,39 @@ export default function AdminDashboard() {
     return () => unsubMsgs();
   }, [browsingChat]);
 
-  const getTeacherName = (teacherId) => {
-      const teacher = users.find(u => u.id === teacherId);
-      return teacher ? teacher.displayName : "Unknown ID";
+  // --- منطق ترقيم الأساتذة ---
+  // نقوم بحساب قائمة الأساتذة المرتبة مرة واحدة (Memoized) لتجنب إعادة الحساب
+  const teachersList = useMemo(() => {
+      // نفلتر المستخدمين الذين رتبتهم 'teacher' فقط
+      return users.filter(u => u.role === 'teacher');
+      // بما أننا جلبنا المستخدمين مرتبين بـ createdAt asc، فالترتيب هنا محفوظ
+      // أول أستاذ سجل هو رقم 1، وهكذا.
+  }, [users]);
+
+  // دالة للحصول على "لقب" الأستاذ (مثل Teacher #1)
+  const getTeacherLabel = (teacherId) => {
+      if (!teacherId) return "Unassigned";
+      
+      const index = teachersList.findIndex(t => t.id === teacherId);
+      if (index !== -1) {
+          const teacher = teachersList[index];
+          // عرض: Teacher #1 (Name)
+          return `Teacher #${index + 1} (${teacher.displayName || 'Unknown'})`;
+      }
+      
+      // في حالة كان المعرف موجوداً ولكن المستخدم لم يعد موجوداً أو تغيرت رتبته
+      return "Unknown/Retired Teacher";
   };
 
-  // --- الإجراءات (مع التحقق من الصلاحيات) ---
+  // --- الإجراءات ---
 
   const handleRoleChange = async (uid, newRole) => {
       if (!isSuperAdmin) { alert("Access Denied: Super Admin Only"); return; }
-      try { await updateDoc(doc(db, "users", uid), { role: newRole }); } catch (e) { alert(e.message); }
+      try { 
+          // إذا تم تغيير الرتبة من أستاذ لشيء آخر، يجب الانتباه أن طلابه سيبقون مرتبطين بمعرفه
+          // لكن هذا مقبول، سيظهرون تحت "Unknown/Retired"
+          await updateDoc(doc(db, "users", uid), { role: newRole }); 
+      } catch (e) { alert(e.message); }
   };
 
   const toggleBan = async (uid, currentStatus) => {
@@ -138,15 +161,15 @@ export default function AdminDashboard() {
 
   const unlinkStudent = async (studentId) => {
       if (!isSuperAdmin) { alert("Access Denied"); return; }
-      if (!confirm("Force unlink student?")) return;
+      if (!confirm("Force unlink student from teacher?")) return;
       try {
-          await updateDoc(doc(db, "users", studentId), { teacherId: deleteField(), role: 'user' });
+          await updateDoc(doc(db, "users", studentId), { teacherId: deleteField() });
           alert("Link severed.");
       } catch (e) { console.error(e); }
   };
 
   const sendBroadcast = async () => {
-    if (!isSuperAdmin) { alert("Access Denied: Broadcast is restricted."); return; }
+    if (!isSuperAdmin) { alert("Access Denied."); return; }
     if(!broadcastMsg.trim()) return;
     await updateDoc(doc(db, "system", "broadcast"), { 
         message: broadcastMsg, active: true, sentBy: currentUser.email, timestamp: new Date().toISOString() 
@@ -156,7 +179,6 @@ export default function AdminDashboard() {
   };
 
   const initiateChatWithUser = (targetUser) => {
-      // الجونيور يمكنه بدء محادثة
       const existingTicket = tickets.find(t => t.id === targetUser.id);
       if (existingTicket) { setSelectedTicket(existingTicket); } else {
           setSelectedTicket({ 
@@ -171,7 +193,8 @@ export default function AdminDashboard() {
       if(!selectedTicket || !replyText.trim()) return;
       try {
           const ticketRef = doc(db, "support_tickets", selectedTicket.id);
-          const newMsg = { text: replyText, sender: 'admin', time: Date.now() };
+          const safeText = replyText || ""; // الحماية من الـ undefined
+          const newMsg = { text: safeText, sender: 'admin', time: Date.now() };
           
           if (selectedTicket.isVirtual) {
               await setDoc(ticketRef, { userId: selectedTicket.id, userEmail: selectedTicket.userEmail, messages: [newMsg], lastUpdate: Date.now(), status: 'replied' });
@@ -181,7 +204,8 @@ export default function AdminDashboard() {
           }
           await addDoc(collection(db, "notifications"), {
               userId: selectedTicket.userId, target: 'user', type: "support_reply",
-              title: "📩 ADMIN MESSAGE", message: `Admin: "${replyText.substring(0, 30)}..."`,
+              // استخدام الحماية هنا لمنع الانهيار
+              title: "📩 ADMIN MESSAGE", message: `Admin: "${safeText.substring(0, 30)}..."`,
               senderId: currentUser.uid, createdAt: serverTimestamp(), read: false
           });
           setReplyText("");
@@ -189,29 +213,31 @@ export default function AdminDashboard() {
   };
 
   const deleteMessage = async (msgId) => { 
-      if (!isSuperAdmin) { alert("Access Denied: Only Super Admin can delete logs."); return; }
+      if (!isSuperAdmin) return;
       if (confirm("Delete message?")) await deleteDoc(doc(db, "chats", browsingChat.id, "messages", msgId)); 
   };
   
   const startEditing = (msg) => { setEditingMsgId(msg.id); setEditContent(msg.text); };
   
   const saveEditedMessage = async () => {
-      // الجونيور يمكنه التعديل (كما طلبت)
       if (!editContent.trim()) return;
       try {
           await updateDoc(doc(db, "chats", browsingChat.id, "messages", editingMsgId), {
-              text: editContent, isEdited: true, editedBy: isSuperAdmin ? 'admin' : 'junior_admin', editedAt: serverTimestamp()
+              text: editContent, isEdited: true, editedBy: isSuperAdmin ? 'admin' : 'junior', editedAt: serverTimestamp()
           });
           setEditingMsgId(null); setEditContent("");
       } catch (e) { alert("Failed to update."); }
   };
 
   const terminateChannel = async () => {
-      if (!isSuperAdmin) { alert("Access Denied"); return; }
+      if (!isSuperAdmin) return;
       if(confirm("Terminate channel?")) deleteDoc(doc(db, "chats", browsingChat.id));
   };
 
-  const filteredUsers = users.filter(u => u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()));
+  // تصفية المستخدمين (نعكس الترتيب للعرض بحيث يظهر الأحدث في القائمة، لكن ترقيم الأساتذة يعتمد على users الأصلية)
+  const filteredUsers = [...users]
+    .sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+    .filter(u => u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || u.displayName?.toLowerCase().includes(searchTerm.toLowerCase()));
 
   // --- Main Render ---
   return (
@@ -239,7 +265,6 @@ export default function AdminDashboard() {
                 <NavBtn id="users" label={t('admin_operatives')} icon={IconUsers} activeView={activeView} onClick={() => {setActiveView('users'); setIsMobileMenuOpen(false);}} />
                 <NavBtn id="chat_control" label={t('admin_chat_control')} icon={IconMessages} activeView={activeView} onClick={() => {setActiveView('chat_control'); setIsMobileMenuOpen(false);}} />
                 <NavBtn id="support" label={t('admin_uplink')} icon={IconMessage2} count={tickets.filter(t=>t.status!=='resolved').length} activeView={activeView} onClick={() => {setActiveView('support'); setIsMobileMenuOpen(false);}} />
-                {/* إخفاء زر البث للجونيور */}
                 {isSuperAdmin && <NavBtn id="broadcast" label={t('admin_alert')} icon={IconBroadcast} activeView={activeView} onClick={() => {setActiveView('broadcast'); setIsMobileMenuOpen(false);}} />}
             </div>
             
@@ -285,7 +310,18 @@ export default function AdminDashboard() {
                 {activeView === 'users' && (
                     <div className="h-full overflow-y-auto p-6 md:p-8 custom-scrollbar animate-in slide-in-from-bottom-4 duration-500">
                         <div className="grid gap-3">
-                            {filteredUsers.map(u => (
+                            {filteredUsers.map(u => {
+                                // هنا نحدد رقم الأستاذ إذا كان هذا المستخدم أستاذاً
+                                let displayRole = "USER";
+                                if (u.role === 'teacher') {
+                                    // البحث عنه في القائمة المرتبة
+                                    const tIndex = teachersList.findIndex(t => t.id === u.id);
+                                    displayRole = `TEACHER #${tIndex + 1}`;
+                                } else if (u.role) {
+                                    displayRole = u.role.toUpperCase();
+                                }
+
+                                return (
                                 <div key={u.id} className="group flex flex-col md:flex-row items-center gap-4 p-4 rounded-2xl bg-[#0a0a0a] border border-white/5 hover:border-indigo-500/30 transition-all hover:bg-[#0e0e0e]">
                                     <div className="flex items-center gap-4 w-full md:w-auto flex-1">
                                         <div className="relative">
@@ -295,13 +331,20 @@ export default function AdminDashboard() {
                                             {u.isBanned && <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-[#0a0a0a]"></div>}
                                         </div>
                                         <div>
-                                            <div className="font-bold text-white text-sm">{u.displayName || "Unknown"}</div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="font-bold text-white text-sm">{u.displayName || "Unknown"}</div>
+                                                {/* عرض الرتبة المحسنة */}
+                                                <span className={`text-[8px] px-1.5 py-0.5 rounded border ${
+                                                    u.role === 'teacher' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                                                    u.role === 'student' ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400' :
+                                                    'bg-zinc-800 border-zinc-700 text-zinc-400'
+                                                }`}>{displayRole}</span>
+                                            </div>
                                             <div className="text-[10px] text-white/30 font-mono">{u.email}</div>
                                         </div>
                                     </div>
 
                                     <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
-                                        {/* تغيير الرتبة: للسوبر أدمن فقط */}
                                         <select 
                                             value={u.role || 'user'} 
                                             onChange={(e) => handleRoleChange(u.id, e.target.value)}
@@ -317,11 +360,12 @@ export default function AdminDashboard() {
                                             {isSuperAdmin && <option value="junior_admin">Junior Admin</option>}
                                         </select>
 
+                                        {/* إذا كان طالباً، نعرض من هو أستاذه */}
                                         {u.role === 'student' && u.teacherId && (
-                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/5">
+                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-lg border border-white/5" title={getTeacherLabel(u.teacherId)}>
                                                 <IconSchool size={12} className="text-purple-400"/>
-                                                <span className="text-[10px] text-white/50">{getTeacherName(u.teacherId).substring(0,10)}..</span>
-                                                {/* فك الارتباط: سوبر أدمن فقط */}
+                                                {/* نستخدم التابع الآمن substring */}
+                                                <span className="text-[10px] text-white/50">{getTeacherLabel(u.teacherId).substring(0, 15)}..</span>
                                                 {isSuperAdmin && <button onClick={() => unlinkStudent(u.id)} className="text-red-500/50 hover:text-red-500"><IconUnlink size={12}/></button>}
                                             </div>
                                         )}
@@ -330,7 +374,6 @@ export default function AdminDashboard() {
                                     <div className="flex items-center gap-2 w-full md:w-auto justify-end">
                                         <button onClick={() => initiateChatWithUser(u)} className="p-2.5 bg-indigo-500/10 hover:bg-indigo-500 text-indigo-500 hover:text-white rounded-xl transition-all border border-indigo-500/20"><IconMessagePlus size={18}/></button>
                                         
-                                        {/* الحظر: سوبر أدمن فقط */}
                                         <button 
                                             onClick={() => toggleBan(u.id, u.isBanned)} 
                                             disabled={!isSuperAdmin}
@@ -340,7 +383,7 @@ export default function AdminDashboard() {
                                         </button>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                         </div>
                     </div>
                 )}
@@ -377,6 +420,7 @@ export default function AdminDashboard() {
                                         </div>
                                         <div className="flex items-center justify-between mt-2">
                                             <span className="text-[9px] font-mono text-white/30 uppercase tracking-widest">{chat.members?.length || 0} UNITS</span>
+                                            {/* Fix for potential undefined createdBy */}
                                             {chat.createdBy && <span className="text-[8px] bg-white/5 px-2 py-0.5 rounded text-white/20 font-mono">ID:{chat.createdBy.substring(0,4)}</span>}
                                         </div>
                                     </div>
@@ -395,7 +439,6 @@ export default function AdminDashboard() {
                                                 <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.3em]">{browsingChat.type} CHANNEL</span>
                                             </div>
                                         </div>
-                                        {/* حذف القناة: سوبر أدمن فقط */}
                                         {isSuperAdmin && <button onClick={terminateChannel} className="px-5 py-2.5 bg-red-950/30 text-red-500 rounded-xl border border-red-500/20 font-black text-[9px] uppercase tracking-widest transition-all hover:bg-red-600 hover:text-white flex items-center gap-2"><IconTrash size={14}/> Terminate</button>}
                                     </div>
                                     
@@ -422,9 +465,7 @@ export default function AdminDashboard() {
 
                                                     {editingMsgId !== msg.id && (
                                                         <div className="absolute -right-24 top-1/2 -translate-y-1/2 flex gap-2 opacity-0 group-hover/msg:opacity-100 transition-all translate-x-4 group-hover/msg:translate-x-0">
-                                                            {/* التعديل: متاح للجميع (بما فيهم الجونيور) */}
                                                             <button onClick={() => startEditing(msg)} className="p-2.5 bg-[#0e0e0e] text-indigo-400 border border-indigo-500/30 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-lg"><IconPencil size={16}/></button>
-                                                            {/* الحذف: سوبر أدمن فقط */}
                                                             {isSuperAdmin && <button onClick={() => deleteMessage(msg.id)} className="p-2.5 bg-[#0e0e0e] text-red-500 border border-red-500/30 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-lg"><IconTrash size={16}/></button>}
                                                         </div>
                                                     )}

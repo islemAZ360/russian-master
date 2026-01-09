@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { 
   IconTrash, IconPencil, IconSearch, IconDatabase, IconArrowDown, 
   IconPlus, IconCategory, IconSettings, IconX, IconCheck, IconFolder, 
-  IconLock, IconEye, IconCpu, IconServer
+  IconLock, IconEye, IconServer
 } from "@tabler/icons-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLanguage } from "@/hooks/useLanguage";
@@ -15,8 +15,12 @@ const getCatTranslation = (catName, t) => {
     if (!catName) return t('cat_uncategorized');
     if (catName === 'All') return t('cat_all');
     if (catName === 'General') return t('cat_general');
+    
+    // محاولة ترجمة المفتاح
     const key = `cat_${catName.toLowerCase().replace(/ & /g, '_').replace(/ /g, '_')}`;
     const translated = t(key);
+    
+    // إذا لم توجد ترجمة، نعيد الاسم الأصلي
     return translated === key ? catName : translated;
 };
 
@@ -31,10 +35,6 @@ const MemoryNode = React.memo(({
     const handleChange = (field, value) => {
         setEditForm(prev => ({ ...prev, [field]: value }));
     };
-
-    // تحديد ما إذا كانت البطاقة "نظام" (لا يمكن حذفها بسهولة) أو "مخصصة"
-    // (في هذا التصميم نفترض أن البطاقات القابلة للتعديل هي فقط التي يملكها المستخدم)
-    const isSystemCard = !card.id || card.id.toString().length < 5; // افتراض بسيط للتمييز
 
     return (
         <motion.div 
@@ -96,7 +96,7 @@ const MemoryNode = React.memo(({
                                         <button onClick={() => onDelete(card.id)} className="p-2 rounded-xl bg-white/5 hover:bg-red-600 text-gray-400 hover:text-white transition-colors border border-white/10"><IconTrash size={14}/></button>
                                     </div>
                                 ) : (
-                                    <div className="opacity-20 text-white" title="System Protected">
+                                    <div className="opacity-20 text-white" title="Read Only">
                                         <IconLock size={14} />
                                     </div>
                                 )}
@@ -131,6 +131,7 @@ MemoryNode.displayName = "MemoryNode";
 export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
   const { t, dir } = useLanguage();
   
+  // تحديد الصلاحية: هل الدوال موجودة؟
   const canEdit = !!(onAdd && onDelete && onUpdate);
 
   const [search, setSearch] = useState("");
@@ -148,6 +149,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
   const [newCatNameInput, setNewCatNameInput] = useState("");
 
   const categories = useMemo(() => {
+    // تجميع التصنيفات الموجودة
     const cats = new Set(cards.map(c => c.category || "General"));
     return ["All", ...Array.from(cats).sort()];
   }, [cards]);
@@ -161,6 +163,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
       });
   }, [cards, search, filter]);
 
+  // إعادة تعيين حد العرض عند تغيير الفلتر
   useEffect(() => { setDisplayLimit(20); }, [search, filter]);
 
   // --- العمليات ---
@@ -186,6 +189,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
       }
   }, [editingId, editForm, onUpdate, canEdit]);
 
+  // --- إدارة التصنيفات (حذف/تعديل اسم مجموعة كاملة) ---
   const handleRenameCategory = (oldName) => {
       if (!canEdit) return;
       if (!newCatNameInput.trim() || newCatNameInput === oldName) {
@@ -205,7 +209,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
       cardsToDelete.forEach(card => onDelete(card.id));
   };
 
-  // --- Modal ---
+  // --- Modal: إدارة المجموعات ---
   const CategoryManagerModal = () => (
       <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md">
           <motion.div initial={{scale:0.9, opacity:0}} animate={{scale:1, opacity:1}} className="bg-[#0c0c0c] border border-white/10 w-full max-w-xl rounded-[2.5rem] p-8 shadow-2xl flex flex-col max-h-[85vh]">
@@ -296,6 +300,7 @@ export function DataManager({ onAdd, onDelete, onUpdate, cards = [] }) {
                 />
              </div>
 
+             {/* أزرار الإضافة تظهر فقط إذا كان canEdit = true */}
              {canEdit && (
                  <div className="w-full md:w-auto flex flex-col md:flex-row items-center gap-3 border-t md:border-t-0 md:border-l border-white/10 pt-4 md:pt-0 md:pl-5">
                      <div className="flex w-full md:w-auto gap-3">

@@ -47,7 +47,7 @@ export default function SettingsView() {
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // تحديث البيانات المحلية
+  // تحديث البيانات المحلية عند تحميل الصفحة
   useEffect(() => {
     if (user || userData) {
       setDisplayName(userData?.displayName || user?.displayName || "");
@@ -58,7 +58,7 @@ export default function SettingsView() {
           setContactInfo(userData?.contactInfo || "");
       }
 
-      // جلب اسم الأستاذ إذا كان المستخدم طالباً
+      // جلب اسم الأستاذ إذا كان المستخدم طالباً لعرضه
       if (isStudent && userData?.teacherId) {
           const fetchTeacher = async () => {
               try {
@@ -78,14 +78,17 @@ export default function SettingsView() {
     if (!user) return;
     setLoading(true);
     try {
+        // تحديث في Auth
         await updateProfile(user, { displayName, photoURL });
         
+        // تجهيز بيانات التحديث لـ Firestore
         const updateData = { 
             displayName, 
             photoURL,
             updatedAt: new Date().toISOString()
         };
 
+        // إضافة بيانات الأستاذ إذا كان أستاذاً
         if (isTeacher) {
             updateData.subject = subject;
             updateData.contactInfo = contactInfo;
@@ -125,7 +128,7 @@ export default function SettingsView() {
       
       setLoading(true);
       try {
-          // حفظ معرف الأستاذ القديم قبل الحذف لإرسال الإشعار
+          // حفظ معرف الأستاذ القديم قبل الحذف لإرسال الإشعار له
           const oldTeacherId = userData?.teacherId;
 
           // تحديث مستند المستخدم (حذف التبعية وإعادة الرتبة ليوزر عادي)
@@ -148,8 +151,8 @@ export default function SettingsView() {
               });
           }
 
-          alert("You have left the squad.");
-          window.location.reload(); // إعادة تحميل لتحديث الواجهة والصلاحيات
+          alert("You have left the squad. Returning to base.");
+          window.location.reload(); // إعادة تحميل لتحديث الواجهة والصلاحيات فوراً
 
       } catch (error) {
           console.error(error);
@@ -217,7 +220,12 @@ export default function SettingsView() {
               <div className="flex flex-col items-center mb-10">
                   <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                       <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-cyan-500/20 shadow-2xl relative z-10 transition-transform group-hover:scale-105">
-                          <img src={photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                          <img 
+                            src={photoURL || '/avatars/avatar1.png'} 
+                            alt="Avatar" 
+                            className="w-full h-full object-cover" 
+                            onError={(e) => {e.target.src = '/avatars/avatar1.png'}}
+                          />
                       </div>
                       <div className="absolute -inset-2 rounded-full bg-gradient-to-tr from-cyan-500 to-purple-600 blur opacity-20 group-hover:opacity-40 transition-opacity"></div>
                       <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
@@ -239,7 +247,7 @@ export default function SettingsView() {
                       />
                   </div>
 
-                  {/* --- Teacher Fields --- */}
+                  {/* --- Teacher Fields: يظهر فقط للأستاذ --- */}
                   {isTeacher && (
                       <div className="space-y-6 p-6 bg-cyan-500/5 border border-cyan-500/10 rounded-3xl animate-in slide-in-from-top-2">
                           <div className="flex items-center gap-2 mb-2 text-cyan-500">
@@ -252,12 +260,12 @@ export default function SettingsView() {
                           </div>
                           <div>
                               <label className="text-[9px] font-black uppercase tracking-widest mb-2 block opacity-60">Contact Info</label>
-                              <textarea value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-white text-sm outline-none focus:border-cyan-500 transition-all h-24 resize-none" placeholder="Contact details..." />
+                              <textarea value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} className="w-full bg-black/20 border border-white/10 rounded-xl py-3 px-4 text-white text-sm outline-none focus:border-cyan-500 transition-all h-24 resize-none" placeholder="Contact details visible to students..." />
                           </div>
                       </div>
                   )}
 
-                  {/* --- Student Fields (Leaving Squad) --- */}
+                  {/* --- Student Fields: يظهر فقط للطالب --- */}
                   {isStudent && (
                       <div className="space-y-6 p-6 bg-purple-500/5 border border-purple-500/10 rounded-3xl animate-in slide-in-from-top-2">
                           <div className="flex justify-between items-start">
@@ -274,6 +282,10 @@ export default function SettingsView() {
                               >
                                   <IconUnlink size={14}/> Leave
                               </button>
+                          </div>
+                          <div className="flex items-start gap-2 text-yellow-500/70 text-[10px] font-mono bg-yellow-500/5 p-3 rounded-xl border border-yellow-500/10">
+                              <IconAlertTriangle size={14} className="shrink-0"/>
+                              <span>Warning: Leaving the squad will disconnect you from the teacher's content and live sessions.</span>
                           </div>
                       </div>
                   )}

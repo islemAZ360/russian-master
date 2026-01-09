@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, limit, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, limit, where } from 'firebase/firestore';
 import { 
   IconShieldCheck, IconCrown, IconUser, IconMedal, 
   IconUsers, IconActivity, IconTrophy, IconSchool, IconWorld 
@@ -18,39 +18,41 @@ export default function MemberList() {
   const { t, dir, isRTL } = useLanguage();
   const { user, userData, isStudent, isTeacher, isUser } = useAuth();
 
-  // تغيير وضع الفلترة تلقائياً بناءً على الرتبة
+  // تغيير وضع الفلترة الافتراضي بناءً على الرتبة
   useEffect(() => {
       if (isStudent || isTeacher) {
           setFilterMode('squad');
+      } else {
+          setFilterMode('global');
       }
   }, [isStudent, isTeacher]);
 
-  // جلب البيانات بناءً على الفلتر
+  // جلب البيانات
   useEffect(() => {
     if (!user) return;
 
     setLoading(true);
     let q;
 
-    // 1. وضع الفصل (Squad Mode)
+    // 1. وضع الكتيبة (Squad Mode)
     if (filterMode === 'squad') {
         let teacherIdToQuery = null;
 
         if (isTeacher) {
             teacherIdToQuery = user.uid; // الأستاذ يرى طلابه
         } else if (isStudent && userData?.teacherId) {
-            teacherIdToQuery = userData.teacherId; // الطالب يرى زملاءه (نفس الأستاذ)
+            teacherIdToQuery = userData.teacherId; // الطالب يرى زملاءه
         }
 
         if (teacherIdToQuery) {
+            // FIX: إزالة orderBy من الاستعلام لتجنب أخطاء الفهرسة (Missing Index)
+            // سنقوم بالترتيب في JavaScript لاحقاً
             q = query(
                 collection(db, "users"),
-                where("teacherId", "==", teacherIdToQuery),
-                orderBy("xp", "desc"),
-                limit(50)
+                where("teacherId", "==", teacherIdToQuery)
             );
         } else {
-            // حالة نادرة: طالب بدون أستاذ أو مستخدم عادي ضغط على الزر
+            // حالة: طالب بدون أستاذ أو مستخدم عادي ضغط على الزر بالخطأ
             setMembers([]);
             setLoading(false);
             return;
@@ -58,15 +60,26 @@ export default function MemberList() {
     } 
     // 2. الوضع العالمي (Global Mode)
     else {
+        // في الوضع العالمي، نجلب عدد محدود ونرتبهم
+        // هنا غالباً الفهرس الافتراضي موجود لـ xp desc
+        // إذا حدث خطأ، سنعالجه في الـ catch
         q = query(
             collection(db, "users"), 
-            orderBy("xp", "desc"),
-            limit(50)
+            limit(100)
         );
     }
 
     const unsubscribe = onSnapshot(q, (snap) => {
-        const usersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        let usersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        
+        // الترتيب البرمجي (Client-side Sorting) لضمان الأمان والسرعة
+        usersList.sort((a, b) => (b.xp || 0) - (a.xp || 0));
+
+        // في الوضع العالمي، نأخذ أفضل 50 فقط بعد الترتيب
+        if (filterMode === 'global') {
+            usersList = usersList.slice(0, 50);
+        }
+
         setMembers(usersList);
         setLoading(false);
     }, (error) => {
@@ -77,13 +90,14 @@ export default function MemberList() {
     return () => unsubscribe();
   }, [filterMode, user, isTeacher, isStudent, userData]);
 
+  // دالة تحديد شكل الشارة بناءً على الرتبة
   const getRoleBadge = (role) => {
       switch(role) {
-          case 'master': return { color: 'text-red-500 bg-red-500/10 border-red-500/20', icon: <IconCrown size={14}/>, label: t('rank_cybergod') };
-          case 'admin': return { color: 'text-purple-500 bg-purple-500/10 border-purple-500/20', icon: <IconShieldCheck size={14}/>, label: t('rank_commander') };
+          case 'master': return { color: 'text-red-500 bg-red-500/10 border-red-500/20', icon: <IconCrown size={14}/>, label: t('rank_cybergod') || "MASTER" };
+          case 'admin': return { color: 'text-purple-500 bg-purple-500/10 border-purple-500/20', icon: <IconShieldCheck size={14}/>, label: t('rank_commander') || "ADMIN" };
           case 'teacher': return { color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20', icon: <IconSchool size={14}/>, label: "INSTRUCTOR" };
-          case 'student': return { color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', icon: <IconMedal size={14}/>, label: t('rank_soldier') };
-          default: return { color: 'text-gray-500 bg-white/5 border-white/10', icon: <IconUser size={14}/>, label: t('rank_recruit') };
+          case 'student': return { color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20', icon: <IconMedal size={14}/>, label: t('rank_soldier') || "STUDENT" };
+          default: return { color: 'text-gray-500 bg-white/5 border-white/10', icon: <IconUser size={14}/>, label: t('rank_recruit') || "USER" };
       }
   };
 
@@ -98,7 +112,7 @@ export default function MemberList() {
                 </div>
                 <div>
                     <h2 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tighter italic">
-                        {filterMode === 'squad' ? "SQUAD RANKING" : "GLOBAL ELITE"}
+                        {filterMode === 'squad' ? (t('squad_title') || "SQUAD RANKING") : "GLOBAL ELITE"}
                     </h2>
                     <div className="flex items-center gap-2 mt-1">
                         <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
@@ -109,7 +123,7 @@ export default function MemberList() {
                 </div>
             </div>
 
-            {/* زر التبديل (يظهر فقط للطلاب والأساتذة) */}
+            {/* أزرار التبديل (تظهر فقط للطلاب والأساتذة) */}
             {(!isUser) && (
                 <div className="bg-[#0f0f0f] p-1 rounded-xl border border-white/10 flex">
                     <button 
@@ -139,7 +153,9 @@ export default function MemberList() {
             ) : members.length === 0 ? (
                 <div className="text-center py-20 opacity-30 flex flex-col items-center border-2 border-dashed border-white/10 rounded-[2rem]">
                     <IconUsers size={48} className="mb-4"/>
-                    <p className="text-xs font-black uppercase tracking-widest">NO DATA AVAILABLE IN THIS SECTOR</p>
+                    <p className="text-xs font-black uppercase tracking-widest">
+                        {filterMode === 'squad' ? "NO SQUAD DATA DETECTED" : "NO DATA AVAILABLE"}
+                    </p>
                 </div>
             ) : (
                 <AnimatePresence mode='popLayout'>
@@ -170,6 +186,7 @@ export default function MemberList() {
                                             src={m.photoURL || `/avatars/avatar1.png`} 
                                             className="w-full h-full object-cover" 
                                             alt="Avatar"
+                                            onError={(e) => {e.target.src = '/avatars/avatar1.png'}}
                                         />
                                     </div>
                                     {i === 0 && <div className="absolute -top-2 -right-2 bg-yellow-400 text-black p-1 rounded-full shadow-lg"><IconCrown size={12}/></div>}
@@ -201,8 +218,8 @@ export default function MemberList() {
                                     </div>
                                 </div>
 
-                                {/* الزخرفة */}
-                                {isMe && <div className="absolute right-0 top-0 bottom-0 w-1 bg-cyan-500"></div>}
+                                {/* الزخرفة (Border Glow) */}
+                                {isMe && <div className="absolute right-0 top-0 bottom-0 w-1 bg-cyan-500 shadow-[0_0_15px_#06b6d4]"></div>}
                             </motion.div>
                         );
                     })}

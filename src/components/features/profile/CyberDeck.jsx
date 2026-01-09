@@ -5,7 +5,7 @@ import {
   IconUser, IconTrophy, IconFlame, IconTarget, 
   IconActivity, IconLock, IconMedal, IconCrown, 
   IconDna, IconChartRadar, IconSchool, IconShieldCheck, 
-  IconBook, IconMessage, IconId
+  IconBook, IconMessage, IconId, IconRobot
 } from "@tabler/icons-react";
 import { useLanguage } from "@/hooks/useLanguage";
 import { doc, getDoc } from "firebase/firestore";
@@ -80,9 +80,12 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                   const docSnap = await getDoc(doc(db, "users", user.teacherId));
                   if (docSnap.exists()) {
                       setCommanderName(docSnap.data().displayName);
+                  } else {
+                      setCommanderName("Unknown Commander");
                   }
               } catch (err) {
                   console.error("Failed to load commander data", err);
+                  setCommanderName("System Error");
               }
           };
           fetchCommander();
@@ -90,11 +93,13 @@ export default function CyberDeck({ user, stats, cards = [] }) {
   }, [user]);
 
   const analytics = useMemo(() => {
-    const xp = stats?.xp || 0;
-    const streak = stats?.streak || 0;
-    const totalCards = cards.length;
-    const masteredCards = cards.filter(c => c.level >= 5).length;
-    const learningCards = cards.filter(c => c.level > 0 && c.level < 5).length;
+    // حماية ضد القيم الفارغة
+    const safeStats = stats || { xp: 0, streak: 0 };
+    const xp = safeStats.xp || 0;
+    const streak = safeStats.streak || 0;
+    const totalCards = cards?.length || 0;
+    const masteredCards = cards?.filter(c => c.level >= 5).length || 0;
+    const learningCards = cards?.filter(c => c.level > 0 && c.level < 5).length || 0;
     const masteryRate = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
     
     // حساب الرتبة
@@ -116,15 +121,19 @@ export default function CyberDeck({ user, stats, cards = [] }) {
     let displayRank = xpRank;
     let customTitle = null;
 
+    // تخصيص الرتب بناءً على الدور الفعلي في النظام
     if (user?.role === 'master') {
         displayRank = { color: "text-red-500", bg: "bg-red-500", icon: <IconCrown /> };
-        customTitle = t('rank_cybergod');
+        customTitle = t('rank_cybergod') || "SYSTEM MASTER";
     } else if (user?.role === 'admin') {
         displayRank = { color: "text-purple-500", bg: "bg-purple-500", icon: <IconShieldCheck /> };
-        customTitle = t('rank_commander');
+        customTitle = t('rank_commander') || "ADMIN";
     } else if (user?.role === 'teacher') {
         displayRank = { color: "text-emerald-400", bg: "bg-emerald-500", icon: <IconSchool /> };
         customTitle = "INSTRUCTOR";
+    } else if (user?.role === 'student') {
+        // الطلاب يحتفظون برتبة الـ XP لكن مع أيقونة خاصة
+        displayRank = { ...xpRank, icon: <IconId /> };
     }
 
     return {
@@ -143,6 +152,8 @@ export default function CyberDeck({ user, stats, cards = [] }) {
   const isTeacher = user?.role === 'teacher';
   const isStudent = user?.role === 'student';
 
+  if (!user) return null;
+
   return (
     <div className="w-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20" dir={dir}>
         
@@ -157,7 +168,12 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                     <div className="relative">
                         <div className="w-40 h-40 rounded-3xl p-1 bg-gradient-to-br from-white/20 to-transparent shadow-2xl">
                             <div className="w-full h-full rounded-[1.4rem] overflow-hidden bg-black border border-white/10">
-                                <img src={user?.photoURL || '/avatars/avatar1.png'} className="w-full h-full object-cover grayscale-[0.5] hover:grayscale-0 transition-all duration-500" alt="Avatar"/>
+                                <img 
+                                    src={user?.photoURL || '/avatars/avatar1.png'} 
+                                    className="w-full h-full object-cover grayscale-[0.5] hover:grayscale-0 transition-all duration-500" 
+                                    alt="Avatar"
+                                    onError={(e) => {e.target.src = '/avatars/avatar1.png'}} // Fallback image
+                                />
                             </div>
                         </div>
                         <div className="absolute -bottom-4 inset-x-0 flex justify-center">
@@ -188,22 +204,22 @@ export default function CyberDeck({ user, stats, cards = [] }) {
                                         <span className="text-sm font-bold uppercase tracking-wide">{user.subject}</span>
                                     </div>
                                 )}
-                                {user?.contactInfo && (
-                                    <div className="flex items-center gap-2 text-white/50">
-                                        <IconMessage size={16}/>
-                                        <span className="text-xs font-mono">{user.contactInfo}</span>
-                                    </div>
-                                )}
+                                <div className="flex items-center gap-2 text-white/50">
+                                    <IconMessage size={16}/>
+                                    <span className="text-xs font-mono">{user.contactInfo || "No contact info"}</span>
+                                </div>
                             </div>
                         )}
 
-                        {/* --- معلومات الطالب (القائد) --- */}
-                        {isStudent && commanderName && (
+                        {/* --- معلومات الطالب (عرض اسم الأستاذ) --- */}
+                        {isStudent && (
                             <div className="mb-4 inline-flex items-center gap-3 px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20">
-                                <IconId size={16} className="text-purple-400" />
+                                <IconRobot size={16} className="text-purple-400" />
                                 <div className="flex flex-col text-left">
-                                    <span className="text-[8px] text-purple-400/60 font-black uppercase tracking-widest leading-none mb-0.5">SQUAD COMMANDER</span>
-                                    <span className="text-xs text-purple-100 font-bold uppercase">{commanderName}</span>
+                                    <span className="text-[8px] text-purple-400/60 font-black uppercase tracking-widest leading-none mb-0.5">ASSIGNED TO SQUAD</span>
+                                    <span className="text-xs text-purple-100 font-bold uppercase">
+                                        {commanderName || "Loading Commander..."}
+                                    </span>
                                 </div>
                             </div>
                         )}

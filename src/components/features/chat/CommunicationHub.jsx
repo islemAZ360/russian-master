@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   IconMessage, IconPlus, IconLock, IconSend, IconUserPlus, 
-  IconArrowLeft, IconX, IconHash, IconUsers, IconWorld, IconTrash,
-  IconShieldLock, IconSchool, IconLoader2, IconRefresh
+  IconArrowLeft, IconX, IconHash, IconWorld, IconTrash,
+  IconSchool, IconLoader2, IconShieldLock
 } from "@tabler/icons-react";
 import { db } from "@/lib/firebase";
 import { 
@@ -33,7 +33,7 @@ export default function CommunicationHub() {
 
   const messagesEndRef = useRef(null);
 
-  // 1. جلب الدردشات
+  // --- 1. جلب الدردشات (Smart Filtering) ---
   useEffect(() => {
     if (!user) return;
     setLoadingChats(true);
@@ -54,9 +54,7 @@ export default function CommunicationHub() {
 
     const addToMapAndSync = (snap) => {
         snap.docs.forEach(doc => chatsMap.set(doc.id, { id: doc.id, ...doc.data() }));
-        // التعامل مع الحذف: إذا عادت الـ snapshot ببيانات، يجب أن نتأكد من إزالة العناصر المحذوفة من الـ map
-        // (في هذه البنية المبسطة، التحديث التفاؤلي في دالة الحذف هو الحل الأسرع، 
-        // لكن هنا نضمن التحديث عند الإضافة أيضاً)
+        // التعامل مع الحذف
         snap.docChanges().forEach((change) => {
             if (change.type === "removed") {
                 chatsMap.delete(change.doc.id);
@@ -66,15 +64,19 @@ export default function CommunicationHub() {
     };
 
     try {
+        // أ. الجميع يرى القنوات العامة
         const qPublic = query(collection(db, "chats"), where("type", "==", "public"));
         unsubscribers.push(onSnapshot(qPublic, addToMapAndSync));
 
+        // ب. القنوات التي أنا عضو فيها
         const qMember = query(collection(db, "chats"), where("members", "array-contains", user.uid));
         unsubscribers.push(onSnapshot(qMember, addToMapAndSync));
 
+        // ج. القنوات التي أنشأتها (للأستاذ)
         const qOwner = query(collection(db, "chats"), where("createdBy", "==", user.uid));
         unsubscribers.push(onSnapshot(qOwner, addToMapAndSync));
 
+        // د. 🔥 للطالب: جلب قنوات الأستاذ تلقائياً
         if (isStudent && userData?.teacherId) {
             const qTeacher = query(collection(db, "chats"), where("createdBy", "==", userData.teacherId));
             unsubscribers.push(onSnapshot(qTeacher, addToMapAndSync));
@@ -89,10 +91,11 @@ export default function CommunicationHub() {
     };
   }, [user, isAdmin, isStudent, userData, isTeacher]);
 
-  // 2. جلب الرسائل
+  // --- 2. جلب الرسائل والانضمام التلقائي ---
   useEffect(() => {
     if (!selectedChat) return;
     
+    // 🔥 الانضمام التلقائي للطالب إذا دخل دردشة أستاذه ولم يكن مسجلاً فيها
     if (isStudent && userData?.teacherId === selectedChat.createdBy && !selectedChat.members?.includes(user.uid)) {
         updateDoc(doc(db, "chats", selectedChat.id), {
             members: arrayUnion(user.uid)
@@ -113,9 +116,10 @@ export default function CommunicationHub() {
     return () => unsub();
   }, [selectedChat, isStudent, user, userData]);
 
-  // 3. جلب طلاب الأستاذ للدعوة
+  // --- 3. جلب طلاب الأستاذ للدعوة ---
   useEffect(() => {
       if (showInviteModal && isTeacher) {
+          // جلب الطلاب المرتبطين بالأستاذ فقط
           const q = query(collection(db, "users"), where("teacherId", "==", user.uid));
           const unsub = onSnapshot(q, (snap) => {
               setMyStudentsToInvite(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -150,6 +154,7 @@ export default function CommunicationHub() {
   const handleCreateGroup = async () => {
     if (!newGroup.name.trim()) return;
     
+    // إذا كان أستاذاً، نوع القناة الافتراضي "خاص" لطلابه
     const finalType = isTeacher ? (newGroup.type || 'private') : newGroup.type;
 
     try {
@@ -167,7 +172,7 @@ export default function CommunicationHub() {
         
         const newChatData = { id: docRef.id, name: newGroup.name, type: finalType, createdBy: user.uid, members: [user.uid] };
         setSelectedChat(newChatData);
-        // تحديث محلي فوري للقائمة
+        // تحديث محلي سريع
         setChats(prev => [newChatData, ...prev]);
         
     } catch (e) { console.error(e); }
@@ -183,29 +188,21 @@ export default function CommunicationHub() {
       } catch (e) { console.error(e); }
   };
 
-  // --- 🔥 إصلاح حذف المحادثة (التحديث الفوري) ---
   const handleDeleteChat = async () => {
       if(!selectedChat) return;
-      if(!confirm(t('admin_confirm_delete') || "Are you sure you want to dismantle this squad?")) return;
+      if(!confirm("Dismantle this squad channel?")) return;
       
       const chatIdToDelete = selectedChat.id;
-
       try {
-          // 1. التحديث الفوري للواجهة (Optimistic Update)
-          // نحذف الشات من القائمة المحلية فوراً قبل انتظار السيرفر
           setChats(prevChats => prevChats.filter(chat => chat.id !== chatIdToDelete));
-          setSelectedChat(null); // العودة للقائمة الرئيسية
-
-          // 2. التنفيذ الفعلي في قاعدة البيانات
+          setSelectedChat(null); 
           await deleteDoc(doc(db, "chats", chatIdToDelete));
-          
       } catch(e) { 
           console.error("Delete Error:", e);
-          alert("Failed to delete squad.");
-          // في حال الفشل، يمكن إعادة تحميل الصفحة أو إعادة القائمة (اختياري)
       }
   };
 
+  // الصلاحيات: الأستاذ والأدمن فقط ينشئون القنوات
   const canCreate = !isStudent; 
   const isOwner = selectedChat && selectedChat.createdBy === user.uid;
   const canModify = isOwner || isAdmin;
@@ -419,7 +416,7 @@ export default function CommunicationHub() {
                     <option value="private">{t('chat_private')}</option>
                   </select>
               )}
-              {isTeacher && <div className="mb-8 p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl text-[10px] text-orange-400 font-bold uppercase flex items-center gap-2"><IconLock size={14}/> Private Class Channel</div>}
+              {isTeacher && <div className="mb-8 p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl text-[10px] text-orange-400 font-bold uppercase flex items-center gap-2"><IconShieldLock size={14}/> Private Class Channel</div>}
 
               <div className="flex gap-3">
                   <button onClick={()=>setShowCreateModal(false)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-white/40 hover:text-white font-black uppercase text-[10px]">{t('chat_cancel')}</button>

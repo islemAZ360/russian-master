@@ -23,18 +23,19 @@ export default function NotificationCenter() {
   const displayedNotifications = useMemo(() => {
       if (!Array.isArray(notifications)) return [];
       
-      // إذا كان أدمن، نعرض له فقط إشعارات الأدمن (مثل ردود الدعم) + إشعاراته الشخصية المهمة
+      // إذا كان أدمن، نعرض له إشعارات الأدمن + إشعاراته الشخصية
       if (isAdmin) {
           return notifications.filter(n => 
-              n.target === 'admin' || // موجهة للأدمن (مثل رد مستخدم)
+              n.target === 'admin' || 
               n.type === 'admin_alert' || 
-              n.type === 'support_reply'
+              n.type === 'support_reply' ||
+              n.userId === user?.uid
           );
       }
       
       // للمستخدم العادي (طالب/أستاذ)، نعرض كل شيء موجه له
-      return notifications;
-  }, [notifications, isAdmin]);
+      return notifications.filter(n => n.userId === user?.uid);
+  }, [notifications, isAdmin, user]);
 
   // --- 1. معالجة قبول دعوة الانضمام للفريق ---
   const handleAcceptInvite = async (notification) => {
@@ -44,6 +45,7 @@ export default function NotificationCenter() {
     try {
         const { teacherId, teacherName } = notification.actionPayload;
 
+        // تحديث بيانات الطالب (ربطه بالأستاذ)
         const userRef = doc(db, "users", user.uid);
         await updateDoc(userRef, {
             role: 'student',        
@@ -51,6 +53,7 @@ export default function NotificationCenter() {
             updatedAt: serverTimestamp()
         });
 
+        // إشعار الأستاذ بنجاح العملية
         await addDoc(collection(db, "notifications"), {
             userId: teacherId, 
             target: 'teacher',
@@ -62,9 +65,11 @@ export default function NotificationCenter() {
             read: false
         });
 
+        // حذف إشعار الدعوة بعد القبول
         await deleteDoc(doc(db, "notifications", notification.id));
 
         alert(`You have joined ${teacherName}'s squad! Reloading systems...`);
+        // إعادة تحميل لتطبيق الصلاحيات الجديدة (من user إلى student)
         window.location.reload();
 
     } catch (error) {
@@ -74,37 +79,42 @@ export default function NotificationCenter() {
     }
   };
 
-  // --- 2. حذف الإشعار (متاح للجميع) ---
+  // --- 2. حذف الإشعار ---
   const handleDelete = async (e, id) => {
-      e.stopPropagation(); // منع فتح الإشعار عند الضغط على الحذف
+      e.stopPropagation(); 
       await removeNotification(id);
   };
 
   // --- 3. التوجيه عند النقر ---
   const handleNavigation = (n) => {
-    // إشعارات الدعوة لا تحذف تلقائياً عند النقر (يجب القبول أو الرفض)
+    // إشعارات الدعوة لا تحذف تلقائياً عند النقر (يجب القبول أو الرفض بالأزرار)
     if (n.type === 'invite') return;
 
+    // توجيه للبث المباشر
     if (n.type === 'live_start' && n.roomId) {
         setIsOpen(false);
+        // تأخير بسيط لضمان تحميل الصفحة
         setCurrentView('live');
-        setTimeout(() => startBroadcast(n.roomId), 500);
+        setTimeout(() => startBroadcast(n.roomId), 100);
         return;
     }
     
+    // توجيه للدعم الفني
     if (n.type === 'support_reply' || n.type === 'admin_msg') {
         setShowSupport(true);
     }
     
+    // توجيه للوحة المتصدرين (عند الترقية)
     if (n.type === 'rank_up' || n.type === 'recruit_success') {
         setCurrentView('leaderboard'); 
     }
 
+    // توجيه للمحتوى الجديد
     if (n.type === 'new_content') {
         setCurrentView('category'); 
     }
 
-    // إغلاق القائمة وحذف الإشعار بعد التفاعل (لأنه تم استهلاكه)
+    // إغلاق القائمة وحذف الإشعار بعد التفاعل (لأنه تم قراءته)
     setIsOpen(false);
     removeNotification(n.id);
   };
@@ -159,7 +169,6 @@ export default function NotificationCenter() {
           bg-[#0a0a0a]/90 border-white/10 text-white hover:bg-white/10 hover:border-cyan-500/50
         `}
       >
-        {/* FIX: إزالة التوهج الغبي (animate-pulse) واستبداله باهتزاز بسيط للأيقونة فقط عند وجود إشعارات */}
         <IconBell 
             size={24} 
             className={displayedNotifications.length > 0 ? "text-cyan-400 animate-swing" : "text-white/60"} 
@@ -245,7 +254,7 @@ export default function NotificationCenter() {
                                     )}
                                 </div>
 
-                                {/* 🔥 زر الحذف للجميع (ما عدا الدعوات التي تتطلب قرار) */}
+                                {/* زر الحذف للجميع (ما عدا الدعوات التي تتطلب قراراً، لحمايتها من الحذف الخطأ) */}
                                 {n.type !== 'invite' && (
                                     <button 
                                         onClick={(e) => handleDelete(e, n.id)}
