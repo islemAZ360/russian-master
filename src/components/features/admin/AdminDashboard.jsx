@@ -11,7 +11,7 @@ import {
   IconMenu2, IconSend, IconDeviceGamepad, IconHome, 
   IconMessagePlus, IconSearch,
   IconSchool, IconUnlink, IconActivity, IconLock, IconWorld, IconPencil, IconCheck, IconX,
-  IconCpu, IconTerminal2, IconLockAccess
+  IconCpu, IconTerminal2, IconLockAccess, IconMessages // <--- تمت الإضافة هنا
 } from '@tabler/icons-react';
 import { useUI } from '@/context/UIContext';
 import { useLanguage } from '@/hooks/useLanguage';
